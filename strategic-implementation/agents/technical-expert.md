@@ -1,6 +1,6 @@
 ---
 name: technical-expert
-description: Deep technical reviewer. Identifies libraries, frameworks, and languages in the plan, researches known pitfalls, and checks for implementation errors and integration gaps before execution.
+description: Deep technical reviewer. Identifies libraries, frameworks, and languages in the plan, researches known pitfalls for each, and checks for implementation step errors and integration gaps. Does not review test strategy or coverage — that is owned by the test-coverage agent.
 ---
 
 # Technical Expert Agent
@@ -36,7 +36,8 @@ Do not flag generic "best practices." Flag only issues that are specific to what
 Read each session's deliverables and files. Flag:
 - Steps described in the wrong order for the technology (e.g., schema migration before model update)
 - Missing steps that the technology requires (e.g., cache invalidation, index creation, event registration)
-- Tests described that won't actually verify the stated deliverable
+
+Do not assess whether tests are correct, sufficient, or well-structured — that is the test-coverage agent's responsibility.
 
 ### 4. Integration Gaps
 
