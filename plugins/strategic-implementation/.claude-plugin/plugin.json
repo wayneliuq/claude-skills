@@ -1,0 +1,9 @@
+{
+  "name": "strategic-implementation",
+  "version": "1.0.0",
+  "description": "Full planning-to-execution workflow: clarify → spec → revise → sessionize → agent review → session plan → execute",
+  "author": {
+    "name": "wayneliuq"
+  },
+  "repository": "https://github.com/wayneliuq/claude-skills"
+}
