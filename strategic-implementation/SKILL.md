@@ -69,6 +69,17 @@ Do not proceed until resolved.
 
 ## Step 5 — Parallel Review: All Agents
 
+### 5a — Collect Document References (before launching agents)
+
+Before launching agents, ask the user for two document locations if not already known:
+
+1. **Security policy document** — "Is there a security policy document for this project? If so, where is it?" (Pass location to `agents/security.md`; if none, pass that information so the agent can flag it.)
+2. **Schema design / ERD** — "Is there a schema design document, entity-relationship diagram, or data dictionary? If so, where is it?" (Pass location to `agents/data-model.md`; if none, pass that information so the agent can assess whether to block or flag.)
+
+Only ask if not already provided during clarification. Do not ask both at once if only one is relevant to the change (e.g., skip schema question for changes with no data storage).
+
+### 5b — Launch Agents in Parallel
+
 Launch all always-on agents in parallel using the Agent tool:
 
 **Always launch:**
@@ -76,6 +87,12 @@ Launch all always-on agents in parallel using the Agent tool:
 - `agents/technical-expert.md`
 - `agents/scope-limiter.md`
 - `agents/future-proofing.md`
+- `agents/security.md` (pass: security policy doc location, or note that none exists)
+- `agents/data-model.md` (pass: schema doc location, or note that none exists)
+- `agents/api-contract.md`
+- `agents/test-coverage.md`
+- `agents/performance.md`
+- `agents/dependency.md`
 
 **Launch conditionally (if change involves UI, UX, or front-end):**
 - `agents/frontend-engineer.md`
@@ -139,6 +156,12 @@ Launch the same always-on agents again, now reviewing the session plan:
 - `agents/technical-expert.md`
 - `agents/scope-limiter.md`
 - `agents/future-proofing.md`
+- `agents/security.md`
+- `agents/data-model.md`
+- `agents/api-contract.md`
+- `agents/test-coverage.md`
+- `agents/performance.md`
+- `agents/dependency.md`
 - `agents/frontend-engineer.md` (if applicable)
 
 Each agent receives both the session plan AND the full implementation guide as context. They must check alignment between the two.
