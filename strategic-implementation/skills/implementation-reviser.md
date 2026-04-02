@@ -10,6 +10,8 @@ You are revising the implementation spec document. The default posture for every
 You receive:
 - The current spec document (with or without filled feedback slots)
 - User feedback (free-form message, or filled feedback slots in the document, or both)
+- Architecture document location (from the orchestrator — used if Step 11 re-run is triggered)
+- UX/PMF document location (from the orchestrator, if applicable — used if Step 11 re-run is triggered)
 
 ---
 
@@ -151,7 +153,7 @@ If this revision round made changes that significantly restructure the spec — 
 - A Key Decision in Section 6 was reversed or a new major technical decision was added
 - The change now affects a different area of the system than originally described
 
-Then: silently re-run the architecture review (`skills/architecture-review.md`) and UX/PMF review (`skills/ux-pmf-review.md`) using the revised spec as input. Incorporate any new findings into the document (Sections 4, 6, or 7 as appropriate) before presenting.
+Then: silently re-run the architecture review (`skills/architecture-review.md`) and UX/PMF review (`skills/ux-pmf-review.md`) using the revised spec as input. Pass the document locations received from the orchestrator — do not ask the user for them again. Incorporate any new findings into the document (Sections 4, 6, or 7 as appropriate) before presenting.
 
 If re-run was triggered, note it in the revision log: "Architecture and UX/PMF review re-run due to significant scope change."
 

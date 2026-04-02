@@ -9,14 +9,15 @@ A structured planning workflow for software development. No code is written unti
 
 ---
 
-## Entry: Two Paths
+## Entry: Three Paths
 
 Before anything else, ask:
 
-**"Do you have an existing sessionized implementation plan for this work?"**
+**"Where are you in the process for this work?"**
 
-- **Yes — sessionized plan exists:** You don't need this skill. Invoke `skills/session-plan.md` directly with your implementation plan.
-- **No — no plan yet:** Proceed to Step 1 below.
+- **Sessionized implementation plan exists:** You don't need this skill. Invoke `skills/session-plan.md` directly with your plan.
+- **Spec document in progress (not yet sessionized):** Ask — "Do you want to continue revising, or is it ready to sessionize?" → revision: go to Step 5 with the existing spec; sessionize: go to Step 6 with the finalized spec.
+- **Nothing yet:** Proceed to Step 1 below.
 
 ---
 
@@ -45,10 +46,21 @@ After clarification, assess scope against ALL THREE criteria:
 
 ## Step 3 — Parallel Review: Architecture + UX/PMF
 
-Launch both agents in parallel using the Agent tool:
+### 3a — Collect Document References First
 
-- `skills/architecture-review.md`
-- `skills/ux-pmf-review.md`
+Before launching agents, ask the user for document locations:
+
+1. **Architecture document** — "Where is the architecture document for this project? Is it current?" (Required — architecture review will BLOCK without it)
+2. **UX/PMF document** — "Is there a UX or product-market fit document for this area?" (Only ask if the change has any user-facing impact; skip for purely backend changes)
+
+Store both locations. They are passed to their respective agents and to the reviser in Step 5 — do not re-ask for them later.
+
+### 3b — Launch Agents in Parallel
+
+Launch both agents in parallel using the Agent tool, passing the document locations collected above:
+
+- `skills/architecture-review.md` (pass: architecture document location)
+- `skills/ux-pmf-review.md` (pass: UX/PMF document location, if applicable)
 
 Wait for both to return.
 
@@ -84,6 +96,8 @@ Run `skills/implementation-reviser.md`.
 Pass:
 - The current spec document
 - All user feedback
+- Architecture document location (from Step 3a)
+- UX/PMF document location (from Step 3a, if applicable)
 
 The reviser evaluates, refines, logs, and re-presents. Repeat this step as many times as the user needs.
 

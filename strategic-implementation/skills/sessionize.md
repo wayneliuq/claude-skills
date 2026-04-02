@@ -57,6 +57,11 @@ For each session, draft:
 - Files affected (specific file paths)
 - Docs to update
 - Estimated size (S / M / L)
+- Hard decisions applied (any [HARD DECISION] items from the spec that this session implements — name them explicitly so the executor sees them)
+
+For the plan's **Overview** section, carry forward:
+- All entries from spec Section 6 "Already decided" → **Key decisions** field
+- This includes hard decisions AND other significant settled choices (library selections, architectural patterns, approach decisions)
 
 Leave "Session Order & Dependencies" blank — the scope-limiter generates this.
 
@@ -107,6 +112,8 @@ Read all agent outputs. Apply the standard synthesis rules:
 2. Discard low-utility suggestions — vague, speculative, or not actionable against this specific plan.
 3. Reconcile conflicts between agents — choose the more conservative or correct position; note the conflict.
 4. Surface any BLOCK statuses to the user immediately. A BLOCK must be resolved before proceeding.
+   - **If the BLOCK is resolvable at the session level** (e.g., a session is too large, a dependency is missing, a migration path is unspecified): patch the sessionized plan, re-present.
+   - **If the BLOCK requires changes to the specification itself** (e.g., a hard decision needs revisiting, a fundamental scope or design issue was identified): inform the user — _"This BLOCK requires revising the specification before sessionization can proceed. Run the implementation-reviser with the following issue, then re-trigger sessionize."_ Pass the blocker details as the revision input. Do not attempt to patch the sessionized plan for spec-level issues.
 5. If FLAGS or RECOMMENDATIONS require user decisions → surface them WITH a recommendation and rationale. Wait for response.
 6. Apply the final patch list to the sessionized plan.
 7. Run a final consistency check: goal, deliverables, and files consistent across sessions; naming consistent throughout; no orphan references.
