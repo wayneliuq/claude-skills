@@ -5,7 +5,7 @@ description: Use when starting any non-trivial feature, change, or new component
 
 # strategic-implementation
 
-A structured planning workflow for software development. No code is written until a spec is approved, sessionized, and reviewed. This skill produces an approved sessionized implementation plan — session planning and execution are handled by the session-plan skill, invoked separately.
+A structured planning workflow for software development. No code is written until a spec is approved, sessionized, and reviewed. This skill produces an approved sessionized implementation plan — session planning and execution are handled by the `strategic-implementation:session-plan` skill, invoked separately.
 
 ---
 
@@ -15,7 +15,7 @@ Before anything else, ask:
 
 **"Where are you in the process for this work?"**
 
-- **Sessionized implementation plan exists:** You don't need this skill. Invoke `skills/session-plan.md` directly with your plan.
+- **Sessionized implementation plan exists:** You don't need this skill. Invoke `strategic-implementation:session-plan` directly with your plan.
 - **Spec document in progress (not yet sessionized):** Ask — "Do you want to continue revising, or is it ready to sessionize?" → revision: go to Step 5 with the existing spec; sessionize: go to Step 6 with the finalized spec.
 - **Nothing yet:** Proceed to Step 1 below.
 
@@ -23,7 +23,7 @@ Before anything else, ask:
 
 ## Step 1 — Clarify
 
-Run `skills/clarify.md`.
+Use the `strategic-implementation:clarify` skill.
 
 List assumptions. Ask only what would change the approach. Wait for user confirmation before proceeding.
 
@@ -38,7 +38,7 @@ After clarification, assess scope against ALL THREE criteria:
 2. Change contained to one area (one component, file group, or feature)
 3. No new architectural patterns or dependencies introduced
 
-**If fast-path:** invoke `_copied-skills/writing-plans.md`, then `_copied-skills/executing-plans.md`. This skill ends here.
+**If fast-path:** invoke `superpowers:writing-plans`, then `superpowers:executing-plans`. This skill ends here.
 
 **Otherwise:** continue to Step 3.
 
@@ -59,8 +59,8 @@ Store both locations. They are passed to their respective agents and to the revi
 
 Launch both agents in parallel using the Agent tool, passing the document locations collected above:
 
-- `skills/architecture-review.md` (pass: architecture document location)
-- `skills/ux-pmf-review.md` (pass: UX/PMF document location, if applicable)
+- `strategic-implementation:architecture-review` (pass: architecture document location)
+- `strategic-implementation:ux-pmf-review` (pass: UX/PMF document location, if applicable)
 
 Wait for both to return.
 
@@ -72,7 +72,7 @@ Store both outputs. They are passed silently to the drafter in Step 4 — do not
 
 ## Step 4 — Draft Specification Document
 
-Run `skills/implementation-drafter.md`.
+Use the `strategic-implementation:implementation-drafter` skill.
 
 Pass:
 - The clarified request
@@ -91,7 +91,7 @@ Do not present the spec until resolved.
 
 The user reviews the spec and provides feedback. When the user says "revise it" (with feedback in the message, in the feedback slots, or both):
 
-Run `skills/implementation-reviser.md`.
+Use the `strategic-implementation:implementation-reviser` skill.
 
 Pass:
 - The current spec document
@@ -109,7 +109,7 @@ The reviser evaluates, refines, logs, and re-presents. Repeat this step as many 
 
 When the user triggers sessionization:
 
-Run `skills/sessionize.md`.
+Use the `strategic-implementation:sessionize` skill.
 
 Pass:
 - The finalized spec document

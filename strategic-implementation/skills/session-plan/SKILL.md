@@ -75,19 +75,19 @@ _Date: [date]_
 Launch all always-on agents in parallel. Each receives **both the session plan AND the full implementation plan** as input. Agents must check alignment between the two — the session plan must not contradict or diverge from the implementation plan.
 
 **Always launch:**
-- `agents/10k-foot.md`
-- `agents/technical-expert.md`
-- `agents/scope-limiter.md`
-- `agents/future-proofing.md`
-- `agents/security.md`
-- `agents/data-model.md`
-- `agents/api-contract.md`
-- `agents/test-coverage.md`
-- `agents/performance.md`
-- `agents/dependency.md`
+- `/Users/qiangliu/Documents/Development/claude-skills/strategic-implementation/agents/10k-foot.md`
+- `/Users/qiangliu/Documents/Development/claude-skills/strategic-implementation/agents/technical-expert.md`
+- `/Users/qiangliu/Documents/Development/claude-skills/strategic-implementation/agents/scope-limiter.md`
+- `/Users/qiangliu/Documents/Development/claude-skills/strategic-implementation/agents/future-proofing.md`
+- `/Users/qiangliu/Documents/Development/claude-skills/strategic-implementation/agents/security.md`
+- `/Users/qiangliu/Documents/Development/claude-skills/strategic-implementation/agents/data-model.md`
+- `/Users/qiangliu/Documents/Development/claude-skills/strategic-implementation/agents/api-contract.md`
+- `/Users/qiangliu/Documents/Development/claude-skills/strategic-implementation/agents/test-coverage.md`
+- `/Users/qiangliu/Documents/Development/claude-skills/strategic-implementation/agents/performance.md`
+- `/Users/qiangliu/Documents/Development/claude-skills/strategic-implementation/agents/dependency.md`
 
 **Launch conditionally (if session involves UI, UX, or front-end):**
-- `agents/frontend-engineer.md`
+- `/Users/qiangliu/Documents/Development/claude-skills/strategic-implementation/agents/frontend-engineer.md`
 
 Wait for all agents to return.
 
@@ -117,4 +117,4 @@ If the user requests changes: apply them, re-run consistency check, re-present. 
 
 Announce: "Session plan approved. Starting execution."
 
-Automatically invoke `_copied-skills/executing-plans.md`. No manual step needed.
+Automatically invoke `superpowers:executing-plans`. No manual step needed.

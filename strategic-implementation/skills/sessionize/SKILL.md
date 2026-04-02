@@ -69,7 +69,7 @@ Leave "Session Order & Dependencies" blank — the scope-limiter generates this.
 
 ## Step 4 — Run Scope Limiter
 
-Run `agents/scope-limiter.md` with the drafted sessions as input.
+Run `/Users/qiangliu/Documents/Development/claude-skills/strategic-implementation/agents/scope-limiter.md` with the drafted sessions as input.
 
 The scope-limiter will:
 - Review sessions for scope creep and sizing
@@ -85,18 +85,18 @@ Apply the scope-limiter's session order and dependency map to the plan. Address 
 Launch all always-on agents in parallel using the Agent tool. Each receives the full sessionized plan as input.
 
 **Always launch:**
-- `agents/10k-foot.md`
-- `agents/technical-expert.md`
-- `agents/future-proofing.md`
-- `agents/security.md` (pass: security policy doc location from Step 2)
-- `agents/data-model.md` (pass: schema doc location from Step 2)
-- `agents/api-contract.md`
-- `agents/test-coverage.md`
-- `agents/performance.md`
-- `agents/dependency.md`
+- `/Users/qiangliu/Documents/Development/claude-skills/strategic-implementation/agents/10k-foot.md`
+- `/Users/qiangliu/Documents/Development/claude-skills/strategic-implementation/agents/technical-expert.md`
+- `/Users/qiangliu/Documents/Development/claude-skills/strategic-implementation/agents/future-proofing.md`
+- `/Users/qiangliu/Documents/Development/claude-skills/strategic-implementation/agents/security.md` (pass: security policy doc location from Step 2)
+- `/Users/qiangliu/Documents/Development/claude-skills/strategic-implementation/agents/data-model.md` (pass: schema doc location from Step 2)
+- `/Users/qiangliu/Documents/Development/claude-skills/strategic-implementation/agents/api-contract.md`
+- `/Users/qiangliu/Documents/Development/claude-skills/strategic-implementation/agents/test-coverage.md`
+- `/Users/qiangliu/Documents/Development/claude-skills/strategic-implementation/agents/performance.md`
+- `/Users/qiangliu/Documents/Development/claude-skills/strategic-implementation/agents/dependency.md`
 
 **Launch conditionally (if plan involves UI, UX, or front-end):**
-- `agents/frontend-engineer.md`
+- `/Users/qiangliu/Documents/Development/claude-skills/strategic-implementation/agents/frontend-engineer.md`
 
 Note: the scope-limiter already ran in Step 4 and its output is incorporated. Do not re-run it here.
 
