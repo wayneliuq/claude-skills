@@ -15,6 +15,17 @@ Invoke this skill when the user describes work they want to do — before any co
 
 ---
 
+## Entry: Two Paths
+
+Before anything else, ask:
+
+**"Do you have an existing implementation guide for this work?"**
+
+- **Yes — implementation guide exists:** Ask the user to provide it (file path or paste contents). Skip directly to Step 8 (Build Session Plan). Steps 1–7 do not run.
+- **No — no implementation guide:** Proceed to Step 1 (Clarify). Run the full workflow through Steps 1–7 to generate one.
+
+---
+
 ## Step 1 — Clarify
 
 Run `skills/clarify.md`.
