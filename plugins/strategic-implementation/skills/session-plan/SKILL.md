@@ -171,3 +171,18 @@ Wait for the user's reply in the conversation.
    - Session number: N
 
 Automatically invoke `strategic-implementation:executing-plans`, passing the paths from Step 5a. No manual step needed.
+
+## Step 5b — Plan Mode Fallback (safety net)
+
+If, for any reason, plan mode is entered during Step 5a or at any point after the user's affirmative, you **must** structure the plan mode steps so that invoking `executing-plans` is an explicit, named final step — not implied or omitted. The approved plan must contain:
+
+```
+1. Save session plan → <feature-folder-path>/session-N-plan.md
+2. Invoke strategic-implementation:executing-plans
+   - Session plan path: <feature-folder-path>/session-N-plan.md
+   - Implementation guide path: <feature-folder-path>/implementation-guide.md
+   - Feature folder path: <feature-folder-path>/
+   - Session number: N
+```
+
+This ensures that even if plan mode approval is the mechanism, the skill hand-off is a committed step in the approved plan and will execute when the user clicks approve.
