@@ -1,3 +1,6 @@
+<!-- ⚠️ DEPRECATED — superseded by strategic-implementation:executing-plans
+     (plugins/strategic-implementation/skills/executing-plans/SKILL.md)
+     Kept for reference only. Do not invoke. -->
 <!--
   Copied from: superpowers plugin (claude-plugins-official/superpowers), skills/executing-plans/SKILL.md
   Version copied: 5.0.5
