@@ -1,6 +1,6 @@
 {
   "name": "strategic-implementation",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "Full planning-to-execution workflow: clarify → spec → revise → sessionize → agent review → session plan → execute",
   "author": {
     "name": "wayneliuq"
