@@ -38,7 +38,7 @@ After clarification, assess scope against ALL THREE criteria:
 2. Change contained to one area (one component, file group, or feature)
 3. No new architectural patterns or dependencies introduced
 
-**If fast-path:** invoke `superpowers:writing-plans`, then `superpowers:executing-plans`. This skill ends here.
+**If fast-path:** invoke `superpowers:writing-plans`, explicitly instructing it to save the plan to `docs/strategic-implementation/YYYY-MM-DD-<feature-name>/implementation-guide.md` (derive feature name from the one-sentence description; writing-plans supports path overrides via user instruction). Then invoke `strategic-implementation:executing-plans`. This skill ends here.
 
 **Otherwise:** continue to Step 3.
 
@@ -81,6 +81,12 @@ Pass:
 
 The drafter produces a specification document using the 8-section framework with feedback slots. Present the completed spec to the user.
 
+Store the feature folder path returned by implementation-drafter. Pass it to:
+- implementation-reviser in Step 5 (as spec file path: `<feature-folder-path>/spec.md`)
+- sessionize in Step 6
+- session-plan when the user triggers session planning
+Do not re-derive it from the spec title.
+
 **If the architecture review found that the change requires new architectural components or significant adaptation that are not yet documented:**
 → Pause before presenting the spec. Inform the user: "This change requires architectural decisions not yet captured in the architecture document. Please update the architecture doc first, then we can proceed."
 Do not present the spec until resolved.
@@ -98,6 +104,7 @@ Pass:
 - All user feedback
 - Architecture document location (from Step 3a)
 - UX/PMF document location (from Step 3a, if applicable)
+- Spec file path: `<feature-folder-path>/spec.md` (from Step 4)
 
 The reviser evaluates, refines, logs, and re-presents. Repeat this step as many times as the user needs.
 
@@ -113,6 +120,7 @@ Use the `strategic-implementation:sessionize` skill.
 
 Pass:
 - The finalized spec document
+- The feature folder path (stored in Step 4)
 
 The sessionize skill handles everything from here:
 - Breaks the spec into sessions
@@ -131,6 +139,11 @@ The user has an approved sessionized implementation plan.
 
 The sessionize skill will have prompted the user:
 > "When you're ready to plan a session for execution, say 'plan session [N]' or invoke the session-plan skill."
+
+When the user triggers session planning, invoke `strategic-implementation:session-plan` passing:
+- Implementation guide path: `<feature-folder-path>/implementation-guide.md`
+- Feature folder path: `<feature-folder-path>/`
+- Which session to plan (from the user)
 
 ---
 
