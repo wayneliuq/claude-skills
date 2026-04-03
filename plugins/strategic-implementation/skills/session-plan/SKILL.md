@@ -81,6 +81,9 @@ _Date: [date]_
 - Do not implement anything from Session [N+1] or later
 - Flag any unexpected scope expansion to user before proceeding
 - If a step reveals a pre-condition is not met: stop and surface to user before continuing
+
+---
+_To begin execution: reply `go`, `execute`, or `start` in the conversation._
 ```
 
 ---
@@ -145,13 +148,16 @@ Apply standard synthesis rules:
 
 ## Step 5 — Present for Approval
 
-Present the final session plan to the user.
+Present the final session plan to the user as a normal inline message. **Do not use plan mode for this approval gate** — plan mode's approve button does not reliably trigger skill invocations.
 
-If the user requests changes: apply them, re-run consistency check, re-present. Do not re-run the full agent panel unless changes are substantial (a step is added that introduces new files or libraries not in the original plan).
+After presenting the plan, end your message with this exact callout:
 
-**Once the user approves:**
+> **Ready to execute.** Reply `go`, `execute`, or `start` to begin. Describe changes to revise.
 
-Announce: "Session plan approved. Starting execution."
+Wait for the user's reply in the conversation.
+
+- **If the user requests changes:** apply them, re-run the consistency check, re-present the updated plan, and append the trigger callout again. Do not re-run the full agent panel unless changes are substantial (a step is added that introduces new files or libraries not in the original plan).
+- **If the user replies with any affirmative** (`go`, `execute`, `start`, `approve`, `yes`, `looks good`, `lgtm`, or any similar short confirmation): announce "Session plan approved. Starting execution." then immediately proceed to Step 5a.
 
 ## Step 5a — Save Session Plan
 
