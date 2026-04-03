@@ -159,6 +159,29 @@ _When you are ready to revise this document, provide your feedback in the sectio
 
 ---
 
+## Step 4 — Save Artifact
+
+After completing the draft (before presenting to the user):
+
+1. **Derive the feature folder name.**
+   - Take the spec title from `# Implementation Spec: [Feature / Change Name]`
+   - Convert the feature name to kebab-case: lowercase, spaces and special characters → hyphens
+   - Prefix with today's date: `YYYY-MM-DD`
+   - Example: `# Implementation Spec: Auth Redesign` → `2026-04-02-auth-redesign`
+
+2. **Create the feature folder and save the spec.**
+   - Folder: `docs/strategic-implementation/YYYY-MM-DD-<feature-name>/`
+   - File: `docs/strategic-implementation/YYYY-MM-DD-<feature-name>/spec.md`
+   - Create the folder if it does not exist.
+
+3. **Add a saved-path line** after presenting the spec:
+   > _Spec saved to `docs/strategic-implementation/YYYY-MM-DD-<feature-name>/spec.md`_
+
+4. **Pass the feature folder path to the orchestrator.**
+   The path `docs/strategic-implementation/YYYY-MM-DD-<feature-name>/` is canonical for this feature. Store it and pass it to all downstream skills. Do not re-derive from the title later — the path established here is authoritative.
+
+---
+
 ## Drafting Standards
 
 - Every claim in the spec must be grounded in the clarified request or the review outputs. Do not invent requirements.
