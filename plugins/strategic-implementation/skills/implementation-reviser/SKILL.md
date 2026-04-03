@@ -12,6 +12,7 @@ You receive:
 - User feedback (free-form message, or filled feedback slots in the document, or both)
 - Architecture document location (from the orchestrator — used if Step 11 re-run is triggered)
 - UX/PMF document location (from the orchestrator, if applicable — used if Step 11 re-run is triggered)
+- Spec file path (e.g., `docs/strategic-implementation/2026-04-02-auth-redesign/spec.md`) — passed by the orchestrator; this is where the revised spec is saved after each round
 
 ---
 
@@ -162,6 +163,8 @@ If re-run was triggered, note it in the revision log: "Architecture and UX/PMF r
 ## Step 12 — Present
 
 Present the revised document in full. Clear the feedback slots (reset them to blank) so they are ready for the next round of input.
+
+**Save the revised spec.** Overwrite the spec file at the path received from the orchestrator with the full revised document. Confirm: `_Spec updated at <spec-file-path>_`.
 
 End with:
 > _Round [N] complete. Review the changes above and provide further feedback when ready, or say "sessionize it" to proceed._
