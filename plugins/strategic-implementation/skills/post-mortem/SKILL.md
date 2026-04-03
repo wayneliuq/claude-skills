@@ -43,6 +43,57 @@ Read in full:
 
 ---
 
+## Step 2a — Audit Deviation Log Completeness
+
+Run before any analysis. The goal is to ensure no deviation went unlogged and no logged entry is incomplete. Surface gaps to the user and resolve them before proceeding.
+
+### 2a-i — Internal integrity
+
+For every DEV-NNN entry:
+- Check each required field for placeholder text (`[...]`), blank values, or "unknown". List any incomplete fields by entry ID.
+- Count the actual number of DEV-NNN entries. Compare to `_Total deviations: N_` in the log header. If mismatched: note the discrepancy.
+
+### 2a-ii — Git history cross-check
+
+Run: `git log --oneline` filtered to commits referencing Session N (match `session-N`, `bug-fix session-N`, or the feature folder name).
+
+For each commit found:
+- Does a DEV-NNN entry exist that covers the work in this commit?
+- Pay particular attention to: `bug-fix session-N:` commits (indicate post-execution fixes that must be logged), any commit that required a revert, and any commit where the message implies a retry or correction.
+- If a commit has no corresponding deviation entry: flag it as a **missing deviation** with the commit hash and message.
+
+### 2a-iii — Session plan step coverage
+
+For each step in the session plan:
+- Compare what the plan described to what was actually committed (from git log).
+- If the implementation diverged from the plan description in any material way and no DEV entry covers it: flag as a **possible unlogged deviation** with the step number.
+
+### 2a-iv — Resolve gaps before proceeding
+
+If any gaps were found in 2a-i, 2a-ii, or 2a-iii:
+
+Surface them to the user:
+```
+## Deviation Log Audit
+
+The following gaps were found before proceeding with post-mortem analysis:
+
+**Incomplete entries:** [list DEV-NNN with missing fields, or "none"]
+**Missing deviations (from git):** [list commit hash + message with no DEV entry, or "none"]
+**Possible unlogged deviations (from plan):** [list step numbers, or "none"]
+**Header count mismatch:** [expected N, found M, or "none"]
+```
+
+Ask: "How would you like to handle these? Options:
+1. I fill in what I can from git history and session plan context — you review before I proceed.
+2. You update the deviation log manually, then I continue."
+
+Wait for the user's choice. If option 1: draft the missing/incomplete entries, show them to the user for confirmation, then write them to the log before continuing. Update `_Total deviations: N_` to reflect the corrected count.
+
+If no gaps: announce "Deviation log audit complete — no gaps found." and continue to Step 3.
+
+---
+
 ## Step 3 — Count Total Session Logs
 
 Count all `session-*-log.md` files across all feature folders:
