@@ -9,7 +9,9 @@ You are converting a finalized, user-approved specification document into a sess
 
 This skill owns the full agent review round for the implementation plan. Agents do not run on the spec document — only on the sessionized plan.
 
-You receive: the finalized specification document.
+You receive:
+- The finalized specification document
+- The feature folder path (e.g., `docs/strategic-implementation/2026-04-02-auth-redesign/`) — passed by the orchestrator, established by implementation-drafter
 
 ---
 
@@ -36,6 +38,26 @@ Before running agents, ask the user for two document locations if not already pr
 2. **Schema design / ERD** — "Is there a schema design document, entity-relationship diagram, or data dictionary? If so, where is it?"
 
 Only ask for what's relevant to the change (skip schema if no data storage is involved). Pass these locations to the security and data-model agents. If none exists, pass that information so the agents can flag it correctly.
+
+---
+
+## Step 2a — Load Project Learnings
+
+1. Check if `docs/strategic-implementation/project-learnings.md` exists. If not: skip this step entirely.
+2. Read the file. For each agent in the panel (Step 5), identify:
+   - The agent's category tag (see agent files — each lists its category)
+   - Filter learnings to those tagged with that agent's category AND tagged `#multi-session`
+     (sessionize context applies multi-session learnings only — single-session learnings are not yet proven broadly)
+3. If filtered learnings exist for an agent, prepare a "Project Learnings" block to inject into that agent's prompt in Step 5:
+
+```
+## Project Learnings (apply per your "Processing Project Learnings" section)
+Context: implementation guide review — apply #multi-session learnings only.
+
+[paste each applicable L-NNN entry in full]
+```
+
+Store these blocks; inject them in Step 5 when launching agents.
 
 ---
 
@@ -100,6 +122,8 @@ Launch all always-on agents in parallel using the Agent tool. Each receives the 
 
 Note: the scope-limiter already ran in Step 4 and its output is incorporated. Do not re-run it here.
 
+Pass each agent's prepared "Project Learnings" block (from Step 2a) as additional context in its prompt, if one was prepared. Agents with no applicable learnings receive no block.
+
 Wait for all agents to return.
 
 ---
@@ -138,5 +162,10 @@ Sessions:
 
 When you're ready to plan the first session for execution, say "plan session [N]" or invoke the session-plan skill.
 ```
+
+**Save the implementation guide.** Once the user approves:
+- Save to `<feature-folder-path>/implementation-guide.md`
+- Confirm: _Implementation guide saved to `<feature-folder-path>/implementation-guide.md`_
+- Pass this path (and the feature folder path) to the orchestrator for forwarding to session-plan.
 
 Do not automatically proceed to session planning. The user triggers that separately.
