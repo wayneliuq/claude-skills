@@ -102,6 +102,27 @@ For each new entry point, flag if any of the following are not specified:
 
 ---
 
+## Processing Project Learnings
+
+_This section is only active when the orchestrating skill injects a "Project Learnings" block into this prompt. If no such block was injected: skip this section entirely._
+
+**How learnings are injected:** The orchestrating skill reads `docs/strategic-implementation/project-learnings.md`, filters learnings tagged `#security`, and injects them with context:
+- `sessionize` context → `#multi-session` learnings only
+- `session-plan` context → both `#single-session` and `#multi-session` learnings
+(Filtering is already applied before injection — you receive only what's relevant.)
+
+**For each injected learning:**
+1. Check: is the **WHEN** condition clearly present in the current plan?
+   - **Yes, and the DO guidance is followed:**
+     Note in RECOMMENDATIONS as `[L-NNN] ✓ applied — [one phrase]`
+   - **Yes, but the DO guidance is absent or violated:**
+     Add to FLAGS as `[L-NNN] condition met — guidance not followed: [one sentence on the gap]`
+   - **No (WHEN condition not present in this plan):**
+     Skip this learning — it does not apply here.
+2. Do not invent a WHEN condition where none exists. Only flag when the condition is clearly and specifically met.
+
+---
+
 ## Output Format
 
 Use this format exactly:
