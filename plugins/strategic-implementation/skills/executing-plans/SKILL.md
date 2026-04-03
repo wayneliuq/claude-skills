@@ -55,6 +55,58 @@ For each unit in the execution schedule:
 
 **Parallel group:** dispatch one subagent per step using the Agent tool. Each subagent receives the step description, file paths, and the TDD protocol below. Wait for all subagents to return before proceeding to the next unit. If any subagent returns failure: stop and surface the failure to the user — do not proceed to downstream sequential steps.
 
+### Execution Failure Protocol (triggered on any step failure — classification below determines approach)
+
+**Classify the failure first:**
+- **Determinate** — root cause is directly visible (wrong import path, syntax error, missing env var): fix it. If the fix fails, treat as assumption-based and continue below.
+- **Assumption-based** — cause must be inferred from behavior: state the assumption explicitly before attempting any fix.
+
+**Attempt 1:**
+1. State the assumption (assumption-based) or root cause (determinate) in one sentence before touching any code.
+2. Implement the fix. Run tests.
+3. **Success:** log a `blocker` or `retry` deviation, continue execution.
+4. **Failure:** revert all changes from this attempt (`git revert` or manual rollback). Confirm the error/test state returns to baseline before proceeding.
+
+**After Attempt 1 failure — re-examine assumptions:**
+- List ALL assumptions that informed Attempt 1.
+- Rate each: `high` / `medium` / `low` confidence.
+- If no assumption is rated `medium` or `low`: **EXIT** (see Exit Report below).
+- If one or more assumptions are `medium` or `low`: identify the single lowest-confidence assumption. Revise it. Determine if a distinct fix follows from this revision.
+
+**Attempt 2 (only if a distinct fix is identified from revised assumptions):**
+1. State the revised assumption explicitly.
+2. Implement. Run tests.
+3. **Success:** log deviation, continue.
+4. **Failure:** revert all changes from this attempt. Confirm baseline restored. **EXIT.**
+
+**Exit Report — format and surface to user:**
+```
+## Execution Blocked
+
+**Step:** [step number and description]
+**Error:** [exact error message or test output — no paraphrasing]
+
+**Observations (confirmed facts):**
+- [fact 1]
+- [fact 2]
+
+**Assumptions held:**
+- [assumption] — confidence: high / medium / low
+- ...
+
+**Attempts made:**
+1. [what was tried] → [outcome]
+2. [what was tried] → [outcome] _(if applicable)_
+
+**Most suspect assumption:** [single statement of the assumption most likely to be wrong]
+
+**Blocked on:** [what human input, external access, or information is needed to proceed]
+
+All changes from failed attempts have been reverted. Codebase is at baseline.
+```
+
+Do not mark the session complete. Do not proceed to Step 4. Await user direction.
+
 ### TDD Protocol (apply to every step, sequential or parallel)
 
 1. Write the failing test. Run it. Confirm it fails for the expected reason.
@@ -146,9 +198,17 @@ After all steps complete, ask:
    - **Run post-mortem:** invoke `strategic-implementation:post-mortem` with: feature folder path, session number N, session plan path, deviation log path (or `none` if no log exists), implementation guide path.
    - **Skip:** announce "Skipping post-mortem." Then invoke `superpowers:finishing-a-development-branch`.
 
-**If no:**
-Ask: "What isn't working? I'll resume from the failing step."
-Resume execution. Log a new deviation entry for the failure. Do not mark complete until the user confirms.
+**If no, or if the response is ambiguous** ("sort of", "mostly", "there's one small thing", or any answer that is not a clear yes):
+Invoke `strategic-implementation:bug-fix`, passing:
+- Feature folder path
+- Session number N
+- Session plan path
+- Implementation guide path
+- Deviation log path (or `none` if no log exists)
+
+The bug-fix skill owns the investigation and fix. It will return a summary of what was resolved. When it returns, re-ask: "Is everything working as expected now?"
+- **Yes:** proceed to mark complete (step 1–4 of the "If yes" path above).
+- **No or ambiguous:** re-invoke `strategic-implementation:bug-fix` with the same parameters. Repeat until the user confirms yes. Do not mark Session N complete until confirmed.
 
 ---
 
