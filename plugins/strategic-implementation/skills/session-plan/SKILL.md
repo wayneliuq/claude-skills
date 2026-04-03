@@ -10,6 +10,8 @@ This skill plans and reviews **one session** from an approved sessionized implem
 You receive:
 - The approved sessionized implementation plan
 - The user's indication of which session to plan (e.g., "plan session 2" or "plan the authentication session")
+- Implementation guide path (e.g., `docs/strategic-implementation/2026-04-02-auth-redesign/implementation-guide.md`)
+- Feature folder path (e.g., `docs/strategic-implementation/2026-04-02-auth-redesign/`)
 
 ---
 
@@ -20,6 +22,13 @@ Confirm which session the user wants to plan. If ambiguous, list the sessions fr
 Verify pre-conditions:
 - All sessions that this session depends on (per the Session Order & Dependencies section) are marked complete, or the user explicitly acknowledges they are proceeding out of order.
 - If a required prior session is incomplete: surface this and ask how to proceed. Do not block unconditionally — the user may have a valid reason — but make the dependency explicit.
+
+**REVISION NEEDED check:**
+Read the target session block in the implementation guide. If the session's header contains `⚠️ REVISION NEEDED — [reason]`, surface it to the user immediately:
+
+> "Session N is flagged: ⚠️ REVISION NEEDED — [reason]. A prior session's deviation may affect this session. Do you want to: (a) update the implementation guide to address this first, or (b) proceed acknowledging this flag?"
+
+Wait for the user's response before building the plan. Do not proceed automatically.
 
 ---
 
@@ -34,6 +43,7 @@ Draft the session plan using the template below.
 4. **Deliverables & Tests are copied from the implementation plan** and expanded with execution-specific detail — the exact command to run, the exact behavior to observe, or the exact check to perform.
 5. **≤ ~1000 LOC.** If the session as defined in the implementation plan would exceed this, split it and note the split to the user before proceeding.
 6. **Pre-conditions must be checkable.** Every pre-condition item must be something that can be verified before starting — not "understand the architecture" but "architecture doc available at [path]."
+7. **Annotate parallel steps.** Identify steps that can run concurrently: no overlapping file writes, and no output-to-input dependency between them. Annotate eligible steps with `[parallel group: X]` (X = a letter: A, B, C...). Steps sharing the same letter run concurrently. Sequential steps need no annotation.
 
 **Template:**
 
@@ -51,10 +61,15 @@ _Date: [date]_
 - [ ] [Any specific pre-condition: environment running, dependency installed, etc.]
 
 ### Steps
-1. [Concrete step]
+1. [Step that can run concurrently with step 2] [parallel group: A]
    - Files: [exact file paths]
    - What: [what to write, add, change, or delete — specific enough to execute without guessing]
-2. ...
+2. [Another step with no dependency on step 1] [parallel group: A]
+   - Files: [exact file paths]
+   - What: [specific enough to execute without guessing]
+3. [Step that must follow steps 1 and 2] _(sequential)_
+   - Files: [exact file paths]
+   - What: [specific enough to execute without guessing]
 
 ### Deliverables & Tests
 - [ ] Deliverable: [what is produced]
@@ -67,6 +82,25 @@ _Date: [date]_
 - Flag any unexpected scope expansion to user before proceeding
 - If a step reveals a pre-condition is not met: stop and surface to user before continuing
 ```
+
+---
+
+## Step 2a — Load Project Learnings
+
+1. Check if `docs/strategic-implementation/project-learnings.md` exists. If not: skip this step.
+2. Read the file. For each agent in the panel (Step 3), filter learnings by:
+   - Agent's category tag AND
+   - Tagged `#single-session` OR `#multi-session` (session-plan context applies both)
+3. Prepare a "Project Learnings" block for each agent that has applicable learnings:
+
+```
+## Project Learnings (apply per your "Processing Project Learnings" section)
+Context: session plan review — apply both #single-session and #multi-session learnings.
+
+[paste each applicable L-NNN entry in full]
+```
+
+Inject these blocks into agent prompts in Step 3.
 
 ---
 
@@ -88,6 +122,8 @@ Launch all always-on agents in parallel. Each receives **both the session plan A
 
 **Launch conditionally (if session involves UI, UX, or front-end):**
 - `/Users/qiangliu/Documents/Development/claude-skills/strategic-implementation/agents/frontend-engineer.md`
+
+Pass each agent's prepared "Project Learnings" block (from Step 2a) as additional context in its prompt, if one was prepared.
 
 Wait for all agents to return.
 
@@ -117,4 +153,15 @@ If the user requests changes: apply them, re-run consistency check, re-present. 
 
 Announce: "Session plan approved. Starting execution."
 
-Automatically invoke `superpowers:executing-plans`. No manual step needed.
+## Step 5a — Save Session Plan
+
+1. Save to `<feature-folder-path>/session-N-plan.md` (N = the session number from the implementation guide)
+   Example: `docs/strategic-implementation/2026-04-02-auth-redesign/session-1-plan.md`
+2. Confirm: _Session N plan saved to `<feature-folder-path>/session-N-plan.md`_
+3. When invoking `strategic-implementation:executing-plans`, pass:
+   - Session plan path: `<feature-folder-path>/session-N-plan.md`
+   - Implementation guide path: `<feature-folder-path>/implementation-guide.md`
+   - Feature folder path: `<feature-folder-path>/`
+   - Session number: N
+
+Automatically invoke `strategic-implementation:executing-plans`, passing the paths from Step 5a. No manual step needed.
