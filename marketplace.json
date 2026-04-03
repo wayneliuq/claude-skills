@@ -1,0 +1,17 @@
+{
+  "name": "wayneliuq",
+  "owner": {
+    "name": "wayneliuq"
+  },
+  "plugins": [
+    {
+      "name": "strategic-implementation",
+      "source": "./plugins/strategic-implementation",
+      "description": "Full planning-to-execution workflow: clarify → spec → revise → sessionize → agent review → session plan → execute",
+      "version": "1.0.0",
+      "author": {
+        "name": "wayneliuq"
+      }
+    }
+  ]
+}
