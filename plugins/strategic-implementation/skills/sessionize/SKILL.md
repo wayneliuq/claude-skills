@@ -80,6 +80,11 @@ For each session, draft:
 - Docs to update
 - Estimated size (S / M / L)
 - Hard decisions applied (any [HARD DECISION] items from the spec that this session implements — name them explicitly so the executor sees them)
+- **Review agents** — assess which contextual agents are relevant to this specific session:
+  - `frontend-engineer`: does this session create, modify, or significantly interface with UI components, pages, or frontend state?
+  - _(additional contextual agents follow the same pattern as they are added)_
+
+  Set `Review agents` to the agent name(s) if clearly applicable. If the session only touches a domain peripherally (e.g., one env-var read, a single CSS class, a minor label change), set `Review agents: none` and add a `Contextual notes` field with 1–2 sentences describing that peripheral touch — enough for always-on agents to account for it without a full dedicated review.
 
 For the plan's **Overview** section, carry forward:
 - All entries from spec Section 6 "Already decided" → **Key decisions** field
@@ -117,8 +122,16 @@ Launch all always-on agents in parallel using the Agent tool. Each receives the 
 - `/Users/qiangliu/Documents/Development/claude-skills/strategic-implementation/agents/performance.md`
 - `/Users/qiangliu/Documents/Development/claude-skills/strategic-implementation/agents/dependency.md`
 
-**Launch conditionally (if plan involves UI, UX, or front-end):**
-- `/Users/qiangliu/Documents/Development/claude-skills/strategic-implementation/agents/frontend-engineer.md`
+**Launch conditionally — derived from session annotations:**
+
+Collect the union of all `Review agents` fields across every session in the plan. For each distinct contextual agent name that appears in at least one session:
+- Launch that agent with the full sessionized plan as input
+- Pass the list of sessions that named this agent as focused context (so the agent knows which sessions to scrutinize most closely)
+
+If no session lists a given contextual agent, do not launch it.
+
+Currently defined contextual agents:
+- `frontend-engineer` → `/Users/qiangliu/Documents/Development/claude-skills/strategic-implementation/agents/frontend-engineer.md`
 
 Note: the scope-limiter already ran in Step 4 and its output is incorporated. Do not re-run it here.
 

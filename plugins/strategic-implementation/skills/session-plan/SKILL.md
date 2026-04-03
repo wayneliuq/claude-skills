@@ -123,8 +123,14 @@ Launch all always-on agents in parallel. Each receives **both the session plan A
 - `/Users/qiangliu/Documents/Development/claude-skills/strategic-implementation/agents/performance.md`
 - `/Users/qiangliu/Documents/Development/claude-skills/strategic-implementation/agents/dependency.md`
 
-**Launch conditionally (if session involves UI, UX, or front-end):**
-- `/Users/qiangliu/Documents/Development/claude-skills/strategic-implementation/agents/frontend-engineer.md`
+**Launch conditionally — read from the implementation guide:**
+
+Read the target session's `**Review agents:**` field from the implementation guide. Launch each listed contextual agent in addition to the always-on agents above. If the field is `none`, do not launch any contextual agents.
+
+Currently defined contextual agents:
+- `frontend-engineer` → `/Users/qiangliu/Documents/Development/claude-skills/strategic-implementation/agents/frontend-engineer.md`
+
+**Contextual notes pass-through:** If the session has a `**Contextual notes:**` field, include its content verbatim as additional context in the prompts for the always-on agents most likely to care (e.g., a security note goes to `security.md`, a data note goes to `data-model.md`). If the note is domain-ambiguous, include it in all always-on agent prompts.
 
 Pass each agent's prepared "Project Learnings" block (from Step 2a) as additional context in its prompt, if one was prepared.
 

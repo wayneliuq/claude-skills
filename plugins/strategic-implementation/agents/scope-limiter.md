@@ -44,6 +44,22 @@ Flag if:
 
 Identify sessions that have no shared file or module dependencies and could run in parallel. List them explicitly.
 
+### 5. Contextual Agent List
+
+For each session, evaluate the `Review agents` field against the session's actual content (goal, deliverables, files affected):
+
+**Overkill check** — for each agent listed in `Review agents`:
+- Does the session's goal, deliverables, and files clearly involve that agent's domain? If the domain is only touched peripherally (a single config field, one UI label, one env-var read), flag it. Recommend: remove from `Review agents` and replace with a `Contextual notes` entry of 1–2 sentences.
+
+**Gap check** — for each session with `Review agents: none`:
+- Does the session clearly involve a contextual agent's domain that was not listed? If so, flag it and recommend adding the agent.
+
+Only flag when the mismatch is clear-cut. Do not speculate. Only evaluate agents defined as contextual in the sessionize skill (currently: `frontend-engineer`). Do not flag always-on agents here.
+
+Use the `[agents]` prefix for these flags, e.g.:
+- `[agents] Session 3: frontend-engineer listed but session only updates a button label — recommend moving to Contextual notes`
+- `[agents] Session 5: Review agents: none, but session builds a new settings page — recommend adding frontend-engineer`
+
 ---
 
 ## Processing Project Learnings
