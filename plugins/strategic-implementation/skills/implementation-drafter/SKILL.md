@@ -104,12 +104,14 @@ _Status: Draft | Last updated: [date]_
 
 ## 4. Detailed Specification
 
-### [Component or Concern Name]
+#### [Component or Concern Name]
 **Current state:** [what exists today, if modifying something]
 **After this change:** [what will be true]
 **Key details:** [interfaces, contracts, technical decisions embedded here]
 
-### [Next component or concern]
+> **Feedback:** _(leave blank, or type your thoughts, corrections, or questions about this section)_
+
+#### [Next component or concern]
 ...
 
 > **Feedback:** _(leave blank, or type your thoughts, corrections, or questions about this section)_
@@ -188,3 +190,5 @@ After completing the draft (before presenting to the user):
 - Sections 1 and 2 must be readable by a non-technical stakeholder. Sections 3–8 may be technical.
 - If the architecture or UX review flagged something that materially affects the spec, it must be represented — in Section 6 (as an open decision), Section 7 (as a risk), or Section 4 (as a constraint on the design). Do not silently ignore flags.
 - If an open decision in Section 6 is one where you have a clear recommendation, state it. Do not present false balance.
+- **Write ownership at the definition site.** When Section 4 introduces shared mutable state (injection keys, global stores, event buses, shared refs), the spec must state which components are permitted to write it — not just who reads it. This ownership rule belongs in the description of the state's definition, not only in the description of its writers. Future consumers read the definition first.
+- **Precondition-dependent behaviors require a verification step.** When Section 4 specifies interactive behaviors (collapse/expand, drag-resize, show/hide toggle, context-sensitive controls) whose value or correctness depends on an environmental condition (layout position, spatial constraint, service availability, permission state), the spec must include an explicit step to verify that condition before the behavior is implemented. Behaviors built on an unverified assumption are discarded entirely when the assumption turns out wrong.
