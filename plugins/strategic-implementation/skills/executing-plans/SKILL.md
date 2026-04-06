@@ -27,6 +27,12 @@ Derive feature folder path and session number N from the session plan path.
 
 Load and read both files completely before proceeding. Initialize deviation counter at `DEV-001`.
 
+**Branch check:** Run `git branch --show-current`. If the result is `main` or `master`, display the following warning and require explicit user confirmation before proceeding to Step 1:
+
+> ⚠️ **Warning: you are on the `[branch name]` branch.** Executing a session plan directly on `main`/`master` is strongly discouraged. Please confirm you want to proceed on this branch, or switch to a feature branch first.
+
+Wait for explicit user confirmation (e.g., "yes, proceed", "confirmed", or equivalent) before continuing. If the user does not confirm, stop here.
+
 ---
 
 ## Step 1 — Mark Session In-Progress
@@ -35,6 +41,7 @@ In the implementation guide, update Session N's Status field:
 `**Status:** \`pending\`` → `**Status:** \`in-progress\``
 
 Announce: "Implementation guide updated to `in-progress`."
+_updated — docs/strategic-implementation/[path]/implementation-guide.md_
 
 ---
 
@@ -109,6 +116,8 @@ Do not mark the session complete. Do not proceed to Step 4. Await user direction
 
 ### TDD Protocol (apply to every step, sequential or parallel)
 
+**TDD ordering correction:** Before executing, check whether the plan places a test step after its paired implementation step — or defers a test step to a later parallel group. If so: reorder locally so the test precedes the implementation, treat both as sequential, and log an `ambiguity-decision` deviation. Do not execute implementation before test.
+
 1. Write the failing test. Run it. Confirm it fails for the expected reason.
    - If the test passes before any implementation: stop and surface this to the user. Do not proceed.
 2. Write the minimal implementation to make the test pass.
@@ -157,6 +166,7 @@ Run inline. Surface flagged sessions to the user in the next user-facing message
 
 File: `<feature-folder-path>/session-N-log.md`
 Create only when at least one deviation is logged. Do not create an empty file.
+When the file is first created, announce: _saved to docs/strategic-implementation/[path]/session-N-log.md_
 
 **File header:**
 ```markdown
@@ -179,7 +189,7 @@ _Total deviations: [update this count when session completes]_
 **Resolution:** [how it was resolved]
 **Plan gap?** `yes` | `no` — [if yes: one sentence on what the plan failed to anticipate]
 **Downstream impact?** `yes` | `no`
-**Agent category:** [one of: architecture | security | data-model | api-contract | test-coverage | performance | dependency | frontend | scope | technical]
+**Agent category:** [one of: future-proofing | security | data-model | api-contract | test-coverage | performance | dependency | frontend | scope | technical]
 ```
 
 ---
@@ -194,6 +204,7 @@ After all steps complete, ask:
 1. Update implementation guide Session N: `**Status:** \`in-progress\`` → `**Status:** \`complete\``
 2. If a deviation log was created: finalize by updating `_Total deviations: N_` header line.
 3. Announce: "Session N complete. Implementation guide updated."
+   _updated — docs/strategic-implementation/[path]/implementation-guide.md_
 4. Offer: "Would you like to run a post-mortem on this session? It reviews deviations and updates the project learning log. Say 'run post-mortem' or 'skip'."
    - **Run post-mortem:** invoke `strategic-implementation:post-mortem` with: feature folder path, session number N, session plan path, deviation log path (or `none` if no log exists), implementation guide path.
    - **Skip:** announce "Skipping post-mortem." Then invoke `superpowers:finishing-a-development-branch`.
