@@ -24,7 +24,7 @@ _Status: Draft | Last updated: 2026-04-05_
 ## Sessions
 
 ### Session 1: Research Phase
-**Status:** `in-progress`
+**Status:** `complete`
 **Goal:** Gather and synthesize current best practices for all 10 review agent domains via parallel web research, producing a prioritized findings document.
 
 **Deliverables & Tests:**
@@ -46,7 +46,7 @@ _None — session not yet executed_
 ---
 
 ### Session 2: Tier 1 — Portability, Correctness, and File Surfacing
-**Status:** `in-progress`
+**Status:** `complete`
 **Goal:** Fix all 6 correctness and portability issues in the plugin's orchestration skills and standardize file surfacing across all skills that create or edit files.
 
 **Pre-conditions:**
