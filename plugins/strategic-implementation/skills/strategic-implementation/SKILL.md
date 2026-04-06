@@ -38,7 +38,14 @@ After clarification, assess scope against ALL THREE criteria:
 2. Change contained to one area (one component, file group, or feature)
 3. No new architectural patterns or dependencies introduced
 
-**If fast-path:** invoke `superpowers:writing-plans`, explicitly instructing it to save the plan to `docs/strategic-implementation/YYYY-MM-DD-<feature-name>/implementation-guide.md` (derive feature name from the one-sentence description; writing-plans supports path overrides via user instruction). Then invoke `strategic-implementation:executing-plans`. This skill ends here.
+**If fast-path:**
+1. Create `implementation-guide.md` at `docs/strategic-implementation/<date>-<slug>/implementation-guide.md` (derive date as `YYYY-MM-DD`, derive slug from the one-sentence description).
+2. Populate it with the approved spec content — a concise implementation plan covering the goal, steps, deliverables, and any relevant constraints.
+3. Invoke `strategic-implementation:executing-plans`, passing:
+   - Implementation guide path: `docs/strategic-implementation/<date>-<slug>/implementation-guide.md`
+   - Feature folder path: `docs/strategic-implementation/<date>-<slug>/`
+
+This skill ends here.
 
 **Otherwise:** continue to Step 3.
 
