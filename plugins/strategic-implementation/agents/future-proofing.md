@@ -57,7 +57,7 @@ Flag if:
 
 _This section is only active when the orchestrating skill injects a "Project Learnings" block into this prompt. If no such block was injected: skip this section entirely._
 
-**How learnings are injected:** The orchestrating skill reads `docs/strategic-implementation/project-learnings.md`, filters learnings tagged `#architecture`, and injects them with context:
+**How learnings are injected:** The orchestrating skill reads `docs/strategic-implementation/project-learnings.md`, filters learnings tagged `#future-proofing`, and injects them with context:
 - `sessionize` context → `#multi-session` learnings only
 - `session-plan` context → both `#single-session` and `#multi-session` learnings
 (Filtering is already applied before injection — you receive only what's relevant.)
