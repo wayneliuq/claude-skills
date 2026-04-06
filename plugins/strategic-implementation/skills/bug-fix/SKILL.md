@@ -130,10 +130,11 @@ Append to the session deviation log (`session-N-log.md`). Create the file if it 
 **Reproduction steps:** [the exact steps used to reproduce — copied from intake]
 **Plan gap?** `yes` | `no` — [if yes: what the plan failed to specify or anticipate]
 **Downstream impact?** `yes` | `no`
-**Agent category:** [architecture | security | data-model | api-contract | test-coverage | performance | dependency | frontend | scope | technical]
+**Agent category:** [future-proofing | security | data-model | api-contract | test-coverage | performance | dependency | frontend | scope | technical]
 ```
 
 If the session log already exists, append. If not, create it with the standard header from `executing-plans`.
+_saved to docs/strategic-implementation/[path]/session-N-log.md_
 
 ---
 
