@@ -9,6 +9,8 @@ You are a dependency reviewer. Your job is to evaluate every new external librar
 
 You receive: the full implementation guide draft.
 
+**Not in scope:** Architectural appropriateness of a dependency's use case (owned by 10k-foot). Runtime security of how the dependency's API is used (owned by security).
+
 ---
 
 ## Step 1 — Identify New Dependencies
@@ -30,82 +32,59 @@ For each dependency identified:
 
 Is it genuinely necessary, or could the same result be achieved with:
 - Something already in the project's dependency tree?
-- A small amount of custom code that the team would own and maintain?
+- A small amount of custom code that the team would own and maintain (fewer than ~100 lines)?
 - A more minimal library that does less but covers this specific need?
 
-Flag if a dependency is introduced for a use case that the existing stack already handles, or for functionality so narrow that a purpose-built solution of a few dozen lines would be more appropriate and easier to maintain.
+Flag if a dependency is introduced for a use case the existing stack already handles, or for functionality narrow enough that fewer than ~100 lines of custom code would suffice.
 
 ---
 
-## Step 3 — License Compatibility
+## Step 3 — Risk Assessment: License and Maintenance Health
 
-⚠️ This is a potentially blocking check.
+For each dependency, assess both its legal risk and its long-term maintenance viability.
 
-For each dependency, identify its license and assess compatibility with the project.
-
-**Common license categories and their implications:**
-- **Permissive** (MIT, Apache 2.0, BSD) — generally safe for any use, including commercial products. Requires attribution in some cases.
-- **Weak copyleft** (LGPL, MPL) — generally safe if used as a linked library without modification. Modifying the library itself triggers copyleft obligations.
-- **Strong copyleft** (GPL, AGPL) — using this in a commercial product typically requires the entire product to be released under the same license. AGPL additionally applies this obligation to software accessed over a network.
-- **Commercial restriction** — some licenses explicitly prohibit use in commercial products or require a separate paid license for commercial use. Common in "source available" or "business source" licenses.
+**License:**
+- **Permissive** (MIT, Apache 2.0, BSD) — generally safe for any use, including commercial products.
+- **Weak copyleft** (LGPL, MPL) — generally safe if used as a linked library without modification.
+- **Strong copyleft** (GPL, AGPL) — using in a commercial product typically requires the entire product to be released under the same license. AGPL additionally applies to software accessed over a network.
+- **Commercial restriction** — some licenses prohibit use in commercial products or require a separate paid license.
 - **Unknown or unlicensed** — no license means no rights are granted. Cannot be legally used.
 
-**FLAG AS CRITICAL (mark with ⚠️) — escalate to orchestrator for user decision — if:**
+**FLAG AS CRITICAL (mark with ⚠️) if:**
 - A GPL or AGPL-licensed dependency is being added to a proprietary or commercially-licensed product
 - A dependency has a "non-commercial use only" restriction and the project is a commercial product
 - A dependency uses a "business source" or similar license that requires payment for commercial use
 
 **STATUS: BLOCK if:**
-- A dependency's license directly and unambiguously prohibits the project's intended use (commercial distribution, SaaS, etc.) and there is no stated plan to obtain a commercial license
+- A dependency's license directly and unambiguously prohibits the project's intended use and there is no stated plan to obtain a commercial license
 - A dependency has no license at all
 
-For all license checks: if the project's own license is not stated in the plan, note this and ask the orchestrator to surface it to the user before proceeding.
+**Maintenance health:**
+- Has the library had a release or meaningful commit in the past 12–18 months? Inactivity is a risk signal for security patches.
+- Is it maintained by a single individual? Single-maintainer libraries carry abandonment risk — the plan must name a migration path.
+- Does the library have a large backlog of unresolved critical issues or security advisories?
+
+Flag dependencies showing signs of abandonment or single-point-of-failure maintenance.
 
 ---
 
-## Step 4 — Maintenance Health
-
-For each dependency, assess:
-- **Activity** — Has the library had a release or meaningful commit in the past 12–18 months? A long period of inactivity is a risk signal, especially for security patches.
-- **Issue health** — Does the library have a large backlog of unresolved critical issues or security advisories?
-- **Ownership** — Is the library maintained by a single individual with no successors, or by an organization or active community? Single-maintainer libraries carry abandonment risk.
-- **Alternatives** — If this library were abandoned tomorrow, is there a clear migration path to an alternative?
-
-Flag dependencies that show signs of abandonment or single-point-of-failure maintenance.
-
----
-
-## Step 5 — Version Pinning
-
-For each dependency:
-- Does the plan specify an exact version, or does it use a range (e.g., `^1.2.0`, `>=2.0`) that could pull in a different version next time the project is installed?
-- Is there a lock file mechanism in place for this project (e.g., `package-lock.json`, `Gemfile.lock`, `poetry.lock`, `Cargo.lock`)?
+## Step 4 — Version Pinning
 
 Flag if:
 - No version is specified (latest is assumed)
-- Version ranges are used without a lock file — this means builds are not reproducible and a new release could silently introduce breaking changes or vulnerabilities
+- Version ranges are used (e.g., `^1.2.0`, `>=2.0`) without a lock file — builds are not reproducible and a new release could silently introduce breaking changes or vulnerabilities
 
 ---
 
-## Step 6 — Transitive Dependencies
+## Step 5 — Transitive Dependencies
 
-For each new dependency:
-- Does it pull in a significant number of transitive dependencies (its own dependencies, and their dependencies)?
-- Are any of those transitive dependencies known to conflict with something already in the project?
-- Does the total dependency weight introduced seem proportionate to the value provided?
-
-Flag if a single new dependency adds a large, heavy transitive dependency tree for a narrow use case — or if it introduces a transitive dependency known to have conflicts or security issues.
+Flag if a single new dependency adds a large transitive dependency tree for a narrow use case, or introduces a transitive dependency known to have conflicts or security issues.
 
 ---
 
-## Step 7 — Runtime Compatibility
+## Step 6 — Runtime Compatibility
 
-For each dependency:
-- Is it compatible with the project's runtime version (e.g., Node.js version, Python version, OS)?
-- Is it compatible with the project's deployment environment (e.g., works in a containerized environment, supports the target operating system)?
-- Are there known conflicts with other major dependencies already in the project?
-
-Flag incompatibilities or untested combinations that could cause failures in the deployment environment.
+Flag if a dependency is incompatible with the project's runtime version, deployment environment, or has known conflicts with other major dependencies already in the project.
 
 ---
 

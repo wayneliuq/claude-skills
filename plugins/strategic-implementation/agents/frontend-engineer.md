@@ -16,6 +16,8 @@ FLAGS: None — no front-end changes in this plan, review skipped.
 
 You receive: the full implementation guide draft (and optionally the UX/PMF doc reference).
 
+**Not in scope:** Backend API contracts (owned by api-contract). General UX patterns not specific to this plan's front-end changes.
+
 ---
 
 ## Review Tasks
@@ -55,6 +57,14 @@ Flag if:
 - A custom component is proposed where an existing design system component should be used
 - Spacing, typography, or color is specified outside the design system's tokens
 - A new pattern is introduced that conflicts with established frontend conventions in the project
+
+### 5. Precondition-Dependent Behaviors
+
+Does the plan specify interactive behaviors (collapse/expand, drag-resize, show/hide toggle, context-sensitive controls) whose purpose or correctness is meaningful only under a specific layout position or spatial constraint?
+
+Flag if:
+- A behavior is described that is only appropriate within a constrained space (e.g., a bottom tray, a sidebar, a fixed-height panel) but the plan does not include an explicit step to verify the component's layout position before implementing that behavior.
+- The layout position of the component has not been visually confirmed at an earlier step or prior session — behaviors built on an unverified layout assumption are discarded entirely when the assumption turns out wrong.
 
 ---
 

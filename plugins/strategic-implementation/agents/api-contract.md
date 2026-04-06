@@ -11,6 +11,8 @@ An "interface" in this context means any boundary where two components exchange 
 
 You receive: the full implementation guide draft.
 
+**Not in scope:** Database schema or storage format (owned by data-model). Technical implementability of the interface (owned by technical-expert).
+
 ---
 
 ## Step 1 — Identify All Interfaces
@@ -41,7 +43,7 @@ Flag any interface where any of these four are unspecified.
 If the plan modifies an existing interface:
 - Does the change break any existing caller? (Removing a field, changing a field's type, making a previously optional field required, changing the meaning of an existing field)
 - Is there a versioning strategy? (e.g., `/v2/` path, a new function name, a feature flag, a deprecation period)
-- If the change is breaking and no versioning strategy is described → FLAG as critical.
+- If the change is breaking and no versioning strategy is described → **BLOCK** if known consumers are not addressed.
 - If the change is non-breaking (adding an optional field, adding a new endpoint) → confirm this is actually non-breaking given the consumers listed.
 
 ---
@@ -52,9 +54,10 @@ Are error responses fully and consistently specified?
 
 Flag if:
 - The plan introduces new error conditions but does not define what the caller receives
-- Error formats are inconsistent across interfaces in this plan (some return `{error: "..."}`, others return `{message: "..."}`, others return HTTP status codes with no body)
+- The plan introduces new interfaces without specifying the error envelope format — inconsistent error structures require client-side special-casing per endpoint and are expensive to standardize retroactively
+- Error formats are inconsistent across interfaces in this plan
 - The caller has no way to distinguish between different error conditions (a single generic error for multiple distinct failure modes)
-- Transient errors (network timeouts, temporary unavailability) are not distinguished from permanent errors, leaving the caller unable to decide whether to retry
+- Transient errors (network timeouts, temporary unavailability) are not distinguished from permanent errors
 
 ---
 
@@ -64,7 +67,7 @@ Does the plan account for every known consumer of each interface it introduces o
 
 Flag if:
 - A consumer is known (frontend, mobile app, another service, a third-party integration) but is not mentioned in the plan
-- A consumer would need to be updated to handle the change, but no session in the plan covers that update
+- A consumer would need to be updated to handle the change, but no session in the plan covers that update — **BLOCK** if the interface is breaking and known consumers are not addressed
 - An interface is being deprecated or replaced, but the plan does not describe migrating or notifying existing consumers
 
 ---
@@ -74,21 +77,10 @@ Flag if:
 Do all interfaces introduced in this plan follow the same conventions?
 
 Flag if:
-- Naming patterns are inconsistent (e.g., some endpoints use `camelCase` parameters, others use `snake_case`)
+- Naming patterns are inconsistent across interfaces in the same plan — different casing (`camelCase` vs. `snake_case`), or different terms for the same concept (`user_id` vs. `userId` vs. `account_id`)
 - Date and time formats are inconsistent (ISO 8601 in some places, Unix timestamps in others)
 - Pagination patterns differ across list endpoints
 - Authentication methods differ across endpoints in the same plan without explanation
-- The same concept is named differently in different interfaces (e.g., `user_id` in one place, `userId` in another, `account_id` in a third)
-
----
-
-## Step 7 — Contract Capture
-
-Is the contract recorded somewhere durable?
-
-Flag if:
-- The plan introduces or changes an interface but does not specify that the contract will be documented in a spec file (OpenAPI/Swagger, GraphQL schema, protobuf definition, TypeScript type, or equivalent)
-- The contract will exist only as implicit behavior in code, with no canonical reference for consumers
 
 ---
 

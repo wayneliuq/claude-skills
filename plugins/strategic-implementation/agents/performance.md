@@ -11,6 +11,8 @@ You are reviewing the plan, not the code. You are flagging design-level choices 
 
 You receive: the full implementation guide draft.
 
+**Not in scope:** Database schema decisions (owned by data-model). Dependency bundle size (owned by dependency).
+
 ---
 
 ## Step 1 — Identify Performance-Sensitive Areas
@@ -32,11 +34,11 @@ These are the areas where performance problems most commonly emerge. Focus your 
 For each database interaction described in the plan:
 
 Flag if:
-- A list of records is fetched and then a separate database query is made for each record in that list — this is the "N+1 query" pattern, and it scales catastrophically (100 records = 101 queries; 10,000 records = 10,001 queries)
-- A query searches or sorts on a field that is not indexed, requiring a full scan of the table
+- A list of records is fetched and then a separate query is made for each record — N+1 pattern; scales catastrophically (100 records = 101 queries)
+- A query searches or sorts on a field that is not indexed, requiring a full table scan
 - A query loads entire tables or large unfiltered result sets into memory (no `LIMIT`, no filtering on a selective field)
-- A large join or aggregation is performed on every request, when the result changes infrequently and could be cached or precomputed
-- Writes that must be consistent (bank transfers, inventory updates, order placements) are not described as using a database transaction
+- A large join or aggregation is performed on every request when the result changes infrequently and could be cached
+- Writes that must be consistent are not described as using a database transaction
 
 ---
 
@@ -55,10 +57,10 @@ Flag if:
 ## Step 4 — Caching
 
 Flag if:
-- Data that is read frequently and changes rarely is re-fetched from the database or an external service on every request, with no caching described
-- A cache is introduced but the plan does not specify when it is invalidated — stale cache data that never refreshes is worse than no cache
-- The plan introduces a cache without specifying its scope (per-user, per-request, shared across all users) — wrong scope leads to either cache misses or data leakage
-- A cache key is not described precisely enough to guarantee that different inputs produce different cache entries (cache collision)
+- Frequently-read, rarely-changing data is re-fetched on every request with no caching described
+- A cache is introduced but the plan does not specify when it is invalidated
+- The plan introduces a cache without specifying its scope (per-user, per-request, shared) — wrong scope causes cache misses or data leakage
+- A cache key is not described precisely enough to guarantee different inputs produce different cache entries
 
 ---
 
@@ -67,34 +69,23 @@ Flag if:
 Does the plan place slow operations directly in the path where a user is waiting for a response?
 
 Flag if:
-- Sending an email, SMS, or push notification is described as happening synchronously during a user request
-- A call to an external third-party API is described as happening synchronously in a user-facing endpoint, with no timeout or fallback described
-- A file is processed, resized, or analyzed synchronously in a user-facing request
-- A report or export is generated synchronously for large datasets
+- Email, SMS, push notification, or external API call is described as synchronous in a user-facing request with no timeout or fallback
+- File processing or report generation is described as synchronous in a user-facing request
 
-For each of these: recommend moving the operation to a background queue and returning an immediate acknowledgment to the user.
+For each: recommend moving to a background queue and returning an immediate acknowledgment.
 
 ---
 
-## Step 6 — Performance Targets
+## Step 6 — Targets, Concurrency, and Load
 
-Does the plan define what acceptable performance looks like?
-
-Flag if:
-- No performance targets are stated for user-facing operations (response time, throughput)
-- No resource consumption limits are stated for background jobs (max memory, max runtime, max records processed per run)
-- A deliverable involves performance but has no test that would verify it meets a target
-
-Without defined targets, there is no way to know during execution whether performance is acceptable — and no way to catch regressions later.
-
----
-
-## Step 7 — Concurrency and Load
+Does the plan define what acceptable performance looks like, and does it account for concurrent usage?
 
 Flag if:
-- The plan introduces a resource (database connection, external API quota, in-memory data structure) that would become a bottleneck if many users triggered the same operation simultaneously
-- A background job or batch operation has no concurrency controls — running two instances simultaneously could corrupt data or produce duplicate results
-- A rate limit imposed by an external API is not accounted for (the plan assumes unlimited throughput from a third-party service)
+- No performance targets are stated for user-facing operations or background jobs — flag any performance-sensitive feature (search, aggregation, batch processing, report generation) without a stated target
+- A deliverable involves performance but has no test verifying it meets a target
+- A resource (database connection, external API quota, in-memory structure) would become a bottleneck under concurrent usage
+- A background job has no concurrency controls — two simultaneous instances could corrupt data or produce duplicates
+- An external API rate limit is not accounted for
 
 ---
 
