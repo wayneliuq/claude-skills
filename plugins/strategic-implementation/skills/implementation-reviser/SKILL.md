@@ -148,7 +148,7 @@ Format:
 
 ## Step 11 — Re-run Architecture and UX Review (if triggered)
 
-If this revision round made changes that significantly restructure the spec — specifically, if two or more of the following are true:
+If two or more of the following are true in this revision round:
 - A new component or system was added to Section 4
 - The Scope Boundary (Section 5) was substantially expanded or contracted
 - A Key Decision in Section 6 was reversed or a new major technical decision was added
