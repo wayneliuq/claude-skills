@@ -195,6 +195,7 @@ Wait for response before writing.
 ## Step 10 — Write Artifacts
 
 **Write `<feature-folder-path>/session-N-postmortem.md`:**
+_saved to [feature-folder-path]/session-N-postmortem.md_
 
 ```markdown
 # Session N Post-Mortem: [session name]
@@ -219,6 +220,7 @@ _Deviations reviewed: [count]_
 ```
 
 **Update `docs/strategic-implementation/project-learnings.md`:**
+_saved to docs/strategic-implementation/project-learnings.md_
 
 If file does not exist, create it with this header:
 
