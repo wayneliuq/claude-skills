@@ -41,9 +41,11 @@ Draft the session plan using the template below.
 2. **Goal must match the implementation plan verbatim.** Copy it exactly — do not rephrase.
 3. **Steps must be concrete.** Each step names the exact file(s) and what to write, change, or delete. "Implement the feature" is not a step.
 4. **Deliverables & Tests are copied from the implementation plan** and expanded with execution-specific detail — the exact command to run, the exact behavior to observe, or the exact check to perform.
-5. **≤ ~1000 LOC.** If the session as defined in the implementation plan would exceed this, split it and note the split to the user before proceeding.
+5. **≤ ~1000 LOC.** If the session as defined in the implementation plan would exceed this, split it and note the split to the user before proceeding. If a leading-indicator threshold fires mid-session (a step comes in larger than anticipated), project total remaining session LOC before deciding to split — split only if the projection exceeds ~1000 LOC. A threshold firing is not itself a mandate to split.
 6. **Pre-conditions must be checkable.** Every pre-condition item must be something that can be verified before starting — not "understand the architecture" but "architecture doc available at [path]."
-7. **Annotate parallel steps.** Identify steps that can run concurrently: no overlapping file writes, and no output-to-input dependency between them. Annotate eligible steps with `[parallel group: X]` (X = a letter: A, B, C...). Steps sharing the same letter run concurrently. Sequential steps need no annotation.
+7. **Annotate parallel steps.** Identify steps that can run concurrently: no overlapping file writes, and no output-to-input dependency between them. Annotate eligible steps with `[parallel group: X]` (X = a letter: A, B, C...). Steps sharing the same letter run concurrently. Sequential steps need no annotation. Before assigning a parallel group letter, verify the steps are genuinely independent — any step that consumes output from another step in the same group must be made sequential instead.
+8. **TDD ordering is a hard constraint.** When a step has a paired test, the test step must precede or be co-located with its implementation step in the same sequential phase. Never defer a test step to a later parallel group — doing so makes the parallel structure invalid (the executing agent collapses them into a sequential TDD cycle anyway). If implementation and test cannot share a step, order them as: test step → implementation step, both sequential.
+9. **Verify file paths.** Every step that references a specific file by path must reference a file that exists. Before finalizing the plan, use the Glob tool to verify that every file path referenced in session steps actually exists in the repository. If a file does not exist: remove the reference, substitute the correct path, or flag it explicitly with `[PATH NOT FOUND]`. Paths that cannot be verified must be annotated with `[PATH NOT FOUND]`. Unverified references are silently skipped during execution.
 
 **Template:**
 
@@ -112,23 +114,25 @@ Inject these blocks into agent prompts in Step 3.
 Launch all always-on agents in parallel. Each receives **both the session plan AND the full implementation plan** as input. Agents must check alignment between the two — the session plan must not contradict or diverge from the implementation plan.
 
 **Always launch:**
-- `/Users/qiangliu/Documents/Development/claude-skills/strategic-implementation/agents/10k-foot.md`
-- `/Users/qiangliu/Documents/Development/claude-skills/strategic-implementation/agents/technical-expert.md`
-- `/Users/qiangliu/Documents/Development/claude-skills/strategic-implementation/agents/scope-limiter.md`
-- `/Users/qiangliu/Documents/Development/claude-skills/strategic-implementation/agents/future-proofing.md`
-- `/Users/qiangliu/Documents/Development/claude-skills/strategic-implementation/agents/security.md`
-- `/Users/qiangliu/Documents/Development/claude-skills/strategic-implementation/agents/data-model.md`
-- `/Users/qiangliu/Documents/Development/claude-skills/strategic-implementation/agents/api-contract.md`
-- `/Users/qiangliu/Documents/Development/claude-skills/strategic-implementation/agents/test-coverage.md`
-- `/Users/qiangliu/Documents/Development/claude-skills/strategic-implementation/agents/performance.md`
-- `/Users/qiangliu/Documents/Development/claude-skills/strategic-implementation/agents/dependency.md`
+- `strategic-implementation:10k-foot`
+- `strategic-implementation:technical-expert`
+- `strategic-implementation:scope-limiter`
+- `strategic-implementation:future-proofing`
+- `strategic-implementation:security`
+- `strategic-implementation:data-model`
+- `strategic-implementation:api-contract`
+- `strategic-implementation:test-coverage`
+- `strategic-implementation:performance`
+- `strategic-implementation:dependency`
+
+<!-- Agent type names are resolved by the Claude Code plugin registry — see .claude-plugin/plugin.json -->
 
 **Launch conditionally — read from the implementation guide:**
 
 Read the target session's `**Review agents:**` field from the implementation guide. Launch each listed contextual agent in addition to the always-on agents above. If the field is `none`, do not launch any contextual agents.
 
 Currently defined contextual agents:
-- `frontend-engineer` → `/Users/qiangliu/Documents/Development/claude-skills/strategic-implementation/agents/frontend-engineer.md`
+- `frontend-engineer` → `strategic-implementation:frontend-engineer`
 
 **Contextual notes pass-through:** If the session has a `**Contextual notes:**` field, include its content verbatim as additional context in the prompts for the always-on agents most likely to care (e.g., a security note goes to `security.md`, a data note goes to `data-model.md`). If the note is domain-ambiguous, include it in all always-on agent prompts.
 
