@@ -151,10 +151,8 @@ If a deviation is a pure execution error (typo, environment issue, nothing recur
 
 ## Step 7 — Cross-Session Grep (only if total log count ≥ 3)
 
-From each deviation in this log, extract 2–3 keywords from "What actually happened".
-Search for those keywords across all other `session-*-log.md` files.
-
-If a keyword pattern appears in 2+ other sessions: flag it as a potential multi-session pattern with the matching sessions listed. This is advisory — it does not automatically promote a learning to `#multi-session`. Promotion requires explicit user confirmation.
+From each deviation's "What actually happened", extract 2–3 keywords and search across all other `session-*-log.md` files.
+If a pattern appears in 2+ other sessions: flag it as a potential multi-session pattern (advisory only — promotion to `#multi-session` requires explicit user confirmation).
 
 ---
 
