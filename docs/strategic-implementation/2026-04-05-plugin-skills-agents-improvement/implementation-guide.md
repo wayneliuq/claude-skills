@@ -141,7 +141,7 @@ _None_
 ---
 
 ### Session 4: Skill Best-Practice Additions
-**Status:** `pending`
+**Status:** `in-progress`
 **Goal:** Apply four targeted best-practice improvements to skills: clarify fast-skip, reviser trigger precision, post-mortem Step 7 compression, and implementation-drafter subsection feedback format.
 
 **Pre-conditions:**
