@@ -136,7 +136,7 @@ _None — session not yet executed_
 **Contextual notes:** All edits are plain-text markdown prompt files. The "Not in scope" lines for each agent are specified in the spec (Section 4.2.2). Per-agent trimming targets are specified in the spec (Section 4.2.1). frontend-engineer gets only the scope boundary line, not trimming, because it is one of the 5 baseline-accepted in-progress files.
 
 #### Meaningful Deviations
-_None — session not yet executed_
+_None_
 
 ---
 
