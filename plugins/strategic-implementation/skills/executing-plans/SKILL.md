@@ -129,6 +129,16 @@ Do not mark the session complete. Do not proceed to Step 4. Await user direction
 
 _Exception: steps involving infrastructure or configuration only (no testable behavior) may skip the test-first step. Describe why in the deviation log if skipped._
 
+### Code Discipline (apply to every step, alongside TDD)
+
+**Simplicity:** Write the minimum code that passes the test and satisfies the step. No abstractions for single-use code, no speculative features, no "flexibility" or "configurability" beyond what the step describes. If you wrote 200 lines and it could be 50, rewrite before committing.
+
+**Surgical changes:** Touch only what the step requires. Do not "improve" adjacent code, comments, formatting, type hints, or docstrings. Do not refactor things that aren't broken. Every changed line should trace directly to the step's deliverable.
+
+**Style matching:** Match the existing codebase's conventions — quote style, spacing, naming patterns, error handling idioms. Even if you'd do it differently, consistency with surrounding code takes priority.
+
+**Clean only your mess:** Remove imports, variables, and functions that YOUR changes made unused. Do not remove pre-existing dead code or unused items — mention them in the deviation log if noticed, but leave them untouched.
+
 ### Deviation Detection
 
 After each step, assess: did this step execute exactly as the plan described?
