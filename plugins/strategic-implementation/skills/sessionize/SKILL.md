@@ -1,6 +1,6 @@
 ---
 name: sessionize
-description: Converts an approved specification document into a sessionized implementation plan. Runs the full 10-agent review on the complete plan in a single round, synthesizes findings, and presents the plan for user approval.
+description: Converts an approved specification document into a sessionized implementation plan. Runs scope-limiter, simplify (whole-plan + per-session), and the full agent panel in sequence, synthesizes findings, and presents the plan for user approval.
 ---
 
 # Sessionize
@@ -116,20 +116,8 @@ Launch `strategic-implementation:simplify` in whole-plan mode, passing: the full
 
 **If STATUS: ALTERNATIVE:**
 
-Present to the user:
+Present to the user under a `## Simplicity Review — Alternative Path Found` heading, rendering the agent's actual DISTILLED PLAN, ALTERNATIVE PATH, and FLAGS sections as received. Then ask:
 
-```
-## Simplicity Review — Alternative Path Found
-
-[agent's DISTILLED PLAN section]
-
-[agent's ALTERNATIVE PATH section]
-
-FLAGS:
-[agent's FLAGS]
-```
-
-Then ask:
 > "A simpler path to the spec's success criteria was identified above. Do you want to rewrite the implementation guide along this path? Reply `yes` to rewrite, or `no` to proceed with the current plan."
 
 Wait for explicit user response.
@@ -142,7 +130,7 @@ Wait for explicit user response.
 
 - **If no:** proceed to Phase 2 with the current guide.
 
-**If STATUS: PASS:** note any FLAGS and RECOMMENDATIONS for Step 5 synthesis, then proceed directly to Phase 2. Do not present Phase 1 output to the user — it flows silently into Step 5.
+**If STATUS: PASS:** store the Phase 1 FLAGS and RECOMMENDATIONS to include in Step 5/6 synthesis alongside Phase 2 outputs. Do not present Phase 1 output to the user — it flows silently into synthesis.
 
 ---
 
@@ -151,6 +139,7 @@ Wait for explicit user response.
 Announce: "Running per-session simplicity check."
 Launch one `strategic-implementation:simplify` sub-agent per session in parallel, using per-session mode. Each sub-agent receives:
 - The single session block (goal, deliverables, files affected, estimated size)
+- The full sessionized implementation guide (for cross-session redundancy context)
 - The spec's success criteria (Section 3) and scope boundary (Section 5)
 
 Wait for all sub-agents to return.
