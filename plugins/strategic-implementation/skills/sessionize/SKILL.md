@@ -107,6 +107,58 @@ Apply the scope-limiter's session order and dependency map to the plan. Address 
 
 ---
 
+## Step 4a — Run Simplify Agent
+
+### Phase 1: Whole-plan simplicity check
+
+Announce: "Running simplicity check against spec."
+Launch `strategic-implementation:simplify` in whole-plan mode, passing: the full sessionized plan and the original spec. Wait for result.
+
+**If STATUS: ALTERNATIVE:**
+
+Present to the user:
+
+```
+## Simplicity Review — Alternative Path Found
+
+[agent's DISTILLED PLAN section]
+
+[agent's ALTERNATIVE PATH section]
+
+FLAGS:
+[agent's FLAGS]
+```
+
+Then ask:
+> "A simpler path to the spec's success criteria was identified above. Do you want to rewrite the implementation guide along this path? Reply `yes` to rewrite, or `no` to proceed with the current plan."
+
+Wait for explicit user response.
+
+- **If yes:**
+  1. Announce: "Rewriting implementation guide along the shorter path."
+  2. Re-run Step 3 (Draft Sessions) using the alternative path description, the original spec, and the previous implementation guide as inputs. The alternative path description drives the session design; the spec's hard decisions and scope boundary remain fixed.
+  3. Re-run Step 4 (Scope Limiter) on the new sessions.
+  4. Proceed to Phase 2 below with the rewritten guide.
+
+- **If no:** proceed to Phase 2 with the current guide.
+
+**If STATUS: PASS:** note any FLAGS and RECOMMENDATIONS for Step 5 synthesis, then proceed directly to Phase 2. Do not present Phase 1 output to the user — it flows silently into Step 5.
+
+---
+
+### Phase 2: Per-session simplicity check
+
+Announce: "Running per-session simplicity check."
+Launch one `strategic-implementation:simplify` sub-agent per session in parallel, using per-session mode. Each sub-agent receives:
+- The single session block (goal, deliverables, files affected, estimated size)
+- The spec's success criteria (Section 3) and scope boundary (Section 5)
+
+Wait for all sub-agents to return.
+
+Collect all per-session `## Simplify (Session N: ...)` outputs. These are passed into Step 5 as additional agent outputs — they flow through synthesis exactly as any other agent FLAG or RECOMMENDATION. Do not present them to the user here.
+
+---
+
 ## Step 5 — Run Full Agent Panel
 
 Launch all always-on agents in parallel using the Agent tool. Each receives the full sessionized plan as input.
@@ -136,6 +188,7 @@ Currently defined contextual agents:
 - `frontend-engineer` → `strategic-implementation:frontend-engineer`
 
 Note: the scope-limiter already ran in Step 4 and its output is incorporated. Do not re-run it here.
+Note: the simplify agent already ran in Step 4a. Its Phase 1 FLAGS/RECOMMENDATIONS and all Phase 2 per-session outputs are treated as additional agent outputs in synthesis (Step 6). Include them alongside the panel results.
 
 Pass each agent's prepared "Project Learnings" block (from Step 2a) as additional context in its prompt, if one was prepared. Agents with no applicable learnings receive no block.
 

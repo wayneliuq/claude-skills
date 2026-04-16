@@ -1,5 +1,5 @@
 {
   "name": "strategic-implementation",
-  "version": "1.2.0",
+  "version": "1.3.0",
   "description": "Full planning-to-execution workflow: clarify → spec → revise → sessionize → agent review → session plan → execute"
 }
