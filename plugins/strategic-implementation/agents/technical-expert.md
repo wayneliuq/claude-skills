@@ -41,6 +41,7 @@ Read each session's deliverables and files. Flag:
 - Missing steps that the technology requires (e.g., cache invalidation, index creation, event registration)
 - Any step that depends on a resource (database connection, cache client, external service) that is initialized in a later step — these cause immediate runtime failures on the first execution attempt
 - Any step that performs a fallible operation (network call, file read, database write) without specifying error handling — missing error handling is discovered at the first production failure
+- Any sequence of two operations where one is reversible and one is irreversible, and the irreversible operation runs first — flag the ordering. The reversible operation (validation, guard check, lock acquisition, pre-condition verification) must always execute before the irreversible mutation (clearing a collection, committing a transaction, firing a navigation event, deleting a record). If the irreversible step runs first and the second step fails, the system is left in an unrecoverable intermediate state with no safe rollback path.
 
 Do not assess whether tests are correct, sufficient, or well-structured — that is the test-coverage agent's responsibility.
 

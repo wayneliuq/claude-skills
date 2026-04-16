@@ -73,6 +73,7 @@ Flag dependencies showing signs of abandonment or single-point-of-failure mainte
 Flag if:
 - No version is specified (latest is assumed)
 - Version ranges are used (e.g., `^1.2.0`, `>=2.0`) without a lock file — builds are not reproducible and a new release could silently introduce breaking changes or vulnerabilities
+- A specific version is pre-filled in an install command AND the plan separately requires verifying that version is the latest at implementation time — this creates a false safety net. The verifier checks whether the pre-filled value is plausible, not whether it is actually current; the wrong version ships. When live verification is required, the install command must omit the specific version and describe only the minimum constraint (e.g., `≥1.30.0`); the implementer fills the actual version after running the registry check.
 
 ---
 

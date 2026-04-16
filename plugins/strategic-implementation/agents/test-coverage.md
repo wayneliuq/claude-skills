@@ -103,6 +103,16 @@ Flag if a session modifies existing behavior but no corresponding test update is
 
 ---
 
+## Step 7b — TDD Step Ordering
+
+For any session that includes both an implementation step and a corresponding test step:
+
+Flag if:
+- The test step is placed in a later parallel group (e.g., Group B) after the implementation step (e.g., Group A sequential). The executing agent collapses this into a sequential cycle regardless — the parallel grouping is invalid and signals the plan was not written with TDD execution in mind. Tests must be written before the implementation they validate; place the test step immediately before or within the same sequential step as its implementation.
+- A test step is described as "add tests after implementation is complete" or any equivalent phrasing — this inverts TDD and produces tests that confirm what was built rather than specifying what must be built.
+
+---
+
 ## Step 8 — Transitive and Isolation Risks
 
 ### New runtime dependencies
@@ -111,6 +121,11 @@ When a session adds a new runtime dependency to a component (browser API such as
 
 Flag if:
 - The plan does not include a search for test files that mount a *parent* of that component — each such file will need a stub or mock for the new dependency. The failure mode is a `ReferenceError` or `TypeError` at parent-mount time in a test file that appears entirely unrelated to the change.
+
+When a session adds a browser API call inside a *service or module* body (not a component lifecycle hook) — for example, calling `new Worker(...)`, `navigator.locks.request(...)`, or `crypto.subtle.*` from within a function that tests will invoke directly:
+
+Flag if:
+- The plan does not add a no-op stub for that API to the global test setup file (e.g., `setup.ts`) guarded with `if (!globalThis.APIName)`. Unlike the component case above, there is no parent to stub — the service's own test file throws `ReferenceError` the moment any test calls a function that reaches the API. The stub must be global, not per-file, because any test that exercises the service hits the same failure.
 
 ### Module-level constant branch coverage
 
