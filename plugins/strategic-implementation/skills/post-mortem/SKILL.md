@@ -126,26 +126,40 @@ For each applicable learning, check: was the WHEN condition present in this sess
 
 ## Step 6 — Synthesize Learning Candidates
 
-For each deviation (or cluster of related deviations), determine:
+### 6a — Triage Filter (run first, before any analysis)
 
-**a) New learning candidate**
+For each `DEV-NNN` entry, check all three conditions:
+
+1. **Single try:** was this deviation resolved on the first fix attempt? (No Attempt 2 was made, or the entry shows immediate resolution)
+2. **No downstream impact:** `**Downstream impact?** no`
+3. **Plan-aligned:** the resolution did not deviate from what the implementation plan described for this step (i.e., the fix brought execution back onto the planned path rather than changing the approach)
+
+**If all three conditions are true:** mark the entry as `no learning candidate — routine fix (single attempt, no downstream impact, plan-aligned)` and skip it in Steps 6b–6d below.
+
+**If any condition is false:** proceed to full analysis for this entry.
+
+---
+
+For each deviation that passed the triage filter, determine:
+
+**6b) New learning candidate**
 - Situation not covered by any existing learning
 - Format: `WHEN [specific situation], DO [specific action]`
 - Tag: `#single-session` (new learnings always start here)
 - Evidence: this deviation
 
-**b) Expansion candidate**
+**6c) Expansion candidate**
 - An existing learning this deviation extends
 - **Expansion rule:** change WHEN (broader situation) OR DO (refined action) — NEVER both simultaneously
 - Valid only when this deviation is a second concrete case (the original learning had one; this is the second)
 - Show: existing learning, proposed change (exactly which part changes), both evidence references
 
-**c) Conflict candidate**
+**6d) Conflict candidate**
 - This deviation's evidence contradicts an existing learning
 - Show: existing learning text, contradicting evidence, recommendation (keep / modify / retire)
 - User decides — do not pre-apply
 
-If a deviation is a pure execution error (typo, environment issue, nothing recurring): note "no learning candidate — [reason]"
+If a deviation is a pure execution error (typo, environment issue, nothing recurring) and did not pass the triage filter: note "no learning candidate — [reason]"
 
 ---
 
@@ -270,4 +284,5 @@ Update `_Sessions tracked: N_` and `_Last updated: YYYY-MM-DD_` at top.
 
 ## After Step 10
 
+Announce: "Invoking `superpowers:finishing-a-development-branch` to finalize the branch."
 Invoke `superpowers:finishing-a-development-branch`.

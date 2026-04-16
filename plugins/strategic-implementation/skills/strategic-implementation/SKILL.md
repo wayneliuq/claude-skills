@@ -23,6 +23,7 @@ Before anything else, ask:
 
 ## Step 1 — Clarify
 
+Announce: "Starting clarification."
 Use the `strategic-implementation:clarify` skill.
 
 List assumptions. Ask only what would change the approach. Wait for user confirmation before proceeding.
@@ -41,7 +42,7 @@ After clarification, assess scope against ALL THREE criteria:
 **If fast-path:**
 1. Create `implementation-guide.md` at `docs/strategic-implementation/<date>-<slug>/implementation-guide.md` (derive date as `YYYY-MM-DD`, derive slug from the one-sentence description).
 2. Populate it with the approved spec content — a concise implementation plan covering the goal, steps, deliverables, and any relevant constraints.
-3. Invoke `strategic-implementation:executing-plans`, passing:
+3. Announce: "Starting execution." then invoke `strategic-implementation:executing-plans`, passing:
    - Implementation guide path: `docs/strategic-implementation/<date>-<slug>/implementation-guide.md`
    - Feature folder path: `docs/strategic-implementation/<date>-<slug>/`
 
@@ -51,52 +52,47 @@ This skill ends here.
 
 ---
 
-## Step 3 — Parallel Review: Architecture + UX/PMF
+## Step 3 — Draft Specification Document
 
-### 3a — Collect Document References First
-
-Before launching agents, ask the user for document locations:
-
-1. **Architecture document** — "Where is the architecture document for this project? Is it current?" (Required — architecture review will BLOCK without it)
-2. **UX/PMF document** — "Is there a UX or product-market fit document for this area?" (Only ask if the change has any user-facing impact; skip for purely backend changes)
-
-Store both locations. They are passed to their respective agents and to the reviser in Step 5 — do not re-ask for them later.
-
-### 3b — Launch Agents in Parallel
-
-Launch both agents in parallel using the Agent tool, passing the document locations collected above:
-
-- `strategic-implementation:architecture-review` (pass: architecture document location)
-- `strategic-implementation:ux-pmf-review` (pass: UX/PMF document location, if applicable)
-
-Wait for both to return.
-
-**If either returns STATUS: BLOCK:** surface the blocking issue with the agent's recommended next step. Do not proceed until resolved.
-
-Store both outputs. They are passed silently to the drafter in Step 4 — do not present them to the user.
-
----
-
-## Step 4 — Draft Specification Document
-
+Announce: "Drafting specification document."
 Use the `strategic-implementation:implementation-drafter` skill.
 
 Pass:
 - The clarified request
-- The architecture review output
-- The UX/PMF review output
 
-The drafter produces a specification document using the 8-section framework with feedback slots. Present the completed spec to the user.
+The drafter produces a specification document using the 8-section framework with feedback slots.
 
 Store the feature folder path returned by implementation-drafter. Pass it to:
+- the post-spec review agents in Step 3a
 - implementation-reviser in Step 5 (as spec file path: `<feature-folder-path>/spec.md`)
 - sessionize in Step 6
 - session-plan when the user triggers session planning
 Do not re-derive it from the spec title.
 
-**If the architecture review found that the change requires new architectural components or significant adaptation that are not yet documented:**
-→ Pause before presenting the spec. Inform the user: "This change requires architectural decisions not yet captured in the architecture document. Please update the architecture doc first, then we can proceed."
-Do not present the spec until resolved.
+---
+
+## Step 3a — Post-Spec Review Gate
+
+After the spec is drafted, collect document references before launching the review agents.
+
+Ask the user:
+1. **Architecture document** — "Where is the architecture document for this project? Is it current?" (Required — architecture review will BLOCK without it)
+2. **UX/PMF document** — "Is there a UX or product-market fit document for this area?" (Only ask if the change has any user-facing impact; skip for purely backend changes)
+
+Store both locations. They are passed to their respective agents and to the reviser in Step 5 — do not re-ask for them later.
+
+Then announce: "Running architecture review and UX/PMF review against the spec." and launch both agents in parallel using the Agent tool:
+
+- `strategic-implementation:architecture-review` (pass: spec content, architecture document location)
+- `strategic-implementation:ux-pmf-review` (pass: spec content, UX/PMF document location, if applicable)
+
+Wait for both to return.
+
+**If either returns STATUS: BLOCK:** surface the blocking issue with the agent's recommended next step. Do not proceed to revision until resolved.
+
+Present both review outputs to the user under a `## Spec Review` heading before entering the revision loop. Frame them as: "These reviews flagged the following before you start revising."
+
+If the architecture review found that the change requires new architectural components or significant adaptation not yet documented: inform the user this must be resolved before revision begins.
 
 ---
 
@@ -104,6 +100,7 @@ Do not present the spec until resolved.
 
 The user reviews the spec and provides feedback. When the user says "revise it" (with feedback in the message, in the feedback slots, or both):
 
+Announce: "Revising spec."
 Use the `strategic-implementation:implementation-reviser` skill.
 
 Pass:
@@ -111,7 +108,7 @@ Pass:
 - All user feedback
 - Architecture document location (from Step 3a)
 - UX/PMF document location (from Step 3a, if applicable)
-- Spec file path: `<feature-folder-path>/spec.md` (from Step 4)
+- Spec file path: `<feature-folder-path>/spec.md` (from Step 3)
 
 The reviser evaluates, refines, logs, and re-presents. Repeat this step as many times as the user needs.
 
@@ -123,11 +120,12 @@ The reviser evaluates, refines, logs, and re-presents. Repeat this step as many 
 
 When the user triggers sessionization:
 
+Announce: "Sessionizing implementation plan."
 Use the `strategic-implementation:sessionize` skill.
 
 Pass:
 - The finalized spec document
-- The feature folder path (stored in Step 4)
+- The feature folder path (stored in Step 3)
 
 The sessionize skill handles everything from here:
 - Breaks the spec into sessions
@@ -147,7 +145,7 @@ The user has an approved sessionized implementation plan.
 The sessionize skill will have prompted the user:
 > "When you're ready to plan a session for execution, say 'plan session [N]' or invoke the session-plan skill."
 
-When the user triggers session planning, invoke `strategic-implementation:session-plan` passing:
+When the user triggers session planning, announce: "Building session plan." then invoke `strategic-implementation:session-plan` passing:
 - Implementation guide path: `<feature-folder-path>/implementation-guide.md`
 - Feature folder path: `<feature-folder-path>/`
 - Which session to plan (from the user)
@@ -157,7 +155,7 @@ When the user triggers session planning, invoke `strategic-implementation:sessio
 ## Constraints (apply throughout)
 
 - No code before spec. This workflow is a gate, not a shortcut.
-- Architecture and UX/PMF review outputs are embedded silently — the user sees the spec, not the review outputs.
+- Architecture and UX/PMF review outputs are presented to the user after the spec is drafted (Step 3a) — they serve as a visible review gate, not silent inputs to the drafter.
 - The spec document is not divided into sessions until the user approves and triggers sessionization.
 - Hard decisions in the spec are locked — they carry through to sessions unchanged.
 - The full agent review runs once on the sessionized plan — not on the spec document.

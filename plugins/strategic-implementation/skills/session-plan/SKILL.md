@@ -180,7 +180,7 @@ Wait for the user's reply in the conversation.
    - Feature folder path: `<feature-folder-path>/`
    - Session number: N
 
-Automatically invoke `strategic-implementation:executing-plans`, passing the paths from Step 5a. No manual step needed.
+Announce: "Invoking `strategic-implementation:executing-plans` to begin session execution." then automatically invoke `strategic-implementation:executing-plans`, passing the paths from Step 5a. No manual step needed.
 
 ## Step 5b — Plan Mode Fallback (safety net)
 

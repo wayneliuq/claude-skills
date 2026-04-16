@@ -1,6 +1,6 @@
 ---
 name: implementation-drafter
-description: Drafts the specification document for a proposed change — a precise, reviewable spec with no session divisions yet. Takes the clarified request and silent architecture/UX review outputs as inputs. Produces an 8-section document with feedback slots under each section.
+description: Drafts the specification document for a proposed change — a precise, reviewable spec with no session divisions yet. Takes the clarified request as input. Produces an 8-section document with feedback slots under each section. Architecture and UX/PMF reviews run after this draft as a post-spec gate.
 ---
 
 # Implementation Drafter
@@ -9,8 +9,8 @@ You are drafting a specification document — not an implementation plan. This d
 
 You receive:
 - The clarified request (from the clarify skill)
-- The architecture review output (embedded silently — do not surface the review itself)
-- The UX/PMF review output (embedded silently — do not surface the review itself)
+
+Architecture and UX/PMF reviews run after the spec is drafted (as a post-spec gate). Do not wait for or request those review outputs — draft from the clarified request only.
 
 ---
 
@@ -20,10 +20,8 @@ You receive:
 
 Before writing anything:
 - Read the clarified request fully
-- Extract from the architecture review: relevant existing components, interfaces, and whether new components are required
-- Extract from the UX/PMF review: affected user types and key UX considerations (or note if it was skipped as backend-only)
 
-Use this to inform the spec. Do not quote or attribute the review outputs in the document — fold their substance into the relevant sections naturally.
+Use this to inform the spec. Architecture and UX/PMF reviews run as a post-spec gate after this draft is presented — do not wait for them.
 
 ### Step 2 — Draft Sections 3–8 First
 
@@ -39,7 +37,7 @@ The core of the document. Break this into subsections by component, concern, or 
 - Key technical decisions embedded in this approach
 - Interface or contract details if this component communicates with others
 
-Draw on the architecture review output here — if the change affects a specific component, describe it using the architecture's own language and structure.
+Draw on any architectural context provided in the clarified request. Architecture review runs after this draft — if the change affects a known component, describe it using whatever structural language the request provides.
 
 **Section 5 — Scope Boundary**
 List everything that is explicitly NOT part of this change. Minimum two entries. For each exclusion, one sentence of rationale (why it's out of scope — deferring to a future session, out of the project's current focus, dependent on another change first, etc.).
@@ -186,9 +184,8 @@ After completing the draft (before presenting to the user):
 
 ## Drafting Standards
 
-- Every claim in the spec must be grounded in the clarified request or the review outputs. Do not invent requirements.
+- Every claim in the spec must be grounded in the clarified request. Do not invent requirements.
 - Sections 1 and 2 must be readable by a non-technical stakeholder. Sections 3–8 may be technical.
-- If the architecture or UX review flagged something that materially affects the spec, it must be represented — in Section 6 (as an open decision), Section 7 (as a risk), or Section 4 (as a constraint on the design). Do not silently ignore flags.
 - If an open decision in Section 6 is one where you have a clear recommendation, state it. Do not present false balance.
 - **Write ownership at the definition site.** When Section 4 introduces shared mutable state (injection keys, global stores, event buses, shared refs), the spec must state which components are permitted to write it — not just who reads it. This ownership rule belongs in the description of the state's definition, not only in the description of its writers. Future consumers read the definition first.
 - **Precondition-dependent behaviors require a verification step.** When Section 4 specifies interactive behaviors (collapse/expand, drag-resize, show/hide toggle, context-sensitive controls) whose value or correctness depends on an environmental condition (layout position, spatial constraint, service availability, permission state), the spec must include an explicit step to verify that condition before the behavior is implemented. Behaviors built on an unverified assumption are discarded entirely when the assumption turns out wrong.

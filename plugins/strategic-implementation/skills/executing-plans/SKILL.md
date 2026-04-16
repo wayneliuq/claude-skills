@@ -216,10 +216,14 @@ After all steps complete, ask:
 3. Announce: "Session N complete. Implementation guide updated."
    _updated — docs/strategic-implementation/[path]/implementation-guide.md_
 4. Offer: "Would you like to run a post-mortem on this session? It reviews deviations and updates the project learning log. Say 'run post-mortem' or 'skip'."
-   - **Run post-mortem:** invoke `strategic-implementation:post-mortem` with: feature folder path, session number N, session plan path, deviation log path (or `none` if no log exists), implementation guide path.
-   - **Skip:** announce "Skipping post-mortem." Then invoke `superpowers:finishing-a-development-branch`.
+   - **Run post-mortem:** announce "Invoking `strategic-implementation:post-mortem` to review session deviations." then invoke `strategic-implementation:post-mortem` with: feature folder path, session number N, session plan path, deviation log path (or `none` if no log exists), implementation guide path.
+   - **Skip:** announce "Skipping post-mortem."
+5. **All-sessions check:** Re-read the implementation guide. Count all sessions and their statuses.
+   - If **all sessions are now marked `complete`:** announce "All sessions complete. Invoking `strategic-implementation:end-of-implementation` for end-to-end validation." then invoke `strategic-implementation:end-of-implementation`, passing: feature folder path, implementation guide path.
+   - If **sessions remain pending or in-progress:** this skill ends here. The user will invoke `strategic-implementation:session-plan` for the next session.
 
 **If no, or if the response is ambiguous** ("sort of", "mostly", "there's one small thing", or any answer that is not a clear yes):
+Announce: "Invoking `strategic-implementation:bug-fix` to investigate and resolve the issue."
 Invoke `strategic-implementation:bug-fix`, passing:
 - Feature folder path
 - Session number N
@@ -228,7 +232,7 @@ Invoke `strategic-implementation:bug-fix`, passing:
 - Deviation log path (or `none` if no log exists)
 
 The bug-fix skill owns the investigation and fix. It will return a summary of what was resolved. When it returns, re-ask: "Is everything working as expected now?"
-- **Yes:** proceed to mark complete (step 1–4 of the "If yes" path above).
+- **Yes:** proceed to mark complete (steps 1–5 of the "If yes" path above, in order).
 - **No or ambiguous:** re-invoke `strategic-implementation:bug-fix` with the same parameters. Repeat until the user confirms yes. Do not mark Session N complete until confirmed.
 
 ---
