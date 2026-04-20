@@ -1,5 +1,5 @@
 {
   "name": "strategic-implementation",
-  "version": "1.4.0",
-  "description": "Full planning-to-execution workflow: clarify → spec → revise → sessionize → agent review → session plan → execute"
+  "version": "2.0.0",
+  "description": "PM-oriented planning-to-execution workflow: clarify → product brief → plan-mode execution plan → tiered review → deliverable-gated execution"
 }

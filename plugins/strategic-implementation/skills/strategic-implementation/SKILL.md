@@ -1,162 +1,117 @@
 ---
 name: strategic-implementation
-description: Use when starting any non-trivial feature, change, or new component — before writing any code or plan. Guides clarification, architecture review, spec drafting, iterative revision, sessionization, and agent review. Session planning is a separate invocation.
+description: v2 orchestrator. Routes PM-described work through clarify → product brief → execution plan (in plan mode) → deliverable-gated execution → post-execution. Single-artifact approval (the brief). Plan mode is both drafting environment and approval gate for the execution plan.
 ---
 
 # strategic-implementation
 
-A structured planning workflow for software development. No code is written until a spec is approved, sessionized, and reviewed. This skill produces an approved sessionized implementation plan — session planning and execution are handled by the `strategic-implementation:session-plan` skill, invoked separately.
+v2 planning-to-execution orchestrator. The PM approves one artifact (the product brief). The execution plan is reviewed and approved inside Claude Code plan mode. Execution is deliverable-gated — no sessions, no LOC budgets.
 
 ---
 
-## Entry: Three Paths
+## Entry: three paths
 
-Before anything else, ask:
+Ask: **"Where are you in the process for this work?"**
 
-**"Where are you in the process for this work?"**
-
-- **Sessionized implementation plan exists:** You don't need this skill. Invoke `strategic-implementation:session-plan` directly with your plan.
-- **Spec document in progress (not yet sessionized):** Ask — "Do you want to continue revising, or is it ready to sessionize?" → revision: go to Step 5 with the existing spec; sessionize: go to Step 6 with the finalized spec.
-- **Nothing yet:** Proceed to Step 1 below.
+- **Execution plan already approved** → invoke `strategic-implementation:executing-plans` directly, passing the plan path and feature folder.
+- **Product brief drafted, not yet planned** → continue to Step 4 (execution-plan) with the existing brief.
+- **Nothing yet** → Step 1.
 
 ---
 
 ## Step 1 — Clarify
 
 Announce: "Starting clarification."
-Use the `strategic-implementation:clarify` skill.
+Invoke `strategic-implementation:clarify`.
 
-List assumptions. Ask only what would change the approach. Wait for user confirmation before proceeding.
+Clarify collects in a single pass: assumptions, approach-changing questions, ALL document references (architecture, UX/PMF, security, schema — as applicable), and the autonomy level.
+
+Store everything clarify returns. No re-asking downstream.
 
 ---
 
-## Step 2 — Scope Assessment
+## Step 2 — Scope assessment
 
-After clarification, assess scope against ALL THREE criteria:
+After clarification, assess:
 
-**Fast-path if all three are true:**
+**Fast-path** (all three true):
 1. Deliverable describable in one sentence
-2. Change contained to one area (one component, file group, or feature)
-3. No new architectural patterns or dependencies introduced
+2. Change contained to one area
+3. No new architectural patterns or dependencies
 
 **If fast-path:**
-1. Create `implementation-guide.md` at `docs/strategic-implementation/<date>-<slug>/implementation-guide.md` (derive date as `YYYY-MM-DD`, derive slug from the one-sentence description).
-2. Populate it with the approved spec content — a concise implementation plan covering the goal, steps, deliverables, and any relevant constraints.
-3. Announce: "Starting execution." then invoke `strategic-implementation:executing-plans`, passing:
-   - Implementation guide path: `docs/strategic-implementation/<date>-<slug>/implementation-guide.md`
-   - Feature folder path: `docs/strategic-implementation/<date>-<slug>/`
+1. Create `docs/strategic-implementation/<YYYY-MM-DD>-<slug>/`.
+2. Write a one-page `execution-plan.md` inline (single deliverable, validation method, files).
+3. Announce: "Fast-path: skipping brief. Starting execution."
+4. Invoke `strategic-implementation:executing-plans` with the plan path, feature folder, autonomy level.
 
-This skill ends here.
+This skill ends.
 
 **Otherwise:** continue to Step 3.
 
 ---
 
-## Step 3 — Draft Specification Document
+## Step 3 — Product brief
 
-Announce: "Drafting specification document."
-Use the `strategic-implementation:implementation-drafter` skill.
+Announce: "Drafting product brief."
+Invoke `strategic-implementation:product-brief-drafter` in `draft` mode with:
+- Clarified request
+- Document references (all of them)
+- Autonomy level
 
-Pass:
-- The clarified request
+The drafter writes `product-brief_<slug>.md` to a new feature folder. It returns the brief path and feature folder path.
 
-The drafter produces a specification document using the 8-section framework with feedback slots.
+### Revision loop
 
-Store the feature folder path returned by implementation-drafter. Pass it to:
-- the post-spec review agents in Step 3a
-- implementation-reviser in Step 5 (as spec file path: `<feature-folder-path>/spec.md`)
-- sessionize in Step 6
-- session-plan when the user triggers session planning
-Do not re-derive it from the spec title.
+The PM reviews the brief. They can:
+- Add inline `<!-- pm: ... -->` comments and reply "revise" → invoke `product-brief-drafter` in `revise` mode.
+- Reply "approve" → proceed to Step 4.
 
----
-
-## Step 3a — Post-Spec Review Gate
-
-After the spec is drafted, collect document references before launching the review agents.
-
-Ask the user:
-1. **Architecture document** — "Where is the architecture document for this project? Is it current?" (Required — architecture review will BLOCK without it)
-2. **UX/PMF document** — "Is there a UX or product-market fit document for this area?" (Only ask if the change has any user-facing impact; skip for purely backend changes)
-
-Store both locations. They are passed to their respective agents and to the reviser in Step 5 — do not re-ask for them later.
-
-Then announce: "Running architecture review and UX/PMF review against the spec." and launch both agents in parallel using the Agent tool:
-
-- `strategic-implementation:architecture-review` (pass: spec content, architecture document location)
-- `strategic-implementation:ux-pmf-review` (pass: spec content, UX/PMF document location, if applicable)
-
-Wait for both to return.
-
-**If either returns STATUS: BLOCK:** surface the blocking issue with the agent's recommended next step. Do not proceed to revision until resolved.
-
-Present both review outputs to the user under a `## Spec Review` heading before entering the revision loop. Frame them as: "These reviews flagged the following before you start revising."
-
-If the architecture review found that the change requires new architectural components or significant adaptation not yet documented: inform the user this must be resolved before revision begins.
+Do not prompt the PM to decide — wait for their signal. The loop runs as many times as needed.
 
 ---
 
-## Step 5 — Iterative Revision
+## Step 4 — Execution plan (plan mode)
 
-The user reviews the spec and provides feedback. When the user says "revise it" (with feedback in the message, in the feedback slots, or both):
+On brief approval, announce: "Drafting execution plan in plan mode."
+Invoke `strategic-implementation:execution-plan` with:
+- Brief path
+- Feature folder path
+- Autonomy level
 
-Announce: "Revising spec."
-Use the `strategic-implementation:implementation-reviser` skill.
+`execution-plan` enters plan mode as its first action, drafts against the brief using live repo state, invokes `strategic-implementation:review` inside plan mode, applies review patches, and presents the plan via plan mode's native UI.
 
-Pass:
-- The current spec document
-- All user feedback
-- Architecture document location (from Step 3a)
-- UX/PMF document location (from Step 3a, if applicable)
-- Spec file path: `<feature-folder-path>/spec.md` (from Step 3)
+On PM approval (plan mode's approve button, or affirmative text reply): `execution-plan` saves the plan, exits plan mode, and invokes `executing-plans` itself.
 
-The reviser evaluates, refines, logs, and re-presents. Repeat this step as many times as the user needs.
-
-**The revision loop continues until the user says "sessionize it" or equivalent.** Do not prompt the user to move on — let them decide when the spec is ready.
+This orchestrator does not re-handle execution — `execution-plan` owns the handoff.
 
 ---
 
-## Step 6 — Sessionize
+## Step 5 — Execution (handled by executing-plans)
 
-When the user triggers sessionization:
+`executing-plans` runs deliverable-by-deliverable. For each deliverable:
+- Pre-flight env check for the validation method
+- Build
+- Validate (preview / cli / tdd / post-hoc)
+- Commit per deliverable (atomic)
+- Log deviations to `validation-log.md`
 
-Announce: "Sessionizing implementation plan."
-Use the `strategic-implementation:sessionize` skill.
-
-Pass:
-- The finalized spec document
-- The feature folder path (stored in Step 3)
-
-The sessionize skill handles everything from here:
-- Breaks the spec into sessions
-- Runs the scope-limiter for dependency map
-- Runs the full 10-agent review
-- Synthesizes and patches
-- Presents to the user for approval
-
-This skill (strategic-implementation) ends when the user approves the sessionized plan inside the sessionize skill.
+On the final deliverable's completion, `executing-plans` invokes `strategic-implementation:post-execution` in `regression-check` mode.
 
 ---
 
-## End State
+## Autonomy semantics (apply throughout)
 
-The user has an approved sessionized implementation plan.
-
-The sessionize skill will have prompted the user:
-> "When you're ready to plan a session for execution, say 'plan session [N]' or invoke the session-plan skill."
-
-When the user triggers session planning, announce: "Building session plan." then invoke `strategic-implementation:session-plan` passing:
-- Implementation guide path: `<feature-folder-path>/implementation-guide.md`
-- Feature folder path: `<feature-folder-path>/`
-- Which session to plan (from the user)
+- `supervised`: pause at every gate for PM review (brief approval, plan approval, each deliverable).
+- `auto` (default): pause only on FLAG / BLOCK and at PM-approval gates (brief, execution plan). Non-blocking steps proceed.
+- `yolo`: pause only on BLOCK. Preview-unavailable auto-escalates to TDD rather than pausing.
 
 ---
 
-## Constraints (apply throughout)
+## Constraints
 
-- No code before spec. This workflow is a gate, not a shortcut.
-- Architecture and UX/PMF review outputs are presented to the user after the spec is drafted (Step 3a) — they serve as a visible review gate, not silent inputs to the drafter.
-- The spec document is not divided into sessions until the user approves and triggers sessionization.
-- Hard decisions in the spec are locked — they carry through to sessions unchanged.
-- The full agent review runs once on the sessionized plan — not on the spec document.
-- Session planning is a separate invocation — this skill does not trigger it.
+- No code before brief approval and execution-plan approval.
+- Execution plan is reviewed; brief is not (brief review is the PM's inline review).
+- Plan mode is entered inside `execution-plan` — not here.
+- Hard decisions in the brief are locked; review cannot reverse them.
+- `executing-plans` owns all per-deliverable flow. This skill ends when execution begins.

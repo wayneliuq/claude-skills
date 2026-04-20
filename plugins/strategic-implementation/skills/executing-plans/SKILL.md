@@ -1,246 +1,209 @@
 ---
 name: executing-plans
-description: Executes a single session plan from the strategic-implementation workflow. Marks session progress in the implementation guide, enforces TDD with atomic commits, logs deviations, updates the living document with meaningful deviations and downstream flags, and offers post-mortem on completion.
+description: Executes an approved v2 execution plan, one deliverable at a time. Deliverable-gated (not session-based). Per-deliverable pre-flight env check, validation per declared method (preview / cli / tdd / post-hoc), atomic commit per deliverable, deviation log. Invokes post-execution for regression-check on completion.
 ---
 
-# Executing Plans
+# executing-plans
 
-Executes one session from an approved session plan. Invoked automatically by `session-plan` (which passes all paths), or manually by the user.
+Executes one approved execution plan end-to-end. v2 is **deliverable-gated** — each deliverable is an atomic unit with its own validation method declared at plan time.
 
-**Announce at start:** "Starting execution of Session N: [session name]."
+You receive:
+- Execution plan path (`<feature-folder>/execution-plan.md`)
+- Feature folder path
+- Autonomy level (`supervised` | `auto` | `yolo`)
 
----
-
-## Step 0 — Receive Context
-
-**If invoked by session-plan:** receive as parameters:
-- Session plan path (e.g., `docs/strategic-implementation/2026-04-02-auth-redesign/session-1-plan.md`)
-- Implementation guide path (e.g., `docs/strategic-implementation/2026-04-02-auth-redesign/implementation-guide.md`)
-- Feature folder path (e.g., `docs/strategic-implementation/2026-04-02-auth-redesign/`)
-- Session number N
-
-**If invoked standalone (user invokes directly):** ask:
-1. "What is the path to the session plan file?"
-2. "What is the path to the implementation guide?"
-
-Derive feature folder path and session number N from the session plan path.
-
-Load and read both files completely before proceeding. Initialize deviation counter at `DEV-001`.
-
-**Branch check:** Run `git branch --show-current`. If the result is `main` or `master`, display the following warning and require explicit user confirmation before proceeding to Step 1:
-
-> ⚠️ **Warning: you are on the `[branch name]` branch.** Executing a session plan directly on `main`/`master` is strongly discouraged. Please confirm you want to proceed on this branch, or switch to a feature branch first.
-
-Wait for explicit user confirmation (e.g., "yes, proceed", "confirmed", or equivalent) before continuing. If the user does not confirm, stop here.
+Announce at start: "Starting execution: <feature slug>."
 
 ---
 
-## Step 1 — Mark Session In-Progress
+## Step 0 — Branch check
 
-In the implementation guide, update Session N's Status field:
-`**Status:** \`pending\`` → `**Status:** \`in-progress\``
+Run `git branch --show-current`. If result is `main` or `master`:
 
-Announce: "Implementation guide updated to `in-progress`."
-_updated — docs/strategic-implementation/[path]/implementation-guide.md_
+> ⚠️ **Warning: you are on `<branch>`.** Execution directly on main/master is strongly discouraged. Confirm to proceed, or switch to a feature branch first.
 
----
-
-## Step 2 — Analyze Parallelism
-
-Read the Steps list in the session plan. Group steps by `[parallel group: X]` annotation — all steps sharing the same letter run concurrently. Steps with no annotation are sequential.
-
-Produce and announce an execution schedule before starting:
-> "Execution schedule: Group A (steps 1, 2) → Step 3 → Group B (steps 4, 5) → Step 6."
+In `supervised` or `auto`: wait for explicit confirmation.
+In `yolo`: proceed but log a `branch-risk` deviation.
 
 ---
 
-## Step 3 — Execute Steps
+## Step 1 — Read plan
 
-For each unit in the execution schedule:
+Read `execution-plan.md` fully. Extract: deliverables, DAG order, parallel groups.
 
-**Sequential step:** execute inline.
+Initialize `validation-log.md` at `<feature-folder>/validation-log.md` with header:
 
-**Parallel group:** dispatch one subagent per step using the Agent tool. Each subagent receives the step description, file paths, and the TDD protocol below. Wait for all subagents to return before proceeding to the next unit. If any subagent returns failure: stop and surface the failure to the user — do not proceed to downstream sequential steps.
+```markdown
+# Validation log
+_Feature: <slug> · Started: <date> · Autonomy: <level>_
+```
 
-### Execution Failure Protocol (triggered on any step failure — classification below determines approach)
+Initialize deviation counter `DEV-001`.
 
-**Classify the failure first:**
-- **Determinate** — root cause is directly visible (wrong import path, syntax error, missing env var): fix it. If the fix fails, treat as assumption-based and continue below.
-- **Assumption-based** — cause must be inferred from behavior: state the assumption explicitly before attempting any fix.
+---
+
+## Step 2 — Execute DAG
+
+For each deliverable group in DAG order (parallel groups run concurrently, sequential groups run in order):
+
+### Step 2a — Pre-flight env check
+
+Before building the deliverable, verify the prerequisites for its validation method:
+
+- **`preview`:** Claude Code preview tool available; dev server startable. If not available: apply preview-unavailable fallback (below).
+- **`cli`:** the CLI command runnable; required binaries in PATH.
+- **`tdd`:** test runner available; baseline suite passes.
+- **`post-hoc`:** no automated pre-check; note manual validation required.
+
+If pre-flight fails: log a `blocker` deviation and stop. Surface to PM with what's missing.
+
+### Preview-unavailable fallback
+
+If `preview` pre-flight fails:
+- `supervised` / `auto`: pause. Surface to PM: "Preview unavailable. Proceed with manual validation, or switch deliverable to TDD?"
+- `yolo`: auto-escalate to TDD. Log an `auto-escalation` deviation. Write a minimal acceptance test before building.
+
+### Step 2b — Build
+
+Implement the deliverable per its steps. Rules:
+
+- **Only files named in the deliverable.** Unrelated touches = deviation.
+- **TDD where declared.** If validation is `tdd`: test first, then implementation, then test passes.
+- **Code discipline:**
+  - Write the minimum that passes validation. No speculative abstractions.
+  - Match existing conventions (style, naming, error handling).
+  - Clean up only code YOUR changes made unused — leave pre-existing dead code alone.
+  - Do not "improve" adjacent code.
+
+### Step 2c — Validate
+
+Run the declared validation:
+- **preview:** start preview, capture the observable behavior, confirm against the deliverable's expected behavior.
+- **cli:** run the command, assert expected output.
+- **tdd:** run the test written in 2b; must pass. Also run the full suite — no new failures.
+- **post-hoc:** surface to PM with what to inspect. In `yolo`, skip inspection, log `yolo-skip`.
+
+If validation fails: apply **Failure Protocol** below.
+
+### Step 2d — Commit
+
+Atomic commit per deliverable:
+
+```
+D<n>: <one-sentence outcome>
+```
+
+Example: `D3: add product-brief revision loop`.
+
+Only the files named in this deliverable are staged.
+
+### Step 2e — Mark complete
+
+In `execution-plan.md`, update deliverable status: `pending` → `complete`.
+
+---
+
+## Failure Protocol
+
+On validation failure:
+
+**Classify:**
+- **Determinate** (clear root cause): fix → re-validate. If that fails, treat as assumption-based.
+- **Assumption-based** (must infer): state the assumption explicitly before any fix.
 
 **Attempt 1:**
-1. State the assumption (assumption-based) or root cause (determinate) in one sentence before touching any code.
-2. Implement the fix. Run tests.
-3. **Success:** log a `blocker` or `retry` deviation, continue execution.
-4. **Failure:** revert all changes from this attempt (`git revert` or manual rollback). Confirm the error/test state returns to baseline before proceeding.
+1. State assumption / root cause in one sentence.
+2. Fix. Re-validate.
+3. Success → log `retry` deviation, continue.
+4. Failure → revert changes. Confirm baseline restored.
 
-**After Attempt 1 failure — re-examine assumptions:**
-- List ALL assumptions that informed Attempt 1.
-- Rate each: `high` / `medium` / `low` confidence.
-- If no assumption is rated `medium` or `low`: **EXIT** (see Exit Report below).
-- If one or more assumptions are `medium` or `low`: identify the single lowest-confidence assumption. Revise it. Determine if a distinct fix follows from this revision.
+**Re-examine:**
+- List all assumptions. Rate each `high` / `medium` / `low`.
+- If all `high`: **EXIT** (see Exit Report).
+- Else: revise the lowest-confidence assumption.
 
-**Attempt 2 (only if a distinct fix is identified from revised assumptions):**
-1. State the revised assumption explicitly.
-2. Implement. Run tests.
-3. **Success:** log deviation, continue.
-4. **Failure:** revert all changes from this attempt. Confirm baseline restored. **EXIT.**
+**Attempt 2** (only if revision yields a distinct fix):
+1. State revised assumption.
+2. Fix. Re-validate.
+3. Success → log deviation, continue.
+4. Failure → revert. **EXIT.**
 
-**Exit Report — format and surface to user:**
+### Exit Report
+
 ```
 ## Execution Blocked
 
-**Step:** [step number and description]
-**Error:** [exact error message or test output — no paraphrasing]
+**Deliverable:** D<n> — <name>
+**Failure:** <exact error / test output>
 
-**Observations (confirmed facts):**
-- [fact 1]
-- [fact 2]
-
-**Assumptions held:**
-- [assumption] — confidence: high / medium / low
+**Confirmed facts:**
 - ...
 
-**Attempts made:**
-1. [what was tried] → [outcome]
-2. [what was tried] → [outcome] _(if applicable)_
+**Assumptions held:**
+- <assumption> — confidence: high/med/low
+- ...
 
-**Most suspect assumption:** [single statement of the assumption most likely to be wrong]
+**Attempts:**
+1. <what> → <outcome>
+2. <what> → <outcome> (if applicable)
 
-**Blocked on:** [what human input, external access, or information is needed to proceed]
+**Most suspect assumption:** <one sentence>
 
-All changes from failed attempts have been reverted. Codebase is at baseline.
+**Blocked on:** <what PM input or external info is needed>
+
+All failed-attempt changes reverted. Working tree at baseline.
 ```
 
-Do not mark the session complete. Do not proceed to Step 4. Await user direction.
-
-### TDD Protocol (apply to every step, sequential or parallel)
-
-**TDD ordering correction:** Before executing, check whether the plan places a test step after its paired implementation step — or defers a test step to a later parallel group. If so: reorder locally so the test precedes the implementation, treat both as sequential, and log an `ambiguity-decision` deviation. Do not execute implementation before test.
-
-1. Write the failing test. Run it. Confirm it fails for the expected reason.
-   - If the test passes before any implementation: stop and surface this to the user. Do not proceed.
-2. Write the minimal implementation to make the test pass.
-3. Run the full test suite (not just the new test). Confirm: new test passes AND no regressions.
-   - If regressions: fix before committing.
-4. Commit atomically — one commit per deliverable (not per step). If multiple steps together complete one deliverable, commit after the deliverable is complete.
-   - Commit message format: `session-N step M: [what was done]`
-   - Example: `session-1 step 3: add user auth middleware`
-
-_Exception: steps involving infrastructure or configuration only (no testable behavior) may skip the test-first step. Describe why in the deviation log if skipped._
-
-### Code Discipline (apply to every step, alongside TDD)
-
-**Simplicity:** Write the minimum code that passes the test and satisfies the step. No abstractions for single-use code, no speculative features, no "flexibility" or "configurability" beyond what the step describes. If you wrote 200 lines and it could be 50, rewrite before committing.
-
-**Surgical changes:** Touch only what the step requires. Do not "improve" adjacent code, comments, formatting, type hints, or docstrings. Do not refactor things that aren't broken. Every changed line should trace directly to the step's deliverable.
-
-**Style matching:** Match the existing codebase's conventions — quote style, spacing, naming patterns, error handling idioms. Even if you'd do it differently, consistency with surrounding code takes priority.
-
-**Clean only your mess:** Remove imports, variables, and functions that YOUR changes made unused. Do not remove pre-existing dead code or unused items — mention them in the deviation log if noticed, but leave them untouched.
-
-### Deviation Detection
-
-After each step, assess: did this step execute exactly as the plan described?
-
-A deviation exists when any of these occurred:
-- A **blocker** was hit (dependency missing, test fails unexpectedly, instruction impossible as written)
-- A **retry** was needed (first attempt failed, approach changed)
-- A **user correction** occurred mid-step
-- A **reversal** — a step was undone
-- An **ambiguity decision** — an unclear instruction required a judgment call
-
-**If no deviation:** continue.
-
-**If deviation:** log it immediately (see Deviation Log below), then assess:
-
-> Is this a **meaningful deviation** — would a future session agent make wrong assumptions if they didn't know this? Test: "Does this change what was actually built relative to what the plan describes?"
-
-- **Yes (meaningful):** update the implementation guide's `#### Meaningful Deviations` block for Session N immediately. Then run Step 3a.
-- **No:** log only. Do not touch the implementation guide.
+Do not mark complete. Do not proceed to next deliverable. Await PM direction.
 
 ---
 
-## Step 3a — Downstream Impact Assessment (run when a meaningful deviation is logged)
+## Deviation logging
 
-Read the implementation guide. For each session after Session N:
-- Would this deviation cause a downstream session agent to make wrong assumptions?
-- If yes: prepend `⚠️ REVISION NEEDED — [one sentence: what changed and why it matters for this session]` to that session's block.
-- If no: leave unchanged.
+A deviation exists on any of: blocker, retry, user-correction, reversal, ambiguity-decision, auto-escalation, yolo-skip, branch-risk.
 
-Run inline. Surface flagged sessions to the user in the next user-facing message.
+Append to `validation-log.md`:
 
----
-
-## Deviation Log Format
-
-File: `<feature-folder-path>/session-N-log.md`
-Create only when at least one deviation is logged. Do not create an empty file.
-When the file is first created, announce: _saved to docs/strategic-implementation/[path]/session-N-log.md_
-
-**File header:**
-```markdown
-# Session N Deviation Log
-_Feature: [feature folder name]_
-_Session: N — [session name]_
-_Date: YYYY-MM-DD_
-_Total deviations: [update this count when session completes]_
-
----
-```
-
-**Each entry:**
 ```markdown
 ## DEV-NNN
-**Type:** `blocker` | `retry` | `user-correction` | `reversal` | `ambiguity-decision`
-**Step:** [step number from session plan]
-**What the plan said:** [verbatim or close paraphrase of the planned step]
-**What actually happened:** [what was done instead, and why]
-**Resolution:** [how it was resolved]
-**Plan gap?** `yes` | `no` — [if yes: one sentence on what the plan failed to anticipate]
-**Downstream impact?** `yes` | `no`
-**Agent category:** [one of: future-proofing | security | data-model | api-contract | test-coverage | performance | dependency | frontend | scope | technical]
+**Type:** blocker | retry | user-correction | reversal | ambiguity-decision | auto-escalation | yolo-skip | branch-risk
+**Deliverable:** D<n>
+**Plan said:** <verbatim>
+**Actually:** <what happened>
+**Resolution:** <how resolved>
+**Downstream impact?** yes | no — <if yes: one sentence on what changes for later deliverables>
+**Agent category:** alignment | boundaries | runtime-risk | tests | frontend | technical | simplify
 ```
+
+If `downstream impact: yes` and a later deliverable is affected: prepend `⚠️ REVISION NEEDED — <one sentence>` to that deliverable's block in `execution-plan.md`. Surface flagged deliverables to the PM before starting them.
 
 ---
 
-## Step 4 — End Checkpoint
+## Step 3 — All-deliverables checkpoint
 
-After all steps complete, ask:
+When all deliverables are marked complete:
 
-> "All steps executed. Is everything working as expected?"
+1. Announce: "All deliverables complete. Running regression check."
+2. Invoke `strategic-implementation:post-execution` in `regression-check` mode with the feature folder path.
+3. `post-execution` writes `post-execution-report.md` and reports back.
+4. If the report status is `PASS`: announce feature complete.
+5. If `FLAG` or `BLOCK`: surface to PM; do not declare complete until resolved.
 
-**If yes:**
-1. Update implementation guide Session N: `**Status:** \`in-progress\`` → `**Status:** \`complete\``
-2. If a deviation log was created: finalize by updating `_Total deviations: N_` header line.
-3. Announce: "Session N complete. Implementation guide updated."
-   _updated — docs/strategic-implementation/[path]/implementation-guide.md_
-4. Offer: "Would you like to run a post-mortem on this session? It reviews deviations and updates the project learning log. Say 'run post-mortem' or 'skip'."
-   - **Run post-mortem:** announce "Invoking `strategic-implementation:post-mortem` to review session deviations." then invoke `strategic-implementation:post-mortem` with: feature folder path, session number N, session plan path, deviation log path (or `none` if no log exists), implementation guide path.
-   - **Skip:** announce "Skipping post-mortem."
-5. **All-sessions check:** Re-read the implementation guide. Count all sessions and their statuses.
-   - If **all sessions are now marked `complete`:** announce "All sessions complete. Invoking `strategic-implementation:end-of-implementation` for end-to-end validation." then invoke `strategic-implementation:end-of-implementation`, passing: feature folder path, implementation guide path.
-   - If **sessions remain pending or in-progress:** this skill ends here. The user will invoke `strategic-implementation:session-plan` for the next session.
+### Learnings trigger
 
-**If no, or if the response is ambiguous** ("sort of", "mostly", "there's one small thing", or any answer that is not a clear yes):
-Announce: "Invoking `strategic-implementation:bug-fix` to investigate and resolve the issue."
-Invoke `strategic-implementation:bug-fix`, passing:
-- Feature folder path
-- Session number N
-- Session plan path
-- Implementation guide path
-- Deviation log path (or `none` if no log exists)
+If `validation-log.md` has ≥2 meaningful deviations (judgment — typo-fixes don't count), offer the PM:
 
-The bug-fix skill owns the investigation and fix. It will return a summary of what was resolved. When it returns, re-ask: "Is everything working as expected now?"
-- **Yes:** proceed to mark complete (steps 1–5 of the "If yes" path above, in order).
-- **No or ambiguous:** re-invoke `strategic-implementation:bug-fix` with the same parameters. Repeat until the user confirms yes. Do not mark Session N complete until confirmed.
+> "N meaningful deviations logged. Run learnings synthesis? (yes/skip)"
+
+On yes: invoke `post-execution` in `learnings-synthesis` mode.
 
 ---
 
 ## Constraints
 
-- Never start implementation on main/master branch without explicit user consent.
-- Never skip a test step. If a deliverable has no described test in the session plan: stop and ask how to verify correctness before implementing.
-- Never commit multiple deliverables in one commit.
-- Never proceed past a failed parallel subagent — surface failures immediately.
-- Stop and ask rather than guess on any ambiguous instruction.
+- No execution on `main`/`master` without explicit consent.
+- No deliverable skipped without explicit PM decision.
+- One commit per deliverable. No batching, no amending prior deliverable commits.
+- No LOC budget — fitness is the gate, not size.
+- Deviation log is append-only. Never rewrite.
+- Hard decisions in the brief and plan are immutable during execution.
