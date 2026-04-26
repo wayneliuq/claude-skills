@@ -9,6 +9,14 @@ v2 planning-to-execution orchestrator. The PM approves one artifact (the product
 
 ---
 
+## Validation honesty principle
+
+**A green test suite is not a proxy for correctness.** A 100% passing run validates only the contracts your tests describe. If your tests systematically mock the integration points where your code actually lives — third-party runtimes, real network/browser behavior, cross-component reactive state — the suite is measuring orthogonal-to-correctness coverage. Validation methods must be honest about what they exercise; mocks at integration-risk seams require manual or integration-test validation as a backstop.
+
+This principle motivates three gates baked into the workflow: integration-risk dependency collection (in `clarify`), library-lifecycle audit and per-deliverable integration-risk classification (in `execution-plan`), and consumer-audit on shape changes (in `execution-plan` + `executing-plans`). Reviewers (`tests`, `runtime-risk`, `alignment`) flag when these are missing or hand-wavy.
+
+---
+
 ## Entry: three paths
 
 Ask: **"Where are you in the process for this work?"**
@@ -77,6 +85,7 @@ On brief approval, announce: "Drafting execution plan in plan mode."
 Invoke `strategic-implementation:execution-plan` with:
 - Brief path
 - Feature folder path
+- Integration-risk dependencies (from clarify; may be empty)
 - Autonomy level
 
 `execution-plan` enters plan mode as its first action, drafts against the brief using live repo state, invokes `strategic-implementation:review` inside plan mode, applies review patches, and presents the plan via plan mode's native UI.

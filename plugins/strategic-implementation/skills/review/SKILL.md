@@ -25,9 +25,14 @@ Scan the plan for trigger tokens. Determine which specialists are candidates:
 | Specialist | Trigger tokens (case-insensitive, any match) |
 |---|---|
 | `boundaries` | auth, permission, role, endpoint, route, schema, migration, column, index, secret, credential, token, api, webhook, pii |
-| `runtime-risk` | cache, queue, batch, retry, cron, worker, hot path, throughput, latency, stream, poll, install, dependency, package, license |
+| `runtime-risk` | cache, queue, batch, retry, cron, worker, hot path, throughput, latency, stream, poll, install, dependency, package, license, **any non-empty `Library lifecycle audit` section, or any deliverable with `Integration-risk class: a`** |
 | `tests` | (always a candidate — validation method adequacy is reviewed every run) |
 | `frontend-engineer` | component, page, route (if frontend framework present), modal, form, button, screen, view, css, style |
+
+Additional triggers (any specialist that matches gets added to the candidate set):
+- **Missing `Library lifecycle audit` when integration-risk deps were declared in clarify** → `runtime-risk`.
+- **Any deliverable whose `Consumer audit` is missing, present-but-empty, or hand-wavy on a shape-changing deliverable** → `alignment`.
+- **Any deliverable with `Integration-risk class: a|b|c` and `Validation: tdd`** → `tests` (honesty check is mandatory).
 
 Record the candidate set. Specialists not in the candidate set will not run unless `alignment` adds them.
 

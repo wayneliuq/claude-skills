@@ -13,13 +13,16 @@ v2 uses **goal-level acceptance testing**, not line-level unit coverage. Pre-GA,
 
 For each deliverable, check:
 
-1. **Validation method is declared and honest.** One of: `preview` (visual confirmation via Claude Code preview), `cli` (command whose output proves the behavior), `tdd` (acceptance test written before implementation), `post-hoc` (manual PM inspection). A missing or vague method is a FLAG.
-2. **The method can actually prove the acceptance criterion.** A UI change claiming `cli` validation is suspicious — what would the CLI show? A data-integrity change claiming `preview` is suspicious — what is there to look at?
-3. **TDD is used where it is actually required.** Required when: (a) the behavior is not visually observable, (b) regression risk is high, (c) a prior bug in this area exists, (d) the brief explicitly demands it. Over-prescribed TDD is a FLAG — it burns tokens without yielding.
-4. **Preview-unavailable fallback.** If a deliverable declares `preview` but the plan runs non-interactive, the fallback (pause for PM manual validation, or escalate to TDD in yolo) must be specified.
-5. **Acceptance coverage.** Every acceptance criterion in the brief maps to at least one deliverable's validation. Orphan criteria are FLAGs.
-6. **Fragility and flakiness.** Tests that depend on timing, network, or non-deterministic ordering are FLAGs. Snapshot tests on large artifacts are FLAGs.
-7. **Regression safety.** For changes that touch shared code, the plan specifies how existing tests will be run and what counts as a regression.
+1. **Validation method is declared and honest.** One of: `preview` (visual confirmation via Claude Code preview), `cli` (command whose output proves the behavior), `tdd` (acceptance test written before implementation), `integration-test` (test exercises the real third-party runtime / network / cross-component seam — no mocks at the integration point), `post-hoc` (manual PM inspection). A missing or vague method is a FLAG.
+2. **Validation honesty at integration-risk seams (HIGH).** If a deliverable declares `Integration-risk class: a|b|c` and `Validation: tdd`, inspect what the proposed test would mock. If the test would mock the dependency whose correctness the deliverable rests on, this is a **HIGH-severity FLAG**. Required wording shape:
+   > "D<n> declares `tdd` validation but mocks `<dependency>` — the very dependency whose lifecycle this deliverable changes. Escalate to `integration-test` or document why the mock is acceptable."
+   A 100% green unit-test suite that mocks the integration point is not correctness coverage; it is orthogonal-to-correctness coverage.
+3. **The method can actually prove the acceptance criterion.** A UI change claiming `cli` validation is suspicious — what would the CLI show? A data-integrity change claiming `preview` is suspicious — what is there to look at?
+4. **TDD is used where it is actually required.** Required when: (a) the behavior is not visually observable, (b) regression risk is high, (c) a prior bug in this area exists, (d) the brief explicitly demands it. Over-prescribed TDD is a FLAG — it burns tokens without yielding.
+5. **Preview-unavailable fallback.** If a deliverable declares `preview` but the plan runs non-interactive, the fallback (pause for PM manual validation, or escalate to TDD in yolo) must be specified.
+6. **Acceptance coverage.** Every acceptance criterion in the brief maps to at least one deliverable's validation. Orphan criteria are FLAGs.
+7. **Fragility and flakiness.** Tests that depend on timing, network, or non-deterministic ordering are FLAGs. Snapshot tests on large artifacts are FLAGs.
+8. **Regression safety.** For changes that touch shared code, the plan specifies how existing tests will be run and what counts as a regression.
 
 Do not review code style, assertion style, or test framework choice. Do not flag missing unit tests — they are intentionally deferred pre-GA.
 
@@ -29,7 +32,7 @@ Do not review code style, assertion style, or test framework choice. Do not flag
 {
   "status": "PASS | FLAG | BLOCK",
   "flags": [
-    { "dimension": "method|coverage|fragility|regression", "severity": "low|med|high", "message": "...", "location": "deliverable id" }
+    { "dimension": "method|honesty|coverage|fragility|regression", "severity": "low|med|high", "message": "...", "location": "deliverable id" }
   ],
   "recommendations": [
     { "action": "patch|discuss|defer", "target": "deliverable id", "change": "..." }

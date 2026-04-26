@@ -25,6 +25,13 @@ You review two concerns together because both are "will this thing hold up?" —
 - Version pinning: the plan specifies a version, not a range that could pull breaking changes.
 - Runtime compatibility: the dep targets the project's runtime (Node version, Python version, browser support).
 
+### Library-lifecycle audit (HIGH-severity check)
+The plan's `Library lifecycle audit` section is required whenever clarify declared one or more integration-risk dependencies. For each declared dependency, the audit must concretely document: (i) what state persists across what boundaries (per-connection / per-session / per-process / per-deployment), (ii) known quirks or gotchas, (iii) a link to the canonical persistence/lifecycle doc consulted.
+
+- **HIGH-severity FLAG** if the audit section is missing while clarify declared integration-risk deps.
+- **HIGH-severity FLAG** if any per-library entry is generic — e.g. "we'll handle errors gracefully" or "the SDK manages state for us" — instead of concrete, e.g. "TEMP tables in this DB are connection-scoped per [doc-link]" or "browser localStorage is shared across tabs of the same origin per [doc-link]".
+- The audit section may be omitted only if clarify declared `none` for integration-risk deps.
+
 ## Output schema
 
 Return a single JSON object. No prose before or after.
@@ -33,7 +40,7 @@ Return a single JSON object. No prose before or after.
 {
   "status": "PASS | FLAG | BLOCK",
   "flags": [
-    { "dimension": "performance|dependency", "severity": "low|med|high", "message": "...", "location": "deliverable id or step" }
+    { "dimension": "performance|dependency|lifecycle-audit", "severity": "low|med|high", "message": "...", "location": "deliverable id or step" }
   ],
   "recommendations": [
     { "action": "patch|discuss|defer", "target": "deliverable id", "change": "..." }

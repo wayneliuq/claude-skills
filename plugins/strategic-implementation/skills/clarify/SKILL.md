@@ -43,6 +43,14 @@ Only questions that:
 
 Skip any document that's clearly irrelevant to the described change.
 
+### B2. Integration-risk dependencies
+
+Ask once, even when the expected answer is "none":
+
+> List every third-party library, runtime, or external system this work depends on whose lifecycle / persistence / state semantics matter (databases, browsers, message queues, caches, SDKs with global state, OS file systems with persistence). For each, one phrase on why it matters. Reply `none` if there are no such dependencies.
+
+The question is cheap when empty and pays for itself when it isn't — `execution-plan` uses the list to drive a 15–30 minute library-lifecycle audit before drafting deliverables.
+
 ### C. Autonomy level
 
 ```
@@ -69,6 +77,7 @@ Wait for confirmation.
 Return:
 - Clarified request (request + assumptions + Q&A answers)
 - Document references (dict with `architecture`, `ux_pmf`, `security`, `schema`, each `path|url|none|n/a`)
+- Integration-risk dependencies (list of `{name, why_it_matters}`, or empty list)
 - Autonomy level (`supervised` | `auto` | `yolo`)
 
 ## Tone

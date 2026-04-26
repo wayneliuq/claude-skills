@@ -81,7 +81,19 @@ Run the declared validation:
 - **preview:** start preview, capture the observable behavior, confirm against the deliverable's expected behavior.
 - **cli:** run the command, assert expected output.
 - **tdd:** run the test written in 2b; must pass. Also run the full suite — no new failures.
+- **integration-test:** run the test against the real third-party runtime / network / cross-component seam (no mocks at the integration point). Must pass. Also run the full suite — no new failures.
 - **post-hoc:** surface to PM with what to inspect. In `yolo`, skip inspection, log `yolo-skip`.
+
+**Mocked-seam flag (not a deviation; a post-execution marker).** If the deliverable's `Integration-risk class` is `a|b|c` AND validation passed only via tests that mock the dependency (e.g. `tdd` on a class-`a` deliverable that the plan slipped past review), append to `validation-log.md`:
+
+```markdown
+## FLAG (mocked-seam) — D<n>
+**Class:** <a|b|c>  **Validation:** <method>
+**Mocked dependency:** <name>
+**Note:** validation passed via mocked tests; integration-risk seam not exercised. Surface for post-execution review.
+```
+
+Execution continues; `post-execution` regression-check reads these flags.
 
 If validation fails: apply **Failure Protocol** below.
 
@@ -98,6 +110,8 @@ Example: `D3: add product-brief revision loop`.
 Only the files named in this deliverable are staged.
 
 ### Step 2e — Mark complete
+
+Before flipping status: if the deliverable has a `Consumer audit` subsection, walk the list. Every entry must be `updated-in-this-deliverable`, `updated-in-D<n>` (where D<n> is already complete or scheduled), `unaffected-because-...`, or `explicit-skip-because-...`. Any entry left as TBD, missing, or contradicted by what was actually changed → log a `consumer-audit-mismatch` deviation and surface to PM before proceeding.
 
 In `execution-plan.md`, update deliverable status: `pending` → `complete`.
 
@@ -160,13 +174,13 @@ Do not mark complete. Do not proceed to next deliverable. Await PM direction.
 
 ## Deviation logging
 
-A deviation exists on any of: blocker, retry, user-correction, reversal, ambiguity-decision, auto-escalation, yolo-skip, branch-risk.
+A deviation exists on any of: blocker, retry, user-correction, reversal, ambiguity-decision, auto-escalation, yolo-skip, branch-risk, consumer-audit-mismatch.
 
 Append to `validation-log.md`:
 
 ```markdown
 ## DEV-NNN
-**Type:** blocker | retry | user-correction | reversal | ambiguity-decision | auto-escalation | yolo-skip | branch-risk
+**Type:** blocker | retry | user-correction | reversal | ambiguity-decision | auto-escalation | yolo-skip | branch-risk | consumer-audit-mismatch
 **Deliverable:** D<n>
 **Plan said:** <verbatim>
 **Actually:** <what happened>
