@@ -27,7 +27,13 @@ Triggered automatically by `executing-plans` when the final deliverable is marke
 2. **Cross-contamination check.** For each modified file, grep the rest of the repo for imports/references. For each dependent, decide: is its behavior potentially affected? Flag dependents whose tests should be rerun.
 3. **Run the existing test suite.** Use the project's test command (detect from `package.json` / `pyproject.toml` / `Makefile`). Record failures. A test that was passing before this feature and fails now is a regression.
 4. **Author acceptance tests for feature flows.** For every acceptance criterion in the brief that was not validated via TDD during execution, author an E2E or integration test now. Run it.
-5. **Write** `<feature-folder>/post-execution-report.md`:
+5. **Goal-backward claim verification.** Build the suspect-set: deliverables whose `Validation` is `post-hoc` OR which carry a `FLAG (mocked-seam)` entry in `validation-log.md`. Take the first **3 matches**. If none, skip this step.
+
+   For each matched deliverable, read its expected outcome from `execution-plan.md` (not from any commit message, summary, or validation-log narrative). For each named artifact (function / route / consumer / config key / file path), run a single grep and record yes/no — does it exist in the codebase as the plan claims? Use the acceptance test authored in Step 4 (if any) as one of the yes/no signals.
+
+   Append findings to the report under `## Goal-backward verification` as one block per deliverable: `D<n>: <artifact> — yes|no`. Any `no` → status BLOCK.
+
+6. **Write** `<feature-folder>/post-execution-report.md`:
 
 ```markdown
 # Post-execution report
@@ -47,11 +53,14 @@ _Date: <date> · Feature: <slug>_
 ## Acceptance tests authored
 <list — which criteria, which test files>
 
+## Goal-backward verification
+<one block per matched deliverable, or "skipped — no post-hoc or mocked-seam matches">
+
 ## Status
-<PASS / FLAG / BLOCK — BLOCK if regressions are unresolved>
+<PASS / FLAG / BLOCK — BLOCK if regressions unresolved or any goal-backward `no`>
 ```
 
-6. If any regression is unresolved: surface to PM. Otherwise announce completion.
+7. If any regression is unresolved or any goal-backward verification returns `no`: surface to PM. Otherwise announce completion.
 
 ---
 

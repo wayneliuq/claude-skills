@@ -1,176 +1,207 @@
 # strategic-implementation
 
-A Claude Code plugin that runs PM-described work through a lean planning-to-execution pipeline built for Opus 4.7. One PM-approvable artifact (the product brief), one plan-mode review gate (the execution plan), and deliverable-gated execution with per-deliverable validation — no sessions, no LOC budgets.
+**Ship features without becoming an engineering bottleneck.**
 
-**Version:** 2.0.0
+`strategic-implementation` is a Claude Code plugin that turns a plain-English description of what you want built into shipped, validated code — through a workflow designed for **product managers, founders, and creators** who think in user outcomes, not implementation details.
 
----
+You write what the user should be able to do. The plugin handles everything between that sentence and merged code: clarification, planning, adversarial review, deliverable-by-deliverable execution, and a regression check at the end. You approve **one document** (the product brief). Everything else happens behind the right gates, with the right level of autonomy you choose at the start.
 
-## What it does
-
-Takes a PM description of work → produces an approved product brief → drafts and reviews an execution plan inside Claude Code plan mode → executes deliverable-by-deliverable with the validation method declared at brief time → runs a regression check at the end.
-
-v2 is a ground-up redesign targeting ≥70% review-phase token reduction vs. v1, higher autonomy for Opus 4.7, and a workflow legible to a non-coder PM.
+**Version:** 2.2.0
+**Built for:** Claude Code on Opus 4.7
+**Audience:** non-technical PMs, solo founders, anyone who can describe what good looks like
 
 ---
 
-## Workflow at a glance
+## Why this plugin exists
+
+Agentic coding tools have two failure modes:
+
+1. **Too thin** — a single chat that runs off-script, makes silent scope changes, and ships something that "passes tests" but doesn't do what you asked.
+2. **Too thick** — a 30-agent SDLC framework with hundreds of slash commands, file-based state machines, and a learning curve that defeats the point of having an agent.
+
+`strategic-implementation` is the **lean middle**. The full plugin is ~1,500 lines of prompts and 8 small skills. There is exactly one document the PM signs off on. There is exactly one approval gate inside Claude Code's native plan mode. And there is a deliberate, measured **token-efficiency target — ≥70% review-phase reduction over our v1** — without giving up adversarial review or honest validation.
+
+In short: **the best balance between performance and token cost.** A reviewer that is sharp where it matters, silent where it doesn't, and never asks you to read three documents when one will do.
+
+---
+
+## Who it's for
+
+- **Product managers** who want their ideas built the way they described them.
+- **Founders** moving fast across a small codebase who need a senior-engineer-shaped reviewer at every step without hiring one.
+- **Creators** — anyone who has a clear vision of what a feature should do for a user, and wants the agent to handle the rest with discipline.
+
+You do not need to know what TDD is. You do not need to read the execution plan unless you want to. You **do** need to write a clear product brief — and the `clarify` skill will pull the right context out of you in a single pass before that brief is drafted.
+
+---
+
+## How it works (the whole arc, in plain English)
 
 ```
-/strategic-implementation
-  │
-  ├─ Execution plan approved?   → invoke executing-plans directly
-  ├─ Brief drafted, not planned? → resume at execution-plan
-  └─ Nothing yet?                → full workflow ↓
-  │
-  ▼
-[clarify] — one-pass: assumptions, ≤3 questions, ALL doc references, autonomy level
-  │
-  ▼
-Scope assessment
-  ├─ One-sentence, one-area, no new patterns → fast-path
-  └─ Otherwise ↓
-  │
-  ▼
-[product-brief-drafter] — draft `product-brief_<slug>.md`
-  │
-  ▼
-PM revision loop (inline `<!-- pm: ... -->` markers) ⇄ [product-brief-drafter] revise mode
-  │
-  ▼  (PM approves the brief)
-[execution-plan]
-  ├─ EnterPlanMode (plan mode is BOTH drafting env AND approval gate)
-  ├─ Survey repo with Glob/Grep; draft deliverable DAG with declared validation per deliverable
-  ├─ Invoke [review] inside plan mode
-  │   ├─ Pre-filter specialists by domain triggers
-  │   ├─ [alignment] + [simplify] in parallel (generalist tier)
-  │   └─ [boundaries] / [runtime-risk] / [tests] / [frontend-engineer] only on flag (specialist tier)
-  ├─ Apply patches; re-check consistency
-  └─ Present via plan-mode UI; on approve → save + ExitPlanMode + invoke executing-plans
-  │
-  ▼
-[executing-plans] — deliverable-gated
-  ├─ Per-deliverable pre-flight env check for declared validation
-  ├─ Build → validate (preview | cli | tdd | post-hoc) → atomic commit
-  ├─ Deviation log: `validation-log.md`
-  ├─ Preview-unavailable fallback: pause (supervised/auto) or auto-TDD (yolo)
-  └─ On final deliverable complete → [post-execution: regression-check]
-  │
-  ▼
-[post-execution]
-  ├─ regression-check — modified-file discovery, cross-contamination, suite run, acceptance-test authoring
-  ├─ triage (on PM-reported issue) — TDD fix, log to validation-log
-  └─ learnings-synthesis (when validation-log has ≥2 meaningful deviations)
-
-[prune-tests] — explicit, PM-invoked. Gated by `.strategic-implementation/ga-state.json`.
+You describe what you want.
+        │
+        ▼
+[clarify]  →  one short conversation: assumptions, ≤3 questions, doc references, autonomy level.
+        │      Catches solution-disguised-as-problem framing before it becomes a brief.
+        ▼
+[product-brief]  →  drafts the ONE document you'll approve. Clean acceptance criteria, hard
+        │            decisions locked, integration-risk dependencies surfaced.
+        │
+        ▼  ← you read it, comment inline with `<!-- pm: ... -->`, approve when ready
+        │
+[execution-plan]  →  enters Claude Code plan mode. Drafts a deliverable DAG. Each deliverable
+        │            declares HOW it will be validated (preview / CLI / TDD / post-hoc).
+        │            Then a panel of reviewers inspects the plan…
+        │
+        ├─ [alignment] + [simplify]  ← always run, in parallel (the generalist tier)
+        ├─ [boundaries] / [runtime-risk] / [tests] / [frontend] / [technical-expert]
+        │   ← run only when the plan touches their dimension (the specialist tier)
+        │
+        │   The plan gets patched, then presented in plan mode. You approve in the UI.
+        ▼
+[executing-plans]  →  one deliverable at a time. Pre-flight check, build, validate, atomic commit.
+        │              If validation fails: a structured Failure Protocol kicks in (state the
+        │              assumption, fix once, re-validate, escalate before guessing further).
+        │              Every deviation is logged. Nothing gets quietly skipped.
+        ▼
+[post-execution]  →  regression check, cross-file impact scan, acceptance tests for any
+                      criterion that didn't get a TDD test, and (v2.2) a goal-backward
+                      verification that the code actually substantiates the plan's claims —
+                      not just that the test suite is green.
 ```
 
----
-
-## Artifacts
-
-Per feature, under `docs/strategic-implementation/<YYYY-MM-DD>-<slug>/`:
-
-- `product-brief_<slug>.md` — PM-approvable. The only document the PM signs off on.
-- `execution-plan.md` — agent-reviewed. Approved inside plan mode.
-- `validation-log.md` — deviations, appended during execution.
-- `post-execution-report.md` — regression-check output.
-
-Shared: `docs/strategic-implementation/project-learnings.md` (appended by post-execution learnings-synthesis).
-
-Repo-level GA state: `.strategic-implementation/ga-state.json` (see `docs/ga-state-schema.md`).
+That's it. There are three more skills (`triage` for bugs after-the-fact, `learnings-synthesis` for accumulating project-specific rules, `prune-tests` for GA prep), but the path above is what runs on every feature.
 
 ---
 
-## Skills (8)
+## What makes this different
 
-| Skill | Role |
+### 1. One PM-facing artifact, not five
+
+Most planning frameworks ask you to read a design doc, a plan, and four review reports. We ship **one** document for your approval — the product brief. The execution plan is reviewed by the agents and approved inside plan mode's native UI. You stay focused on what the feature should do.
+
+### 2. Tiered review, not always-on panels
+
+A 10-agent panel that runs on every plan is a luxury car that idles in the driveway. Our review is **tiered**:
+
+- A **pre-filter** scans the plan for trigger tokens (auth, schema, hot-path, UI).
+- The **generalist tier** (`alignment` + `simplify`) always runs in parallel.
+- **Specialists** run only when their dimension is actually present.
+
+Result: review costs scale with what the plan does, not with how many reviewer types we shipped. Token reduction vs. our v1 always-on panel: ≥70%.
+
+### 3. Validation declared up-front, honestly
+
+Each deliverable declares **how it will be proven correct** before any code is written:
+
+| Method | When to use |
 |---|---|
-| `strategic-implementation` | Orchestrator. Routes clarify → brief → execution-plan. Ends when execution starts. |
-| `clarify` | One-pass entry gate. Collects all doc refs + autonomy level upfront. |
-| `product-brief-drafter` | Produces `product-brief_<slug>.md` in draft or revise mode. Single PM-approvable artifact. |
-| `execution-plan` | Enters plan mode; drafts the deliverable DAG; invokes review inside plan mode; patches; exits on approval. |
-| `review` | Tiered review: pre-filter + generalist (alignment + simplify) + specialists on flag. |
-| `executing-plans` | Deliverable-gated execution. Pre-flight env check, validation per declared method, atomic commit per deliverable, deviation log. |
-| `post-execution` | Three modes: `regression-check`, `triage`, `learnings-synthesis`. |
-| `prune-tests` | PM-invoked. GA-state-gated. Per-batch confirmation. Removes pre-GA unit tests. |
+| `preview` | Visually observable in Claude Code's preview tool |
+| `cli` | A command whose output proves the behavior |
+| `tdd` | Acceptance test written first, then code |
+| `integration-test` | Real third-party runtime / network exercised — no mocks at the seam |
+| `post-hoc` | Manual PM inspection (rare) |
 
----
+The `tests` reviewer flags dishonest method choices — e.g. `tdd` against a database whose lifecycle the deliverable changes is a HIGH flag, because mocking the database doesn't prove the database behaves correctly. **A green test suite is not a proxy for correctness.** The plugin is built around that principle.
 
-## Agents (7)
+### 4. Adversarial reviewers, not cooperative ones
 
-All agents emit JSON (`{status, flags, recommendations}`), cap at ~1500 tokens each, and target ≤120 lines of prompt.
+As of v2.2, the generalist reviewers (`alignment`, `tests`) carry an explicit **adversarial stance** with named failure modes for their own reasoning ("anchoring on passing dimensions", "trusting well-written prose", "calling missing details non-blocking"). The reviewer is told **how reviewers go soft**, so it can resist its own bias toward agreement.
 
-**Generalist tier — always runs:**
-- `alignment` — brief fit + architecture alignment + PMF + plan-level future-proofing. Routes specialists.
-- `simplify` — single pass for a shorter path to the brief's acceptance criteria.
+### 5. Goal-backward verification post-execution
 
-**Specialist tier — runs only on flag or pre-filter match:**
-- `boundaries` — security + data-model + api-contract merged.
-- `runtime-risk` — performance + dependency merged.
-- `tests` — validation-method adequacy against v2's goal-level acceptance model (not line-level coverage).
-- `technical-expert` — stack pitfalls + step-ordering errors.
-- `frontend-engineer` — UI + UX + a11y + preview-fit (absorbs v1 ux-pmf-review). Contextual — only if UI surface exists.
+Tests passing is necessary, not sufficient. After execution completes, the `post-execution` skill (v2.2) re-reads the code against the plan's claims for any deliverable whose validation was `post-hoc` or carried a mocked-seam flag. Did the named function actually appear? Is the route registered? It catches the silent gap between "code committed" and "feature shipped." Token-bounded — runs on at most 3 suspect deliverables, single-grep yes/no checks. **Skipped entirely when every deliverable had real automated proof.**
 
----
+### 6. Anti-framing at the entry gate
 
-## Autonomy levels
+`clarify` (v2.2) catches the most common PM failure mode: smuggling implementation into a request ("add tabs to the login page"). It surfaces one alternative framing — *what is the user actually trying to do?* — so the brief is built around the user need, not the proposed solution. One paragraph, no nagging.
+
+### 7. You pick the autonomy level
 
 | Level | Behavior |
 |---|---|
-| `supervised` | Pause at every gate for PM review. |
-| `auto` (default) | Pause only on FLAG/BLOCK and at PM-approval gates (brief, execution plan). |
-| `yolo` | Pause only on BLOCK. Preview-unavailable auto-escalates to TDD. |
+| `supervised` | Pause at every gate. Maximum control. |
+| `auto` (default) | Pause only on flagged items, blocks, and PM-approval gates. |
+| `yolo` | Pause only on hard blocks. Preview-unavailable auto-escalates to TDD. |
 
-Set at `clarify` time, carried through the workflow.
+Set once at clarify time. Carried through the whole workflow.
 
 ---
 
-## Validation taxonomy
+## Skills (8) and agents (7)
 
-Each deliverable declares its validation method at brief time:
+**Skills:**
 
-| Method | When |
+| Skill | Role |
 |---|---|
-| `preview` | Visually observable via Claude Code preview tool |
-| `cli` | A command whose output proves the behavior |
-| `tdd` | Acceptance test written before implementation |
-| `post-hoc` | Manual PM inspection (rare; reserved for things none of the above fit) |
+| `strategic-implementation` | Orchestrator. Routes clarify → brief → execution-plan. |
+| `clarify` | One-pass entry gate. Anti-framing check, doc refs, autonomy. |
+| `product-brief-drafter` | Single PM-approvable artifact. Draft & revise modes. |
+| `execution-plan` | Plan-mode native. Drafts deliverable DAG, runs review, exits on approval. |
+| `review` | Pre-filter + generalist + specialist tiering. |
+| `executing-plans` | Deliverable-gated execution with declared validation per deliverable. |
+| `post-execution` | `regression-check`, `triage`, `learnings-synthesis`. Goal-backward verification (v2.2). |
+| `prune-tests` | GA-state-gated. Removes pre-GA line-level unit tests. |
 
-The `tests` agent flags honesty of method choice; `executing-plans` pre-flights the method's prerequisites before building.
+**Agents:**
 
----
+- **Generalist (always run):** `alignment`, `simplify`
+- **Specialists (run on flag):** `boundaries` (security + data + API), `runtime-risk` (performance + dependencies), `tests` (validation honesty), `frontend-engineer` (UI/UX/a11y), `technical-expert` (stack pitfalls + step ordering)
 
-## GA state & prune-tests
-
-Pre-GA, v2 intentionally favors goal-level acceptance tests over line-level unit tests. At GA prep, the PM runs `prune-tests` to remove the sparse line-level tests that accumulated.
-
-Gated by `<repo>/.strategic-implementation/ga-state.json`:
-- `pre-ga` / `ga-prep` → prune runs, per-batch PM confirmation, separate commits.
-- `ga` → prune refuses; post-GA deletion requires its own brief.
-
-Schema: see `docs/ga-state-schema.md`.
+All agents return JSON, cap at ~1500 tokens, and stay under ~120 lines of prompt.
 
 ---
 
-## Token reduction (vs. v1.4.0)
+## Artifacts produced
 
-v2 targets ≥70% review-phase reduction via:
+Per feature, under `docs/strategic-implementation/<YYYY-MM-DD>-<slug>/`:
 
-- Single PM artifact (brief) vs. v1's spec + sessionized-guide + per-session-plans.
-- Plan-mode hidden prompting replaces v1's hand-authored drafter prompts.
-- Tiered review (generalist → specialists on flag) vs. v1's always-parallel 10-agent panel.
-- Panel consolidation: 10 always-on → 4 always-eligible + contextual.
-- JSON output contracts with `max_tokens: 1500` hints vs. v1's freeform prose.
-- Merged post-execution skills replace v1's bug-fix + post-mortem + end-of-implementation.
-- Dropped sessionization, LOC gates, revision log, per-step commits, double agent panels.
+- `product-brief_<slug>.md` — the one document you approve
+- `execution-plan.md` — agent-reviewed, approved in plan mode
+- `validation-log.md` — append-only deviation log
+- `post-execution-report.md` — regression + goal-backward verification
+
+Plus a shared `docs/strategic-implementation/project-learnings.md` that accumulates rules synthesized from each feature's deviations.
+
+---
+
+## Token efficiency, by design
+
+v2 vs. v1 → ≥70% review-phase reduction via:
+
+- Single PM artifact replacing v1's spec + sessionized-guide + per-session-plans
+- Plan-mode native approval instead of hand-authored drafter prompts
+- Tiered review (generalist → specialists on flag) instead of always-parallel 10-agent panel
+- Panel consolidation: 10 always-on → 4 always-eligible + contextual
+- JSON output contracts with `max_tokens: 1500` hints instead of freeform prose
+- Merged post-execution skills replacing v1's bug-fix + post-mortem + end-of-implementation
+- Dropped sessionization, LOC gates, revision logs, per-step commits, double agent panels
+
+v2.2 adds (~24 lines added across 4 files; total still ~1,525 lines):
+
+- Adversarial stance prompts on `alignment` and `tests`
+- Anti-framing posture in `clarify`
+- Scoped goal-backward verification in `post-execution` regression-check (zero added cost on TDD-heavy features; ~3–12K tokens worst case)
+
+The principle: **add the agent-side defenses that catch the most common silent-failure modes; spend tokens only where automated proof is weakest.**
+
+---
+
+## Acknowledgments — inspirations for v2.2
+
+The v2.2 changes (adversarial stance, goal-backward verification, anti-framing in clarify) are inspired by close study of two excellent open-source agentic-coding plugins:
+
+- **[gsd-build/get-shit-done](https://github.com/gsd-build/get-shit-done)** — a maximalist spec-driven SDLC framework with deeply considered adversarial-stance prompting for its `gsd-plan-checker` and `gsd-verifier` agents. The "named failure modes for the reviewer's own reasoning" pattern in our `alignment` agent, and the "do not trust the executor's narrative; re-read the code" methodology behind our `post-execution` goal-backward verification, both originate there.
+- **[garrytan/gstack](https://github.com/garrytan/gstack)** — a virtual-engineering-team-in-a-box with a strong anti-sycophancy doctrine in its `office-hours` skill. The anti-framing posture in our `clarify` skill — surfacing solution-disguised-as-problem requests before a brief is drafted — is a direct adaptation.
+
+Both plugins are broader in scope than `strategic-implementation`. Our deliberate choice has been to keep this plugin **lean** — eight small skills, one PM artifact, native plan-mode integration — and to borrow only the specific high-leverage ideas that close real gaps in our own workflow without bloating it. We thank both projects for their public, well-documented work.
 
 ---
 
 ## Feature folder layout
 
 ```
-docs/strategic-implementation/2026-04-20-auth-redesign/
+docs/strategic-implementation/2026-04-28-auth-redesign/
 ├── product-brief_auth-redesign.md
 ├── execution-plan.md
 ├── validation-log.md
@@ -178,3 +209,15 @@ docs/strategic-implementation/2026-04-20-auth-redesign/
 ```
 
 Plus `docs/strategic-implementation/project-learnings.md` at the root.
+
+---
+
+## Get started
+
+Install the plugin via your Claude Code marketplace, then in any project run:
+
+```
+/strategic-implementation
+```
+
+Describe what you want built. The rest of the workflow takes over from there.
