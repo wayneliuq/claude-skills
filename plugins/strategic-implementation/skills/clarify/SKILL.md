@@ -11,6 +11,8 @@ You are the entry gate for v2's streamlined workflow. v1 asked for document loca
 
 The PM described something they want built. Read carefully. Do not ask for anything already stated.
 
+**Load the documentation registry.** If `docs/strategic-implementation/documentation-registry.md` exists, load it. Use the known entries to ground the doc-references prompt in Step 3 — name the docs you already know about so the PM doesn't have to re-state them.
+
 **Anti-framing check.** Before listing assumptions in Step 2, decide whether the request states a user-observable problem or a proposed solution. If it is only a solution (a verb-phrase like "add tabs", "switch to JWT", "rewrite the X module"), surface one alternative framing in Step 2 as an assumption to confirm — phrased as: "this looks like a solution; the underlying user need may be `<X>` — confirm or correct." Do not push back further; one alternative is enough.
 
 **Fast-skip:** if the request leaves nothing ambiguous AND mentions the doc locations already, skip to Step 4.
@@ -44,6 +46,13 @@ Only questions that:
 - **Schema/ERD:** only ask if the change touches data storage. (path, URL, `n/a — no data storage`, or `none`)
 
 Skip any document that's clearly irrelevant to the described change.
+
+**Registry capture at point of mention.** For each doc the PM names (in any of the prompts above), ask two follow-ups inline:
+
+> 1. What does this doc cover, in one line?
+> 2. What kinds of changes would make it stale?
+
+Write/upsert a row in `docs/strategic-implementation/documentation-registry.md` immediately — at point of mention, not later. If the registry doesn't exist yet, create it with the schema header (`Path | Covers | Last Updated | Update Trigger | Owning Area`) and a one-paragraph purpose preamble before adding the row. Set `Last Updated` to today; `Owning Area` to a short tag derived from the doc's path or topic. Keep `Covers` to one line — if it grows, the content belongs in the doc, not the registry.
 
 ### B2. Integration-risk dependencies
 
