@@ -1,8 +1,8 @@
 # strategic-implementation
 
-**Ship features without becoming an engineering bottleneck.**
+**Outcome-first development. Ship features without becoming an engineering bottleneck.**
 
-`strategic-implementation` is a Claude Code plugin that turns a plain-English description of what you want built into shipped, validated code — through a workflow designed for **product managers, founders, and creators** who think in user outcomes, not implementation details.
+`strategic-implementation` is a Claude Code plugin that turns a plain-English description of what the user should be able to do into shipped, validated code. The whole workflow is **outcome-first** — every feature starts from the user-observable change and works backwards to implementation. Designed for **product managers, founders, and creators** who think in user outcomes, not implementation details.
 
 You write what the user should be able to do. The plugin handles everything between that sentence and merged code: clarification, planning, adversarial review, deliverable-by-deliverable execution, and a regression check at the end. You approve **one document** (the product brief). Everything else happens behind the right gates, with the right level of autonomy you choose at the start.
 
@@ -36,6 +36,8 @@ You do not need to know what TDD is. You do not need to read the execution plan 
 ---
 
 ## How it works (the whole arc, in plain English)
+
+The arc is **outcome-first**: clarify pulls the one-sentence user-observable outcome out of you up front, and every later phase works backwards from that to implementation.
 
 ```
 You describe what you want.

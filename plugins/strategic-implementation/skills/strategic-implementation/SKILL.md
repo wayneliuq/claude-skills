@@ -1,11 +1,11 @@
 ---
 name: strategic-implementation
-description: v2 orchestrator. Routes PM-described work through clarify → product brief → execution plan (in plan mode) → deliverable-gated execution → post-execution. Single-artifact approval (the brief). Plan mode is both drafting environment and approval gate for the execution plan.
+description: Outcome-first orchestrator. Routes PM-described work outside-in — clarify → product brief → optional UI mockup → execution plan (in plan mode) → deliverable-gated execution → post-execution. Single-artifact approval (the brief). Plan mode is both drafting environment and approval gate for the execution plan.
 ---
 
 # strategic-implementation
 
-v2 planning-to-execution orchestrator. The PM approves one artifact (the product brief). The execution plan is reviewed and approved inside Claude Code plan mode. Execution is deliverable-gated — no sessions, no LOC budgets.
+Outcome-first planning-to-execution orchestrator. Every feature starts from the user-observable outcome and works backwards to implementation. The PM approves one artifact (the product brief). The execution plan is reviewed and approved inside Claude Code plan mode. Execution is deliverable-gated — no sessions, no LOC budgets.
 
 ---
 
