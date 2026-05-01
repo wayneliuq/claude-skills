@@ -85,6 +85,12 @@ Which? (blank = auto)
 
 ## Step 4 — Confirm
 
+Before output, **play back the outcome** in the PM's own words. One short sentence in the form:
+
+> To confirm — when X happens for user Y, you'll consider this shipped.
+
+Substitute X and Y from the captured `working-backwards`. If the PM corrects the phrasing, capture the corrected version as canonical — that is what flows to the brief verbatim. Skip this playback only if `working-backwards` is `TBD — open question` (nothing to play back).
+
 End with:
 
 ```
