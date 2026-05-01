@@ -46,8 +46,9 @@ You describe what you want.
 [clarify]  →  one short conversation: assumptions, ≤3 questions, doc references, autonomy level.
         │      Catches solution-disguised-as-problem framing before it becomes a brief.
         ▼
-[product-brief]  →  drafts the ONE document you'll approve. Clean acceptance criteria, hard
-        │            decisions locked, integration-risk dependencies surfaced.
+[product-brief]  →  drafts the ONE document you'll approve. Working-backwards paragraph,
+        │            user-observable deliverables (each with its own validation method),
+        │            success signal, anti-goals, hard decisions locked.
         │
         ▼  ← you read it, comment inline with `<!-- pm: ... -->`, approve when ready
         │

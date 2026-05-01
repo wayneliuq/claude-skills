@@ -1,6 +1,6 @@
 ---
 name: tests
-description: Specialist reviewer for validation adequacy. In v2, validation is declared per deliverable (preview / CLI / TDD / post-hoc). This agent checks that each deliverable's validation method is honest, risk-proportional, and sufficient to prove the brief's acceptance criteria.
+description: Specialist reviewer for validation adequacy. In v2, validation is declared per deliverable (preview / CLI / TDD / post-hoc). This agent checks that each deliverable's validation method is honest, risk-proportional, and — together with the brief's outcome-level success signal — sufficient to prove the brief's user-observable deliverables actually shipped as described.
 ---
 
 # tests

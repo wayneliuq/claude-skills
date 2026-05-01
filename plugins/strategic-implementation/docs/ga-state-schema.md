@@ -12,7 +12,7 @@ This file gates destructive cleanup operations (notably `prune-tests`) so they c
 
 | State | Meaning | `prune-tests` behavior |
 |---|---|---|
-| `pre-ga` | Active development. Line-level unit tests are intentionally sparse. | Runs normally. Candidates are unit tests not tied to the brief's acceptance criteria. |
+| `pre-ga` | Active development. Line-level unit tests are intentionally sparse. | Runs normally. Candidates are unit tests not tied to the brief's user-observable deliverables or success signal. |
 | `ga-prep` | Release imminent. Cleanup pass in progress. | Runs normally — this is the state where prune is expected to fire. |
 | `ga` | Released. Line-level coverage is now a durable requirement. | **Refuses to run.** Post-GA, test deletion is an explicit code change requiring its own brief. |
 
