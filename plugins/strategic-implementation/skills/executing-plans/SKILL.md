@@ -77,6 +77,12 @@ Implement the deliverable per its steps. Rules:
   - Clean up only code YOUR changes made unused — leave pre-existing dead code alone.
   - Do not "improve" adjacent code.
 
+**Registry-tracked doc bundle.** If the deliverable's `may-invalidate` field is non-empty, after building primary changes, prompt the PM:
+
+> "Deliverable D<n> may invalidate `<doc-paths>`. Update them now in the same commit?"
+
+In `auto`, surface the prompt and proceed; in `supervised`, pause for explicit reply; in `yolo`, surface and proceed without waiting. Apply the doc edits in the same working tree so they land in this deliverable's atomic commit. The atomic commit is the only place doc updates can ride along — never amend a prior deliverable's commit to add docs.
+
 ### Step 2c — Validate
 
 Run the declared validation:
@@ -109,7 +115,7 @@ D<n>: <one-sentence outcome>
 
 Example: `D3: add product-brief revision loop`.
 
-Only the files named in this deliverable are staged.
+Only the files named in this deliverable are staged — plus any registry-tracked docs updated in Step 2b under `may-invalidate`, plus the registry file itself with **`Last Updated` bumped to today** for each updated doc's row. All of this lands in the one atomic commit. Post-execution verifies these advances.
 
 ### Step 2e — Mark complete
 
