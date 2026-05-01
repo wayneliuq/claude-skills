@@ -35,7 +35,19 @@ Triggered automatically by `executing-plans` when the final deliverable is marke
 
    Append findings to the report under `## Goal-backward verification` as one block per deliverable: `D<n>: <artifact> — yes|no`. Any `no` → status BLOCK.
 
-6. **Write** `<feature-folder>/post-execution-report.md`:
+6. **Registry-update verification.** Load `docs/strategic-implementation/documentation-registry.md` if present. For each deliverable's `may-invalidate` entries (from `execution-plan.md`), check the registry row's `Last Updated` is ≥ feature start date. For each **stale entry** (`Last Updated` did not advance), surface:
+
+   > "Deliverable D<n> declared `may-invalidate <path>` but registry row was not updated. Update the doc now? (y/n/skip)"
+
+   On `y` in `supervised`: pause. On `auto` / `yolo`: surface but do not block. Cross-mode rule: stale registry entries block cycle close in `supervised`; in `auto` and `yolo`, they appear in the report as a FLAG but do not BLOCK.
+
+7. **Visual-contract diff prompt.** For each deliverable in `execution-plan.md` whose `Visual contract:` is non-empty (a mockup file path), prompt:
+
+   > "Open `<mockup-path>` and compare against the shipped UI for D<n>. Match? (y/n/notes)"
+
+   Capture the answer in the report under `## Visual diff`. A `n` (mismatch) is a FLAG, not a BLOCK — the PM may accept divergence, but it is recorded.
+
+8. **Write** `<feature-folder>/post-execution-report.md`:
 
 ```markdown
 # Post-execution report
@@ -58,11 +70,17 @@ _Date: <date> · Feature: <slug>_
 ## Goal-backward verification
 <one block per matched deliverable, or "skipped — no post-hoc or mocked-seam matches">
 
+## Registry-update verification
+<bulleted: "D<n>: <doc-path> — Last Updated advanced | stale (PM action: <updated|skipped>)" or "skipped — no may-invalidate entries">
+
+## Visual diff
+<bulleted: "D<n>: <mockup-path> — match | mismatch (notes: ...)" or "skipped — no Visual contract entries">
+
 ## Status
-<PASS / FLAG / BLOCK — BLOCK if regressions unresolved or any goal-backward `no`>
+<PASS / FLAG / BLOCK — BLOCK if regressions unresolved or any goal-backward `no`. Stale registry entries are FLAG in auto/yolo, BLOCK in supervised. Visual mismatches are FLAG.>
 ```
 
-7. If any regression is unresolved or any goal-backward verification returns `no`: surface to PM. Otherwise announce completion.
+9. If any regression is unresolved or any goal-backward verification returns `no`: surface to PM. Otherwise announce completion.
 
 ---
 
