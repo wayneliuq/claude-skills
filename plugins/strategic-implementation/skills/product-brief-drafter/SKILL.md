@@ -17,11 +17,12 @@ You produce `product-brief_<slug>.md` — the single PM-approvable artifact for 
 
 1. **No code.** Not even snippets. The PM does not read code.
 2. **No jargon without a parenthetical.** If you must say "idempotent," write "idempotent (safe to run twice)."
-3. **Every deliverable is user-observable.** If the PM cannot tell from a demo that a deliverable landed, it does not belong in the brief — move it into execution-plan as internal plumbing.
+3. **Every deliverable is user-observable.** If the PM cannot tell from a demo that a deliverable landed, it does not belong in the brief — move it into execution-plan as internal plumbing. The deliverable's declared validation method is its acceptance test; the brief no longer carries a separate Acceptance Criteria section.
 4. **Every deliverable declares a validation method** at brief time, from: `preview`, `cli`, `tdd`, `post-hoc`. This is non-negotiable — the reviewer agent will flag any deliverable missing this.
 5. **HARD DECISIONs are explicit.** A PM statement with tight language ("must," "non-negotiable," "only way") becomes a `[HARD DECISION]` row and cannot be reversed by reviewers downstream.
 6. **Compact decision rows.** One line each. Full tradeoff tables only for items marked `[HARD DECISION]` or when the PM explicitly asks for one.
 7. **Inline markdown feedback markers.** In revise mode, the PM's `<!-- pm: ... -->` comments in the existing brief are addressed in-place and removed. Do not leave them behind.
+8. **Working backwards is section 1.** The release-note paragraph is written before any deliverables are listed. If clarify passed `working-backwards: TBD`, write `TBD — open question` verbatim — do not fabricate one. Same rule for `success-signal: TBD`.
 
 ---
 
@@ -42,22 +43,22 @@ Compute the feature folder: `docs/strategic-implementation/<today-YYYY-MM-DD>-<s
 # Product Brief: <Feature Name>
 _Slug: <slug> · Date: <YYYY-MM-DD> · Autonomy: <level>_
 
-## 1. What & Why (≤5 sentences)
-<plain-English problem, the user type affected, the outcome they'll see>
+## 1. Working backwards (≤5 sentences, release-note voice)
+> <One paragraph in release-note voice — "the X now does Y," not "we will build." Describes what the user observably gets if this shipped tomorrow. ≤5 sentences. If clarify passed `working-backwards: TBD`, write "TBD — open question" verbatim and do not fabricate.>
 
-## 2. User-observable deliverables
+## 2. What the user does / sees
 | # | Deliverable (user-observable) | Validation |
 |---|---|---|
 | D1 | <one sentence, what the user sees or can do> | `preview` / `cli` / `tdd` / `post-hoc` + one-line how |
 | D2 | ... | ... |
 
-## 3. Acceptance criteria
-- Bulleted, testable statements. "User can X." "When Y happens, Z is true."
-- Every acceptance criterion must map to at least one deliverable above.
+## 3. Success signal
+<Names a thing observable from outside the system — a query, a behavior, a metric. NOT "the deliverable shipped"; that's per-deliverable validation. The success signal is outcome-level. If clarify passed `success-signal: TBD`, write "TBD — open question" verbatim.>
 
-## 4. Scope boundary
+## 4. Boundaries
 **In scope:** <bulleted>
-**Out of scope:** <bulleted — be explicit about temptations to avoid>
+**Out of scope:** <bulleted — what we deferred or won't do this round>
+**Anti-goals (philosophy-level — we deliberately will not):** <bulleted — temptations we'd reject even if free; not the same as out-of-scope. Out-of-scope = "not now"; anti-goals = "we'd reject this even if free.">
 
 ## 5. Decisions
 | Decision | Choice | Status |
@@ -69,13 +70,14 @@ _Slug: <slug> · Date: <YYYY-MM-DD> · Autonomy: <level>_
 ## 6. Risks & unknowns
 - Bulleted. If a risk is large, name it and who owns resolution.
 
-## 7. Document references
+## 7. References & revision log
+**Document references:**
 - Architecture: <path or "none">
 - UX/PMF: <path or "n/a — backend only">
 - Security policy: <path or "none">
 - Schema/ERD: <path or "n/a — no data storage">
 
-## 8. Revision log
+**Revision log:**
 - v0.1 · <date> · initial draft
 ```
 
