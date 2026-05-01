@@ -11,6 +11,7 @@ You receive:
 - Brief path (`.../product-brief_<slug>.md`)
 - Feature folder path
 - Integration-risk dependencies (from clarify; may be empty)
+- Mockup path (optional; provided by orchestrator when ui-mockup ran)
 - Autonomy level (`supervised` | `auto` | `yolo`)
 
 ---
@@ -27,10 +28,11 @@ If the environment does not support `EnterPlanMode` in this context, fall back: 
 
 Inside plan mode:
 
-1. Read the brief end-to-end. Extract: deliverables (D1…Dn), acceptance criteria, scope boundary, hard decisions, document references.
+1. Read the brief end-to-end. Extract: deliverables (D1…Dn), the success signal, scope boundary (in / out / anti-goals), hard decisions, document references. The brief no longer carries a separate Acceptance Criteria section — each deliverable's declared validation method is its acceptance test, and the Success signal section names the outcome-level check.
 2. For each deliverable, identify the concrete files likely to change. Use **Glob** and **Grep** to verify file paths exist before citing them. Unverified paths get `[PATH NOT FOUND]` annotations.
 3. **Library-lifecycle doc pass.** For each integration-risk dependency from clarify, locate the canonical persistence / lifecycle doc (project README, vendor docs, RFC, or in-repo notes). Read the relevant section. Capture: what state persists across what boundaries (per-connection / per-session / per-process / per-deployment), known gotchas, and the doc URL/path. Time-box: aim for 15–30 minutes total across all libraries; if a library has no good docs, note that explicitly. Empty audit is acceptable only if clarify declared `none`.
-4. Load `docs/strategic-implementation/project-learnings.md` if it exists. Filter entries for relevance to this brief's deliverables. Inject matching entries when invoking `review`.
+4. **Load the documentation registry.** Read `docs/strategic-implementation/documentation-registry.md` if present. For each registry entry, judge whether the deliverables in this brief might invalidate it (touches the path, the area, or the update-trigger condition). Tag each deliverable with `may-invalidate: [doc-paths]` or `may-invalidate: none`. Surface the union of impacted entries in the plan summary at Step 5 so the PM sees what docs this work will require updating.
+5. Load `docs/strategic-implementation/project-learnings.md` if it exists. Filter entries for relevance to this brief's deliverables. Inject matching entries when invoking `review`.
 
 ---
 
@@ -66,6 +68,8 @@ _Implements: product-brief_<slug>.md · Date: <date>_
 - **Steps:** <numbered; each names file(s) and what to write/change/delete>
 - **Deps:** <other D-ids, or "none">
 - **Pre-flight env check:** <what must be available to run the validation — e.g. dev server, DB migration applied, credentials present>
+- **may-invalidate:** <bracketed list of registry doc paths this deliverable might invalidate, or `none`. Surfaces here so executing-plans bundles doc updates into the deliverable's atomic commit.>
+- **Visual contract:** <mockup file path if a UI mockup was approved upstream, else `n/a`. Implementation must match this mockup; post-execution prompts a manual visual diff.>
 - **Consumer audit:** <required iff this deliverable changes a data shape — interface / type / schema / payload / return type / function signature. Otherwise: "n/a — no shape change.">
   - <consumer file:symbol> — `updated-in-this-deliverable` | `updated-in-D<n>` | `unaffected-because-<reason>` | `explicit-skip-because-<reason>`
   - ...
