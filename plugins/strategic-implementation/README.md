@@ -6,7 +6,7 @@
 
 You write what the user should be able to do. The plugin handles everything between that sentence and merged code: clarification, planning, adversarial review, deliverable-by-deliverable execution, and a regression check at the end. You approve **one document** (the product brief). Everything else happens behind the right gates, with the right level of autonomy you choose at the start.
 
-**Version:** 2.2.0
+**Version:** 3.0.0
 **Built for:** Claude Code on Opus 4.7
 **Audience:** non-technical PMs, solo founders, anyone who can describe what good looks like
 
@@ -131,7 +131,7 @@ Set once at clarify time. Carried through the whole workflow.
 
 ---
 
-## Skills (8) and agents (7)
+## Skills (9) and agents (7)
 
 **Skills:**
 
@@ -140,10 +140,11 @@ Set once at clarify time. Carried through the whole workflow.
 | `strategic-implementation` | Orchestrator. Routes clarify → brief → execution-plan. |
 | `clarify` | One-pass entry gate. Anti-framing check, doc refs, autonomy. |
 | `product-brief-drafter` | Single PM-approvable artifact. Draft & revise modes. |
-| `execution-plan` | Plan-mode native. Drafts deliverable DAG, runs review, exits on approval. |
+| `ui-mockup` | (v3.0) Optional static-HTML mockup between brief and plan. `generate` / `revise` / `conflict-back-to-brief`. |
+| `execution-plan` | Plan-mode native. Drafts deliverable DAG, runs review, exits on approval. Loads doc registry; tags `may-invalidate` (v3.0). |
 | `review` | Pre-filter + generalist + specialist tiering. |
-| `executing-plans` | Deliverable-gated execution with declared validation per deliverable. |
-| `post-execution` | `regression-check`, `triage`, `learnings-synthesis`. Goal-backward verification (v2.2). |
+| `executing-plans` | Deliverable-gated execution with declared validation per deliverable. Bundles registry-tracked doc updates into the atomic commit (v3.0). |
+| `post-execution` | `regression-check`, `triage`, `learnings-synthesis`. Goal-backward verification (v2.2). Registry-update verification + visual-contract diff (v3.0). |
 | `prune-tests` | GA-state-gated. Removes pre-GA line-level unit tests. |
 
 **Agents:**
@@ -185,6 +186,14 @@ v2.2 adds (~24 lines added across 4 files; total still ~1,525 lines):
 - Adversarial stance prompts on `alignment` and `tests`
 - Anti-framing posture in `clarify`
 - Scoped goal-backward verification in `post-execution` regression-check (zero added cost on TDD-heavy features; ~3–12K tokens worst case)
+
+v3.0 adds (outcome-first restructure + new optional phase + persistent doc index):
+
+- Brief restructured along the working-backwards spine: a release-note paragraph leads every brief; `Acceptance criteria` section dropped (each deliverable's validation method is its acceptance test); new `Success signal` section names the outside-observable outcome; `Anti-goals` separated from out-of-scope as philosophy-level statements.
+- `clarify` primes the new sections with three small additions: a working-backwards prompt (one-sentence outcome), a success-signal prompt, and an outcome playback in Step 4 ("to confirm — when X happens for user Y…"). Inability to answer captured as `TBD — open question` and propagated verbatim — never blocks.
+- New `ui-mockup` skill + Step 3.5 in the orchestrator: optional static-HTML mockup between brief approval and execution-plan drafting, gated by an explicit pre-flight scope estimate. Reuses repo design tokens (CSS vars → Tailwind config → theme file → neutral fallback). Mockup-vs-brief conflicts route back to brief revision, never silently override.
+- Per-repo documentation registry at `docs/strategic-implementation/documentation-registry.md`. Populated at clarify time when a doc is first named (with `Covers` and `Update Trigger` captured then), read by execution-plan to tag deliverables with `may-invalidate`, bundled into the deliverable's atomic commit by executing-plans, verified by post-execution.
+- Defense-in-depth plan-mode exit checks across all file-writing sub-skills + orchestrator constraint.
 
 The principle: **add the agent-side defenses that catch the most common silent-failure modes; spend tokens only where automated proof is weakest.**
 
