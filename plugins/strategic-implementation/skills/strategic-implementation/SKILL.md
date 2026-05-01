@@ -5,13 +5,13 @@ description: Outcome-first orchestrator. Routes PM-described work outside-in —
 
 # strategic-implementation
 
-Outcome-first planning-to-execution orchestrator. Every feature starts from the user-observable outcome and works backwards to implementation. The PM approves one artifact (the product brief). The execution plan is reviewed and approved inside Claude Code plan mode. Execution is deliverable-gated — no sessions, no LOC budgets.
+Outcome-first planning-to-execution orchestrator. Every feature works backwards from the user-observable outcome to implementation. The PM approves one artifact (the product brief). The execution plan is reviewed and approved inside Claude Code plan mode. Execution is deliverable-gated — no sessions, no LOC budgets.
 
 ---
 
 ## Validation honesty principle
 
-**A green test suite is not a proxy for correctness.** A 100% passing run validates only the contracts your tests describe. If your tests systematically mock the integration points where your code actually lives — third-party runtimes, real network/browser behavior, cross-component reactive state — the suite is measuring orthogonal-to-correctness coverage. Validation methods must be honest about what they exercise; mocks at integration-risk seams require manual or integration-test validation as a backstop.
+**A green test suite is not a proxy for correctness.** A passing run validates only the contracts your tests describe. If tests systematically mock the integration points where your code actually lives — third-party runtimes, real network/browser behavior, cross-component reactive state — the suite measures orthogonal-to-correctness coverage. Mocks at integration-risk seams require manual or integration-test validation as a backstop.
 
 This principle motivates three gates baked into the workflow: integration-risk dependency collection (in `clarify`), library-lifecycle audit and per-deliverable integration-risk classification (in `execution-plan`), and consumer-audit on shape changes (in `execution-plan` + `executing-plans`). Reviewers (`tests`, `runtime-risk`, `alignment`) flag when these are missing or hand-wavy.
 
@@ -79,7 +79,7 @@ Do not prompt the PM to decide — wait for their signal. The loop runs as many 
 
 ---
 
-## Step 3.5 — Optional UI mockup (pre-flight scope estimate, then optional ui-mockup)
+## Step 3.5 — Optional UI mockup
 
 On brief approval, decide whether the change warrants a static HTML mockup *before* the execution plan is drafted. The mockup is the cheapest possible failure point for visual misalignment.
 

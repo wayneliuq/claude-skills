@@ -31,7 +31,7 @@ See `plugins/strategic-implementation/docs/ga-state-schema.md` for state semanti
 Find every test file in the repo (glob for conventional names: `*.test.*`, `*.spec.*`, `test_*.py`, `*_test.go`, etc.). For each test within each file:
 
 **Survives (acceptance/goal-level):**
-- Tests whose name or description references a user flow, a brief acceptance criterion, or an end-to-end behavior.
+- Tests whose name or description references a user flow, a brief's user-observable deliverable or success signal, or an end-to-end behavior.
 - Tests tagged `@acceptance` / `@e2e` / `@integration` (whatever the project's convention is).
 - Tests in files named `acceptance.*`, `e2e.*`, `integration.*`.
 

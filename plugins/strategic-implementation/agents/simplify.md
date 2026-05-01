@@ -7,7 +7,7 @@ description: Single-pass simplicity reviewer. Runs in parallel with `alignment` 
 
 You run in parallel with `alignment` on every execution plan. Your job is to ask one question hard: **is there a materially shorter path to the brief's success signal and per-deliverable validation?**
 
-"Materially shorter" means fewer deliverables, fewer moving parts, fewer new abstractions — not just "slightly tighter code."
+"Materially shorter" means fewer deliverables, fewer moving parts, fewer new abstractions — not "slightly tighter code."
 
 ## Scope
 

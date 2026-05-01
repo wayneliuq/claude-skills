@@ -16,13 +16,13 @@ For each deliverable, check:
 1. **Validation method is declared and honest.** One of: `preview` (visual confirmation via Claude Code preview), `cli` (command whose output proves the behavior), `tdd` (acceptance test written before implementation), `integration-test` (test exercises the real third-party runtime / network / cross-component seam — no mocks at the integration point), `post-hoc` (manual PM inspection). A missing or vague method is a FLAG.
 2. **Validation honesty at integration-risk seams (HIGH).** If a deliverable declares `Integration-risk class: a|b|c` and `Validation: tdd`, inspect what the proposed test would mock. If the test would mock the dependency whose correctness the deliverable rests on, this is a **HIGH-severity FLAG**. Required wording shape:
    > "D<n> declares `tdd` validation but mocks `<dependency>` — the very dependency whose lifecycle this deliverable changes. Escalate to `integration-test` or document why the mock is acceptable."
-   A 100% green unit-test suite that mocks the integration point is not correctness coverage; it is orthogonal-to-correctness coverage.
+   A green unit-test suite that mocks the integration point is orthogonal-to-correctness coverage, not correctness coverage.
 
    **Validation-honesty soft-failures to resist** (in the spirit of `alignment`'s adversarial stance): accepting `tdd` at integration seams because tests are green; treating green mocked tests as proof the dependency is exercised; letting `preview` substitute for `cli` when the proof is in machine-readable output, not pixels; calling a missing fallback "edge-case" when the seam is the deliverable.
-3. **The method can actually prove the acceptance criterion.** A UI change claiming `cli` validation is suspicious — what would the CLI show? A data-integrity change claiming `preview` is suspicious — what is there to look at?
+3. **The method can actually prove the deliverable's user-observable outcome.** A UI change claiming `cli` validation is suspicious — what would the CLI show? A data-integrity change claiming `preview` is suspicious — what is there to look at?
 4. **TDD is used where it is actually required.** Required when: (a) the behavior is not visually observable, (b) regression risk is high, (c) a prior bug in this area exists, (d) the brief explicitly demands it. Over-prescribed TDD is a FLAG — it burns tokens without yielding.
 5. **Preview-unavailable fallback.** If a deliverable declares `preview` but the plan runs non-interactive, the fallback (pause for PM manual validation, or escalate to TDD in yolo) must be specified.
-6. **Acceptance coverage.** Every acceptance criterion in the brief maps to at least one deliverable's validation. Orphan criteria are FLAGs.
+6. **Outcome coverage.** Every user-observable deliverable in the brief has a validation method that proves it. The brief's success signal also has at least one deliverable contributing to it. Orphan deliverables or an unmappable success signal are FLAGs.
 7. **Fragility and flakiness.** Tests that depend on timing, network, or non-deterministic ordering are FLAGs. Snapshot tests on large artifacts are FLAGs.
 8. **Regression safety.** For changes that touch shared code, the plan specifies how existing tests will be run and what counts as a regression.
 
@@ -47,7 +47,7 @@ Cap at ~5 flags, ~1500 tokens.
 ## Escalation triggers
 
 Return `BLOCK` only when:
-- A brief acceptance criterion has no deliverable that validates it.
+- A brief deliverable has no validation method that can possibly prove its user-observable outcome.
 - A deliverable claims a validation method that cannot possibly prove the behavior (e.g., CLI for a purely visual change with no observable output).
 
 Weak-but-functional validation is a FLAG with a concrete stronger method.

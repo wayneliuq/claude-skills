@@ -5,7 +5,7 @@ description: Drafts the execution plan for an approved product brief inside Clau
 
 # execution-plan
 
-You convert an approved product brief into a concrete, file-level execution plan. The plan is drafted, reviewed, and approved inside **Claude Code plan mode** — plan mode's native UI is the approval gate, and Claude Code's optimized plan-mode prompting runs implicitly.
+You convert an approved product brief into a concrete, file-level execution plan. The plan is drafted, reviewed, and approved inside **Claude Code plan mode** — plan mode's native UI is the approval gate.
 
 You receive:
 - Brief path (`.../product-brief_<slug>.md`)
@@ -18,7 +18,7 @@ You receive:
 
 ## Step 1 — Enter plan mode
 
-Your **first tool call** is `EnterPlanMode`. Do not do any work before entering plan mode — subsequent work benefits from plan mode's prompting.
+Your **first tool call** is `EnterPlanMode`. Do no work before entering plan mode — subsequent work benefits from plan mode's prompting.
 
 If the environment does not support `EnterPlanMode` in this context, fall back: draft outside plan mode, but still present the final plan as the approval gate (see Step 5 fallback).
 
@@ -120,7 +120,7 @@ The `review` skill runs tiered: `alignment` + `simplify` first, then specialists
 - **FLAGs + RECOMMENDATIONs:** Apply high-severity patches silently. Present medium/low patches as a numbered list — PM can accept all / reject all / pick.
 - **ALTERNATIVE (from simplify):** Present the alternative path. Ask PM whether to rewrite or proceed.
 
-After patches applied, re-run the consistency check (every acceptance criterion still covered; no orphan deliverables; no broken DAG edges).
+After patches applied, re-run the consistency check (every brief deliverable still covered; the success signal still mappable; no orphan deliverables; no broken DAG edges).
 
 ---
 

@@ -5,7 +5,7 @@ description: Entry gate for strategic-implementation v2. Collects all document r
 
 # clarify
 
-You are the entry gate for v2's streamlined workflow. v1 asked for document locations at multiple stages. v2 collects everything upfront, in one pass, so nothing is re-asked later.
+You are the entry gate. Collect everything upfront, in one pass, so nothing is re-asked later.
 
 ## Step 1 — Read the request
 
@@ -60,7 +60,7 @@ Ask once, even when the expected answer is "none":
 
 > List every third-party library, runtime, or external system this work depends on whose lifecycle / persistence / state semantics matter (databases, browsers, message queues, caches, SDKs with global state, OS file systems with persistence). For each, one phrase on why it matters. Reply `none` if there are no such dependencies.
 
-The question is cheap when empty and pays for itself when it isn't — `execution-plan` uses the list to drive a 15–30 minute library-lifecycle audit before drafting deliverables.
+`execution-plan` uses the list to drive a library-lifecycle audit before drafting deliverables.
 
 ### C. Outcome-paired prompts
 
@@ -111,4 +111,4 @@ Return:
 
 ## Tone
 
-Direct. No filler. No enthusiasm. This is a conversation, not a form — but it's also a one-pass conversation. Do not split into multiple rounds.
+Direct. No filler. No enthusiasm. One-pass conversation — do not split into multiple rounds.

@@ -5,7 +5,7 @@ description: Drafts or revises the single PM-facing artifact for a feature — t
 
 # product-brief-drafter
 
-You produce `product-brief_<slug>.md` — the single PM-approvable artifact for a feature. This is not a spec document in the v1 sense. It is a compact, user-observable description of what will be built and how it will be validated.
+You produce `product-brief_<slug>.md` — the single PM-approvable artifact for a feature. It is a compact, user-observable description of what will be built and how it will be validated.
 
 **Modes:** `draft` (new brief) and `revise` (existing brief + PM inline markdown feedback).
 
@@ -18,7 +18,7 @@ You produce `product-brief_<slug>.md` — the single PM-approvable artifact for 
 1. **No code.** Not even snippets. The PM does not read code.
 2. **No jargon without a parenthetical.** If you must say "idempotent," write "idempotent (safe to run twice)."
 3. **Every deliverable is user-observable.** If the PM cannot tell from a demo that a deliverable landed, it does not belong in the brief — move it into execution-plan as internal plumbing. The deliverable's declared validation method is its acceptance test; the brief no longer carries a separate Acceptance Criteria section.
-4. **Every deliverable declares a validation method** at brief time, from: `preview`, `cli`, `tdd`, `post-hoc`. This is non-negotiable — the reviewer agent will flag any deliverable missing this.
+4. **Every deliverable declares a validation method** at brief time, from: `preview`, `cli`, `tdd`, `post-hoc`. Reviewers flag any deliverable missing this.
 5. **HARD DECISIONs are explicit.** A PM statement with tight language ("must," "non-negotiable," "only way") becomes a `[HARD DECISION]` row and cannot be reversed by reviewers downstream.
 6. **Compact decision rows.** One line each. Full tradeoff tables only for items marked `[HARD DECISION]` or when the PM explicitly asks for one.
 7. **Inline markdown feedback markers.** In revise mode, the PM's `<!-- pm: ... -->` comments in the existing brief are addressed in-place and removed. Do not leave them behind.

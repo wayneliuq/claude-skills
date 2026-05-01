@@ -5,7 +5,7 @@ description: Consolidated post-execution skill replacing v1's bug-fix + post-mor
 
 # post-execution
 
-One skill, three modes. Selected by the caller based on context.
+Three modes, selected by the caller based on context.
 
 You receive:
 - `mode`: `regression-check` | `triage` | `learnings-synthesis`
@@ -28,7 +28,7 @@ Triggered automatically by `executing-plans` when the final deliverable is marke
    - Files touched in git history since the feature branch diverged (`git diff --name-only <base>..HEAD`)
 2. **Cross-contamination check.** For each modified file, grep the rest of the repo for imports/references. For each dependent, decide: is its behavior potentially affected? Flag dependents whose tests should be rerun.
 3. **Run the existing test suite.** Use the project's test command (detect from `package.json` / `pyproject.toml` / `Makefile`). Record failures. A test that was passing before this feature and fails now is a regression.
-4. **Author acceptance tests for feature flows.** For every acceptance criterion in the brief that was not validated via TDD during execution, author an E2E or integration test now. Run it.
+4. **Author acceptance tests for feature flows.** For every brief deliverable that was not validated via TDD during execution, author an E2E or integration test now that exercises its user-observable outcome. Run it.
 5. **Goal-backward claim verification.** Build the suspect-set: deliverables whose `Validation` is `post-hoc` OR which carry a `FLAG (mocked-seam)` entry in `validation-log.md`. Take the first **3 matches**. If none, skip this step.
 
    For each matched deliverable, read its expected outcome from `execution-plan.md` (not from any commit message, summary, or validation-log narrative). For each named artifact (function / route / consumer / config key / file path), run a single grep and record yes/no — does it exist in the codebase as the plan claims? Use the acceptance test authored in Step 4 (if any) as one of the yes/no signals.

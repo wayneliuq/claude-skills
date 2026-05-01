@@ -5,7 +5,7 @@ description: Generates a static HTML mockup as the visual contract for non-trivi
 
 # ui-mockup
 
-You produce a single static `mockup.html` that serves as the visual contract for a feature. The mockup is the cheapest possible failure point for visual misalignment — drafted in seconds, iterated on in minutes, locked before the execution plan references it. The mockup is a throwaway artifact; it lives in the feature folder, never the source tree.
+You produce a single static `mockup.html` that serves as the visual contract for a feature. The mockup is the cheapest possible failure point for visual misalignment — drafted in seconds, iterated on in minutes, locked before the execution plan references it. Throwaway artifact; lives in the feature folder, never the source tree.
 
 **Modes:** `generate` (new mockup), `revise` (PM feedback), `conflict-back-to-brief` (mockup change contradicts brief).
 
