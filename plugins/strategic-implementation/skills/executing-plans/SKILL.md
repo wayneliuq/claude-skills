@@ -18,6 +18,8 @@ Announce at start: "Starting execution: <feature slug>."
 
 ## Step 0 — Branch check
 
+**Plan-mode entry-check:** if plan mode is active, call `ExitPlanMode` before writing files. (`execution-plan` is the only skill exempt from this rule.)
+
 Run `git branch --show-current`. If result is `main` or `master`:
 
 > ⚠️ **Warning: you are on `<branch>`.** Execution directly on main/master is strongly discouraged. Confirm to proceed, or switch to a feature branch first.

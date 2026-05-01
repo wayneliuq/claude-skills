@@ -122,5 +122,6 @@ On the final deliverable's completion, `executing-plans` invokes `strategic-impl
 - No code before brief approval and execution-plan approval.
 - Execution plan is reviewed; brief is not (brief review is the PM's inline review).
 - Plan mode is entered inside `execution-plan` — not here.
+- Before invoking `product-brief-drafter`, `executing-plans`, or `post-execution`, exit plan mode if active. Never exit plan mode before invoking `execution-plan` (it enters plan mode itself).
 - Hard decisions in the brief are locked; review cannot reverse them.
 - `executing-plans` owns all per-deliverable flow. This skill ends when execution begins.

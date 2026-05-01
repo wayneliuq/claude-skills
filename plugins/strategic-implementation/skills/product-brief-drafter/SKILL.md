@@ -27,6 +27,8 @@ You produce `product-brief_<slug>.md` — the single PM-approvable artifact for 
 
 ## Mode: draft
 
+**Plan-mode entry-check:** if plan mode is active, call `ExitPlanMode` before writing files. (`execution-plan` is the only skill exempt from this rule.)
+
 You receive:
 - The clarified request (output of `clarify`)
 - Document locations: architecture doc, UX/PMF doc, security policy, schema/ERD (whatever `clarify` collected)
@@ -88,6 +90,8 @@ Do NOT auto-advance. The PM approves the brief explicitly.
 ---
 
 ## Mode: revise
+
+**Plan-mode entry-check:** if plan mode is active, call `ExitPlanMode` before writing files. (`execution-plan` is the only skill exempt from this rule.)
 
 You receive:
 - Path to the existing brief
