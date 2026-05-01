@@ -79,13 +79,45 @@ Do not prompt the PM to decide — wait for their signal. The loop runs as many 
 
 ---
 
+## Step 3.5 — Optional UI mockup (pre-flight scope estimate, then optional ui-mockup)
+
+On brief approval, decide whether the change warrants a static HTML mockup *before* the execution plan is drafted. The mockup is the cheapest possible failure point for visual misalignment.
+
+**Trigger criterion** — emit a pre-flight estimate when the approved brief introduces any of:
+- a new screen,
+- a flow with ≥2 steps, or
+- an information-architecture change (what / where the user sees something).
+
+**Non-trigger** — do NOT emit when the change is:
+- a single control (one button, one input) added to an existing screen,
+- copy-only changes,
+- style-only changes (colors, spacing, typography with no IA shift).
+
+**Pre-flight scope estimate.** When the trigger fires, emit one line in the form:
+
+> Mockup pre-flight estimate: ~`<N>` lines (`<small | medium | large>`), reason: `<which trigger>`. Do the mockup? (yes / skip)
+
+Estimate `<N>` from the brief's UI surface area. `small ≤200`, `medium 200–600`, `large >600`. The PM may always override either way: confirm to proceed even on a non-trigger, or skip even on a trigger.
+
+**On confirm** — invoke `strategic-implementation:ui-mockup` in `generate` mode with the brief path and feature folder. The skill writes `mockup.html` to the feature folder.
+
+**Mockup revision loop.** Mirrors the brief revision loop:
+- PM adds `<!-- pm: ... -->` comments inline (or writes a sibling `mockup-feedback.md`) and replies "revise" → invoke `ui-mockup` in `revise` mode.
+- If a comment contradicts a brief deliverable or HARD DECISION, `ui-mockup` switches to `conflict-back-to-brief` mode and routes back to `product-brief-drafter:revise`. After the brief is revised, the workflow returns to Step 3.5 (re-emit estimate or proceed with revised mockup).
+- PM replies "approve" → proceed to Step 4 with `Mockup path` set.
+
+**On skip** — proceed directly to Step 4 with no `Mockup path`.
+
+---
+
 ## Step 4 — Execution plan (plan mode)
 
-On brief approval, announce: "Drafting execution plan in plan mode."
+On brief approval (or on mockup approval if Step 3.5 ran), announce: "Drafting execution plan in plan mode."
 Invoke `strategic-implementation:execution-plan` with:
 - Brief path
 - Feature folder path
 - Integration-risk dependencies (from clarify; may be empty)
+- Mockup path (from Step 3.5 if produced; else omit)
 - Autonomy level
 
 `execution-plan` enters plan mode as its first action, drafts against the brief using live repo state, invokes `strategic-implementation:review` inside plan mode, applies review patches, and presents the plan via plan mode's native UI.
