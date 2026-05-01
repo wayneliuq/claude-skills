@@ -53,7 +53,17 @@ Ask once, even when the expected answer is "none":
 
 The question is cheap when empty and pays for itself when it isn't — `execution-plan` uses the list to drive a 15–30 minute library-lifecycle audit before drafting deliverables.
 
-### C. Autonomy level
+### C. Outcome-paired prompts
+
+Two short questions (paired — ask together):
+
+> **If this shipped tomorrow, what's the one-sentence change to the user's life?**
+>
+> **How would you know it worked from outside — a query, a behavior, a metric? Not "the deliverable shipped."**
+
+Capture each as a single sentence. **Never block.** If the PM cannot answer either in one sentence, capture that prompt's answer as `TBD — open question` and proceed. Inability to answer is itself signal — it propagates verbatim to the brief's Working-backwards / Success-signal sections so the drafter doesn't fabricate.
+
+### D. Autonomy level
 
 ```
 **Autonomy level** — default is `auto`:
@@ -78,6 +88,8 @@ Wait for confirmation.
 
 Return:
 - Clarified request (request + assumptions + Q&A answers)
+- `working-backwards`: one-sentence outcome in PM's words, or the literal string `TBD — open question`
+- `success-signal`: one-sentence outside-observable signal, or the literal string `TBD — open question`
 - Document references (dict with `architecture`, `ux_pmf`, `security`, `schema`, each `path|url|none|n/a`)
 - Integration-risk dependencies (list of `{name, why_it_matters}`, or empty list)
 - Autonomy level (`supervised` | `auto` | `yolo`)
