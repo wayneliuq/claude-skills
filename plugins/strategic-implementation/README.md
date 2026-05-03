@@ -6,7 +6,7 @@
 
 You write what the user should be able to do. The plugin handles everything between that sentence and merged code: clarification, planning, adversarial review, deliverable-by-deliverable execution, and a regression check at the end. You approve **one document** (the product brief). Everything else happens behind the right gates, with the right level of autonomy you choose at the start.
 
-**Version:** 3.0.0
+**Version:** 3.1.0
 **Built for:** Claude Code on Opus 4.7
 **Audience:** non-technical PMs, solo founders, anyone who can describe what good looks like
 
@@ -207,6 +207,20 @@ The v2.2 changes (adversarial stance, goal-backward verification, anti-framing i
 - **[garrytan/gstack](https://github.com/garrytan/gstack)** — a virtual-engineering-team-in-a-box with a strong anti-sycophancy doctrine in its `office-hours` skill. The anti-framing posture in our `clarify` skill — surfacing solution-disguised-as-problem requests before a brief is drafted — is a direct adaptation.
 
 Both plugins are broader in scope than `strategic-implementation`. Our deliberate choice has been to keep this plugin **lean** — eight small skills, one PM artifact, native plan-mode integration — and to borrow only the specific high-leverage ideas that close real gaps in our own workflow without bloating it. We thank both projects for their public, well-documented work.
+
+---
+
+## Acknowledgments — inspirations for v3.1 (Hardening Pass)
+
+The v3.1 hardening pass adds five rules across `post-execution`, `executing-plans`, and `agents/tests.md` that close a security gate, sharpen triage, prevent rework loops, and tighten the tests reviewer. All five are imported from public, well-documented sources:
+
+- **[mattpocock/skills](https://github.com/mattpocock/skills) @ b843cb5** — the `diagnose` Phase-1 feedback-loop discipline (build a deterministic repro before hypothesizing; produce 3–5 ranked falsifiable hypotheses; tag debug logs with a unique prefix) is imported into `post-execution:triage` (D3). The `tdd` vertical-slice tracer-bullet rule and the `mocking.md` "mock at system boundaries only" rule are imported into `executing-plans` Step 2b and `agents/tests.md` Scope item 3 (D2).
+- **[affaan-m/everything-claude-code](https://github.com/affaan-m/everything-claude-code) @ 841beea** — the AgentShield static-config-scan rule patterns are inlined into `post-execution:regression-check` Step 2a (D1). Patterns are inlined as prose (no `npx` runtime dependency); upstream maintains 102 rules with auto-fix mode, our subset covers secrets, permissions, hook injection, MCP risk profile, and agent config review with severity gating (Critical → BLOCK, High → FLAG, Medium → log).
+- **[millionco/claude-doctor](https://github.com/millionco/claude-doctor) @ f5efb2a** — the edit-thrashing and error-loop signals (>3 edits to one file → re-read brief; 3 consecutive tool failures → escalate to triage instead of retrying) are imported into `executing-plans` Step 2b's Rework guardrails block (D2). The repeated-instructions detection (≥60% phrase-overlap across 5 PM turns → route to brief revision rather than code fix) is imported into `post-execution:triage` Step 1.5 (D3).
+
+**De-facto policy note.** The inlined AgentShield rule patterns in D1 are the plugin's de-facto plugin-config security policy as of v3.1 — the brief declared no security policy doc upstream of this work, and the rule wording shipped here is authoritative-by-default. Future PMs editing security-sensitive plugin config should treat these patterns as the contract until a project-level security policy supersedes them.
+
+The v3.1 choice mirrors v2.2: import the high-leverage idea, leave the heavyweight stack behind. AgentShield's `npx` runtime, claude-doctor's cross-session signals, and mattpocock's persistent domain-language convention are all explicitly out of scope. We thank all three projects for their public, well-documented work.
 
 ---
 

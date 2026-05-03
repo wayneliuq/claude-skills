@@ -1,5 +1,5 @@
 {
   "name": "strategic-implementation",
-  "version": "3.0.0",
+  "version": "3.1.0",
   "description": "Outcome-first planning-to-execution workflow: clarify → product brief → optional UI mockup → plan-mode execution plan → tiered review → deliverable-gated execution. Per-repo documentation registry."
 }

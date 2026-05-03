@@ -88,7 +88,7 @@ _None — clarify declared no integration-risk dependencies. AgentShield's npm r
 - **Visual contract:** n/a.
 - **Consumer audit:** triage validation-log Triage entry gains a new `**Debug-log prefix:**` field — additive, parsed only by `learnings-synthesis` summarizer (no enum). `unaffected-because-additive-prose-field`. Deviation type additions (`repro-blocked`, `spec-ambiguity-redirect`, `spec-ambiguity-override`) — same posture as D2's deviation additions: `unaffected-because-deviation-types-are-narrative-prose-not-parsed-as-enum`.
 
-### D4 — README attribution + version bump
+### D4 — README attribution + version bump  ✅ complete
 - **Integration-risk class:** `d`.
 - **Validation:** `post-hoc` — PM diff-reads README new Acknowledgments section and `package.json` version field.
 - **Files:**
