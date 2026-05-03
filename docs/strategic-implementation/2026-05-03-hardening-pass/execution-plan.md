@@ -13,7 +13,7 @@ _None — clarify declared no integration-risk dependencies. AgentShield's npm r
 
 ## Deliverables (DAG)
 
-### D1 — Inlined plugin-config security scan in `post-execution:regression-check`
+### D1 — Inlined plugin-config security scan in `post-execution:regression-check`  ✅ complete
 - **Source:** `affaan-m/everything-claude-code` AgentShield (commit `841beea`).
 - **Integration-risk class:** `d`.
 - **Validation:** `post-hoc` — PM diff-reads the new Step 2a in `post-execution/SKILL.md`; checks the five rule categories, severity gating, and the inserted `## Plugin config security scan` report block. Behavioral end-to-end (regression-check BLOCK on a real poisoned hook) is deferred to first real use.
