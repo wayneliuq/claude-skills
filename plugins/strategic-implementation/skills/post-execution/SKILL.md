@@ -111,7 +111,19 @@ Triggered when PM reports a behavioral issue after execution completed (bug, une
 ### Steps
 
 1. Read the PM's report. Identify: what surface, what the expected behavior was, what was observed.
-2. Reproduce. Use the validation method from the relevant deliverable (preview, cli, etc.) to confirm.
+
+   **Step 1.5 — Specification-ambiguity check (before repro).** Scan the last 5 PM messages in the current session. If any pair shows ≥60% phrase-overlap (agent-eyeballed — substantive nouns and verbs repeated, not just function words), the issue is likely specification ambiguity, not a code defect. On detection: do **not** proceed to repro. Surface to PM:
+
+   > "Detected repeated/paraphrased instruction in last 5 turns — `<paraphrase A>` vs `<paraphrase B>`. This pattern usually indicates the brief or plan is ambiguous. Recommend invoking `product-brief-drafter:revise` rather than attempting another fix. Proceed to repro anyway? (y/N)"
+
+   Default N. On N: route to brief revision via the orchestrator. Log a `spec-ambiguity-redirect` deviation and stop. On y: proceed to Step 2; log `spec-ambiguity-override`.
+
+2. **Build deterministic repro before hypothesizing.** Prohibit proposing fixes until a fast, deterministic, agent-runnable signal exists that distinguishes "broken" from "fixed." If one cannot be built, log a `repro-blocked` deviation and surface to PM rather than dive into code. Repro-construction ladder, in order of preference: failing test → curl/CLI snapshot diff → headless browser script → trace replay → throwaway harness → bisect harness → differential vs. last-known-good. Stop at the first rung that yields a deterministic pass/fail.
+
+   **Step 2a — Generate ranked hypotheses.** Produce 3–5 falsifiable hypotheses, ranked by expected explanatory power, each with a one-line falsification cost. Forbid fix attempts on hypotheses below rank 3 until the top-3 are ruled out.
+
+   **Step 2b — Tag debug logs for cleanup.** Any debug print/log added during diagnosis carries a unique prefix declared up front (e.g. `[DBG-D<n>-<short-uuid>]`). Step 5's Triage block records the prefix so cleanup is a single grep/remove.
+
 3. **TDD the fix.** Write an acceptance test that captures the bug (fails currently). Then write the minimum code to make it pass.
 4. Run the full test suite to confirm no new regressions.
 5. Append to `<feature-folder>/validation-log.md`:
@@ -120,6 +132,7 @@ Triggered when PM reports a behavioral issue after execution completed (bug, une
 ## Triage · <date>
 **Reported:** <PM's words>
 **Repro:** <how reproduced>
+**Debug-log prefix:** <prefix declared in Step 2b, or "none">
 **Root cause:** <one sentence>
 **Fix:** <one sentence + files touched>
 **Test added:** <path>

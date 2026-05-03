@@ -67,7 +67,7 @@ _None — clarify declared no integration-risk dependencies. AgentShield's npm r
   - `dimension` enum in `agents/tests.md` Output schema → consumers verified at plan-approval time: `grep -rn 'dimension' plugins/strategic-implementation/skills/review/ plugins/strategic-implementation/agents/alignment.md` confirms no switch/case on enum values; `dimension` appears only as a prose word in review SKILL description and as a JSON output field in alignment (emitted, not consumed). **Status: `unaffected-because-not-parsed-as-enum-only-emitted`.**
   - Deviation type strings (`thrash-pause`, `error-loop-escalation`) — `unaffected-because-deviation-types-are-narrative-prose-not-parsed-as-enum`. Note: deviation-type vocabulary is now load-bearing for `learnings-synthesis` prose pattern-matching only; if a future skill ever switches on this enum, both D2 and D3 (which adds spec-ambiguity-* types) silently regress together.
 
-### D3 — Triage rewrite: spec-ambiguity check + Phase-1 deterministic-repro discipline
+### D3 — Triage rewrite: spec-ambiguity check + Phase-1 deterministic-repro discipline  ✅ complete
 - **Source:** `mattpocock/skills` @ `b843cb5` (`diagnose` Phase-1); `millionco/claude-doctor` @ `f5efb2a` (repeated-instructions).
 - **Integration-risk class:** `d`.
 - **Validation:** `post-hoc` — PM diff-reads the rewritten triage section in `post-execution/SKILL.md`; checks that Step 1.5 (spec-ambiguity) precedes the rewritten Step 2 (deterministic repro), 3-5 ranked falsifiable hypotheses are required, and debug-log prefix tagging is declared.
