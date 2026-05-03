@@ -37,7 +37,7 @@ _None — clarify declared no integration-risk dependencies. AgentShield's npm r
 - **Visual contract:** n/a.
 - **Consumer audit:** `post-execution-report.md` schema gains a new `## Plugin config security scan` section and a new field in the `## Status` line. The report is human-read by the PM (no machine consumer). `unaffected-because-no-machine-consumer-of-report-schema`.
 
-### D2 — Executing-plans Step 2b hardening + tests reviewer mock-placement
+### D2 — Executing-plans Step 2b hardening + tests reviewer mock-placement  ✅ complete (cli validation deferred to post-D4 plugin reinstall — see DEV-002)
 - **Source:** `mattpocock/skills` @ `b843cb5` (TDD vertical-slice + mocking.md); `millionco/claude-doctor` @ `f5efb2a` (edit-thrashing + error-loop signals).
 - **Integration-risk class:** `d`.
 - **Validation:** `cli` — synthetic-plan fixture exercises the new `mock-placement` rule. Create `docs/strategic-implementation/2026-05-03-hardening-pass/fixtures/synthetic-plan-with-internal-mock.md` containing a one-deliverable plan that declares `tdd` validation and explicitly mocks an internal collaborator (e.g., a helper function in the same module). Run the `tests` reviewer agent against this fixture (via the same Skill/Agent invocation pattern reviewers normally use). Assert the agent's JSON output contains a flag with `dimension: "mock-placement"` and severity `high`. Prose additions (rework guardrails, TDD vertical-slice rule) are observed in the same commit's diff as the mock-placement rule lands; the cli fixture is the proof-point that any new rule wording is structurally correct.

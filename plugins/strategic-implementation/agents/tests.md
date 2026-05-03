@@ -19,12 +19,15 @@ For each deliverable, check:
    A green unit-test suite that mocks the integration point is orthogonal-to-correctness coverage, not correctness coverage.
 
    **Validation-honesty soft-failures to resist** (in the spirit of `alignment`'s adversarial stance): accepting `tdd` at integration seams because tests are green; treating green mocked tests as proof the dependency is exercised; letting `preview` substitute for `cli` when the proof is in machine-readable output, not pixels; calling a missing fallback "edge-case" when the seam is the deliverable.
-3. **The method can actually prove the deliverable's user-observable outcome.** A UI change claiming `cli` validation is suspicious — what would the CLI show? A data-integrity change claiming `preview` is suspicious — what is there to look at?
-4. **TDD is used where it is actually required.** Required when: (a) the behavior is not visually observable, (b) regression risk is high, (c) a prior bug in this area exists, (d) the brief explicitly demands it. Over-prescribed TDD is a FLAG — it burns tokens without yielding.
-5. **Preview-unavailable fallback.** If a deliverable declares `preview` but the plan runs non-interactive, the fallback (pause for PM manual validation, or escalate to TDD in yolo) must be specified.
-6. **Outcome coverage.** Every user-observable deliverable in the brief has a validation method that proves it. The brief's success signal also has at least one deliverable contributing to it. Orphan deliverables or an unmappable success signal are FLAGs.
-7. **Fragility and flakiness.** Tests that depend on timing, network, or non-deterministic ordering are FLAGs. Snapshot tests on large artifacts are FLAGs.
-8. **Regression safety.** For changes that touch shared code, the plan specifies how existing tests will be run and what counts as a regression.
+3. **Mock placement (HIGH).** Mocks are allowed only at system boundaries (third-party SDKs, network, file system, OS). Mocks of internal collaborators (helpers, factories, services within the same module/package) are a HIGH-severity FLAG. Required wording shape:
+   > "D<n> mocks internal collaborator `<name>` — internal collaborators must be exercised, not stubbed. Move the mock to the system boundary or remove it."
+   A test suite that mocks its own callees proves nothing about integration.
+4. **The method can actually prove the deliverable's user-observable outcome.** A UI change claiming `cli` validation is suspicious — what would the CLI show? A data-integrity change claiming `preview` is suspicious — what is there to look at?
+5. **TDD is used where it is actually required.** Required when: (a) the behavior is not visually observable, (b) regression risk is high, (c) a prior bug in this area exists, (d) the brief explicitly demands it. Over-prescribed TDD is a FLAG — it burns tokens without yielding.
+6. **Preview-unavailable fallback.** If a deliverable declares `preview` but the plan runs non-interactive, the fallback (pause for PM manual validation, or escalate to TDD in yolo) must be specified.
+7. **Outcome coverage.** Every user-observable deliverable in the brief has a validation method that proves it. The brief's success signal also has at least one deliverable contributing to it. Orphan deliverables or an unmappable success signal are FLAGs.
+8. **Fragility and flakiness.** Tests that depend on timing, network, or non-deterministic ordering are FLAGs. Snapshot tests on large artifacts are FLAGs.
+9. **Regression safety.** For changes that touch shared code, the plan specifies how existing tests will be run and what counts as a regression.
 
 Do not review code style, assertion style, or test framework choice. Do not flag missing unit tests — they are intentionally deferred pre-GA.
 
@@ -34,7 +37,7 @@ Do not review code style, assertion style, or test framework choice. Do not flag
 {
   "status": "PASS | FLAG | BLOCK",
   "flags": [
-    { "dimension": "method|honesty|coverage|fragility|regression", "severity": "low|med|high", "message": "...", "location": "deliverable id" }
+    { "dimension": "method|honesty|coverage|fragility|regression|mock-placement", "severity": "low|med|high", "message": "...", "location": "deliverable id" }
   ],
   "recommendations": [
     { "action": "patch|discuss|defer", "target": "deliverable id", "change": "..." }

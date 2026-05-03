@@ -70,12 +70,15 @@ If `preview` pre-flight fails:
 Implement the deliverable per its steps. Rules:
 
 - **Only files named in the deliverable.** Unrelated touches = deviation.
-- **TDD where declared.** If validation is `tdd`: test first, then implementation, then test passes.
+- **TDD where declared (vertical-slice tracer-bullet rule).** When validation is `tdd`, write ONE failing test for the next thinnest slice of user-observable behavior, make it pass, commit-or-stage, then move to the next slice. Do **not** write all tests first then all implementation — that produces tests of imagined behavior and the shape of things, not user-facing behavior. The horizontal-slice anti-pattern (test-batch then code-batch) is rejected.
 - **Code discipline:**
   - Write the minimum that passes validation. No speculative abstractions.
   - Match existing conventions (style, naming, error handling).
   - Clean up only code YOUR changes made unused — leave pre-existing dead code alone.
   - Do not "improve" adjacent code.
+- **Rework guardrails (per-deliverable counters):**
+  - **Edit-thrashing:** track Edit/Write tool calls per file within the current deliverable. On the 4th edit to the same file (>3 edits), pause: re-read the brief and the deliverable's plan block before any further Edit/Write to that file. Log a `thrash-pause` deviation. In `auto`, decide and proceed; in `supervised`, surface and pause.
+  - **Error-loop:** track consecutive tool failures. On the 3rd consecutive failure of any tool call within the current deliverable without a strategy change, do not retry. Escalate to `post-execution:triage` with the error trace as the reported issue. Log an `error-loop-escalation` deviation.
 
 **Registry-tracked doc bundle.** If the deliverable's `may-invalidate` field is non-empty, after building primary changes, prompt the PM:
 
@@ -145,10 +148,11 @@ On validation failure:
 - Else: revise the lowest-confidence assumption.
 
 **Attempt 2** (only if revision yields a distinct fix):
-1. State revised assumption.
-2. Fix. Re-validate.
-3. Success → log deviation, continue.
-4. Failure → revert. **EXIT.**
+1. **Precondition:** if `error-loop-escalation` has already triggered for this deliverable (3+ consecutive failures), do NOT attempt Attempt 2 — proceed directly to EXIT and Exit Report.
+2. State revised assumption.
+3. Fix. Re-validate.
+4. Success → log deviation, continue.
+5. Failure → revert. **EXIT.**
 
 ### Exit Report
 
@@ -182,13 +186,13 @@ Do not mark complete. Do not proceed to next deliverable. Await PM direction.
 
 ## Deviation logging
 
-A deviation exists on any of: blocker, retry, user-correction, reversal, ambiguity-decision, auto-escalation, yolo-skip, branch-risk, consumer-audit-mismatch.
+A deviation exists on any of: blocker, retry, user-correction, reversal, ambiguity-decision, auto-escalation, yolo-skip, branch-risk, consumer-audit-mismatch, thrash-pause, error-loop-escalation.
 
 Append to `validation-log.md`:
 
 ```markdown
 ## DEV-NNN
-**Type:** blocker | retry | user-correction | reversal | ambiguity-decision | auto-escalation | yolo-skip | branch-risk | consumer-audit-mismatch
+**Type:** blocker | retry | user-correction | reversal | ambiguity-decision | auto-escalation | yolo-skip | branch-risk | consumer-audit-mismatch | thrash-pause | error-loop-escalation
 **Deliverable:** D<n>
 **Plan said:** <verbatim>
 **Actually:** <what happened>
