@@ -1,6 +1,6 @@
 # Project Learnings
-_Last updated: 2026-04-06_
-_Sessions tracked: 1_
+_Last updated: 2026-05-03_
+_Sessions tracked: 2_
 
 > **Tag semantics:**
 > - `#single-session`: applied only during session plan review. One session of evidence.
@@ -58,4 +58,14 @@ _Sessions tracked: 1_
 **Source:** 2026-04-05-plugin-skills-agents-improvement, Session 3
 **Evidence:** DEV-006 — verification grep `"initialization order"` returned 0 results because the implemented phrase was `"initialized in a later step"`. The concept was correctly incorporated; only the test anchor failed.
 **Last reviewed:** 2026-04-06
+**Application notes:**
+
+---
+
+### L-005: Plan-time validation depends on what's loaded, not what's written
+**WHEN** an execution plan declares `cli` validation that depends on the runtime behavior of a plugin agent or skill that the same deliverable modifies — and the agent/skill is loaded from a plugin cache (not from the working tree) — **DO** either (a) declare validation `post-hoc` instead, (b) sequence a plugin reinstall step into the deliverable before the cli check runs, or (c) design the cli check so the proof-point is observable in the working tree (grep, file existence, content shape) rather than via a live agent invocation. Never trust that working-tree edits to a plugin's own agents are visible to in-session agent invocations without an explicit reinstall.
+**Tags:** `#tests` `#technical` `#multi-feature`
+**Source:** 2026-05-03-hardening-pass, DEV-002
+**Evidence:** D2's cli validation (run `tests` reviewer against synthetic fixture; assert `dimension: "mock-placement"`) could not produce the canonical enum value because the reviewer agent loaded from `~/.claude/plugins/cache/.../agents/tests.md` (v3.0.0 frozen) rather than from the working-tree `plugins/strategic-implementation/agents/tests.md` (v3.1 with the new dimension). The rule fired correctly under the existing `honesty` label, proving prose-correctness, but the strict cli match was impossible without reinstall. Pre-acknowledged in plan as "plugin-cache drift risk" but the plan still declared `cli` validation rather than `post-hoc`.
+**Last reviewed:** 2026-05-03
 **Application notes:**
