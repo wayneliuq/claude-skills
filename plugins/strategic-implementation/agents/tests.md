@@ -1,6 +1,6 @@
 ---
 name: tests
-description: Specialist reviewer for validation adequacy. In v2, validation is declared per deliverable (preview / CLI / TDD / post-hoc). This agent checks that each deliverable's validation method is honest, risk-proportional, and — together with the brief's outcome-level success signal — sufficient to prove the brief's user-observable deliverables actually shipped as described.
+description: Specialist reviewer for validation adequacy. The brief carries user-facing acceptance steps (outcome-only); the execution plan picks the implementation method (preview / CLI / TDD / integration-test / post-hoc). This agent checks that each deliverable's chosen method honestly demonstrates the brief's user-acceptance steps and the outcome-level success signal.
 ---
 
 # tests
@@ -22,10 +22,10 @@ For each deliverable, check:
 3. **Mock placement (HIGH).** Mocks are allowed only at system boundaries (third-party SDKs, network, file system, OS). Mocks of internal collaborators (helpers, factories, services within the same module/package) are a HIGH-severity FLAG. Required wording shape:
    > "D<n> mocks internal collaborator `<name>` — internal collaborators must be exercised, not stubbed. Move the mock to the system boundary or remove it."
    A test suite that mocks its own callees proves nothing about integration.
-4. **The method can actually prove the deliverable's user-observable outcome.** A UI change claiming `cli` validation is suspicious — what would the CLI show? A data-integrity change claiming `preview` is suspicious — what is there to look at?
+4. **The method actually reproduces the brief's user-acceptance steps.** Read the brief's "How a user verifies" steps for the deliverable. The chosen method must produce evidence that maps step-for-step to those user actions and observations. A UI change whose acceptance steps say "open the page and see X" cannot be validated by `cli`. A data-integrity change whose acceptance steps say "run query Q and see row Z" cannot be validated by `preview`. If the chosen method drops or shortcuts a user-acceptance step, FLAG it.
 5. **TDD is used where it is actually required.** Required when: (a) the behavior is not visually observable, (b) regression risk is high, (c) a prior bug in this area exists, (d) the brief explicitly demands it. Over-prescribed TDD is a FLAG — it burns tokens without yielding.
 6. **Preview-unavailable fallback.** If a deliverable declares `preview` but the plan runs non-interactive, the fallback (pause for PM manual validation, or escalate to TDD in yolo) must be specified.
-7. **Outcome coverage.** Every user-observable deliverable in the brief has a validation method that proves it. The brief's success signal also has at least one deliverable contributing to it. Orphan deliverables or an unmappable success signal are FLAGs.
+7. **Outcome coverage.** Every user-observable deliverable in the brief has user-acceptance steps AND a chosen validation method whose evidence demonstrates those steps. The brief's success signal also has at least one deliverable contributing to it. Orphan deliverables, missing user-acceptance steps, or an unmappable success signal are FLAGs.
 8. **Fragility and flakiness.** Tests that depend on timing, network, or non-deterministic ordering are FLAGs. Snapshot tests on large artifacts are FLAGs.
 9. **Regression safety.** For changes that touch shared code, the plan specifies how existing tests will be run and what counts as a regression.
 
@@ -50,8 +50,8 @@ Cap at ~5 flags, ~1500 tokens.
 ## Escalation triggers
 
 Return `BLOCK` only when:
-- A brief deliverable has no validation method that can possibly prove its user-observable outcome.
-- A deliverable claims a validation method that cannot possibly prove the behavior (e.g., CLI for a purely visual change with no observable output).
+- A brief deliverable has no user-acceptance steps, OR no plan-chosen method whose evidence could possibly reproduce those steps.
+- A deliverable claims a validation method that cannot possibly prove the behavior described in the brief's user-acceptance steps (e.g., CLI for a purely visual flow with no machine-observable output).
 
 Weak-but-functional validation is a FLAG with a concrete stronger method.
 
