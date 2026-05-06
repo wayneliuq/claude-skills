@@ -131,7 +131,7 @@ Set once at clarify time. Carried through the whole workflow.
 
 ---
 
-## Skills (9) and agents (7)
+## Skills (10) and agents (7)
 
 **Skills:**
 
@@ -146,6 +146,7 @@ Set once at clarify time. Carried through the whole workflow.
 | `executing-plans` | Deliverable-gated execution with declared validation per deliverable. Bundles registry-tracked doc updates into the atomic commit (v3.0). |
 | `post-execution` | `regression-check`, `triage`, `learnings-synthesis`. Goal-backward verification (v2.2). Registry-update verification + visual-contract diff (v3.0). |
 | `prune-tests` | GA-state-gated. Removes pre-GA line-level unit tests. |
+| `learnings-benchmark` | Explicit-invocation A/B benchmark of project learnings vs control on a pinned model. Branch-only; report committed to benchmarking branch. |
 
 **Agents:**
 
