@@ -5,7 +5,7 @@ description: Drafts or revises the single PM-facing artifact for a feature — t
 
 # product-brief-drafter
 
-You produce `product-brief_<slug>.md` — the single PM-approvable artifact for a feature. It is a compact, user-observable description of what will be built and how it will be validated.
+You produce `product-brief_<slug>.md` — the single PM-approvable artifact for a feature. It is a compact, user-observable description of what will be built and how a human, using the product, would confirm it works.
 
 **Modes:** `draft` (new brief) and `revise` (existing brief + PM inline markdown feedback).
 
@@ -17,8 +17,8 @@ You produce `product-brief_<slug>.md` — the single PM-approvable artifact for 
 
 1. **No code.** Not even snippets. The PM does not read code.
 2. **No jargon without a parenthetical.** If you must say "idempotent," write "idempotent (safe to run twice)."
-3. **Every deliverable is user-observable.** If the PM cannot tell from a demo that a deliverable landed, it does not belong in the brief — move it into execution-plan as internal plumbing. The deliverable's declared validation method is its acceptance test; the brief no longer carries a separate Acceptance Criteria section.
-4. **Every deliverable declares a validation method** at brief time, from: `preview`, `cli`, `tdd`, `post-hoc`. Reviewers flag any deliverable missing this.
+3. **Every deliverable is user-observable.** If the PM cannot tell from a demo that a deliverable landed, it does not belong in the brief — move it into execution-plan as internal plumbing.
+4. **Every deliverable declares user-facing acceptance steps** — a short numbered list answering the question *"how would a human, using this product, know this worked?"* Outcome-only. No implementation details, no test names, no methods. Each step is something the PM (or a representative user) could perform and observe themselves. The brief intentionally does **not** name an implementation method (`preview` / `cli` / `tdd` / `integration-test` / `post-hoc`) — that choice belongs to execution-plan, derived from these steps plus integration-risk class. Naming a method here would bias downstream review and limit honest test selection. Reviewers flag any deliverable missing user-facing acceptance steps.
 5. **HARD DECISIONs are explicit.** A PM statement with tight language ("must," "non-negotiable," "only way") becomes a `[HARD DECISION]` row and cannot be reversed by reviewers downstream.
 6. **Compact decision rows.** One line each. Full tradeoff tables only for items marked `[HARD DECISION]` or when the PM explicitly asks for one.
 7. **Inline markdown feedback markers.** In revise mode, the PM's `<!-- pm: ... -->` comments in the existing brief are addressed in-place and removed. Do not leave them behind.
@@ -47,13 +47,21 @@ _Slug: <slug> · Date: <YYYY-MM-DD> · Autonomy: <level>_
 > <One paragraph in release-note voice — "the X now does Y," not "we will build." Describes what the user observably gets if this shipped tomorrow. ≤5 sentences. If clarify passed `working-backwards: TBD`, write "TBD — open question" verbatim and do not fabricate.>
 
 ## 2. What the user does / sees
-| # | Deliverable (user-observable) | Validation |
-|---|---|---|
-| D1 | <one sentence, what the user sees or can do> | `preview` / `cli` / `tdd` / `post-hoc` + one-line how |
-| D2 | ... | ... |
+
+For each deliverable, write the user-observable description and the acceptance steps a human would take to confirm it works. No implementation methods, no test names — outcome-only steps a PM could perform.
+
+### D1 — <one-sentence user-observable description>
+**How a user verifies:**
+1. <Concrete action a human takes — open page X, run feature Y from the UI, observe field Z>
+2. <Next step / observation>
+3. <...continue until the outcome is unambiguously confirmed>
+
+### D2 — <...>
+**How a user verifies:**
+1. ...
 
 ## 3. Success signal
-<Names a thing observable from outside the system — a query, a behavior, a metric. NOT "the deliverable shipped"; that's per-deliverable validation. The success signal is outcome-level. If clarify passed `success-signal: TBD`, write "TBD — open question" verbatim.>
+<Names a thing observable from outside the system — a query, a behavior, a metric. NOT "the deliverable shipped"; deliverable-shipped is covered by §2's per-deliverable user-acceptance steps. The success signal is outcome-level: a single thing that, observed from outside, says the feature is working in aggregate. If clarify passed `success-signal: TBD`, write "TBD — open question" verbatim.>
 
 ## 4. Boundaries
 **In scope:** <bulleted>
@@ -108,7 +116,7 @@ Steps:
 
 ### Discipline in revise
 
-- Never silently expand scope. If the PM's feedback implies a new deliverable, add it explicitly with its own validation method and flag the change in the revision log.
+- Never silently expand scope. If the PM's feedback implies a new deliverable, add it explicitly with its own user-facing acceptance steps and flag the change in the revision log.
 - Never reverse a `[HARD DECISION]` without the PM stating it plainly. If feedback conflicts with a hard decision, surface the conflict in the revision log and ask the PM to confirm before reversing.
 - If feedback is ambiguous, leave a `<!-- drafter: <question> -->` comment in place rather than guessing.
 

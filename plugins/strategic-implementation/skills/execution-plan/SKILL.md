@@ -28,7 +28,7 @@ If the environment does not support `EnterPlanMode` in this context, fall back: 
 
 Inside plan mode:
 
-1. Read the brief end-to-end. Extract: deliverables (D1…Dn), the success signal, scope boundary (in / out / anti-goals), hard decisions, document references. The brief no longer carries a separate Acceptance Criteria section — each deliverable's declared validation method is its acceptance test, and the Success signal section names the outcome-level check.
+1. Read the brief end-to-end. Extract: deliverables (D1…Dn), each deliverable's **user-facing acceptance steps** (the outcome contract — what a human does to confirm it works), the success signal, scope boundary (in / out / anti-goals), hard decisions, document references. The brief deliberately does NOT specify an implementation method (`preview` / `cli` / `tdd` / `integration-test` / `post-hoc`); execution-plan chooses the method, driven by the user-acceptance steps and the integration-risk class.
 2. For each deliverable, identify the concrete files likely to change. Use **Glob** and **Grep** to verify file paths exist before citing them. Unverified paths get `[PATH NOT FOUND]` annotations.
 3. **Library-lifecycle doc pass.** For each integration-risk dependency from clarify, locate the canonical persistence / lifecycle doc (project README, vendor docs, RFC, or in-repo notes). Read the relevant section. Capture: what state persists across what boundaries (per-connection / per-session / per-process / per-deployment), known gotchas, and the doc URL/path. Time-box: aim for 15–30 minutes total across all libraries; if a library has no good docs, note that explicitly. Empty audit is acceptable only if clarify declared `none`.
 4. **Load the documentation registry.** Read `docs/strategic-implementation/documentation-registry.md` if present. For each registry entry, judge whether the deliverables in this brief might invalidate it (touches the path, the area, or the update-trigger condition). Tag each deliverable with `may-invalidate: [doc-paths]` or `may-invalidate: none`. Surface the union of impacted entries in the plan summary at Step 5 so the PM sees what docs this work will require updating.
@@ -63,7 +63,8 @@ _Implements: product-brief_<slug>.md · Date: <date>_
   - `b` — depends on real browser / network behavior
   - `c` — depends on cross-component reactive state coordination
   - `d` — none of the above
-- **Validation:** <preview | cli | tdd | integration-test | post-hoc> — <exact command / exact behavior to observe / exact test to write>
+- **User-acceptance steps (from brief):** <numbered list copied verbatim from the brief's "How a user verifies" for this deliverable — the outcome contract>
+- **Validation method (chosen here):** <preview | cli | tdd | integration-test | post-hoc> — <exact command / exact behavior to observe / exact test to write>. Must be the method whose evidence actually demonstrates the user-acceptance steps above.
 - **Files:** <specific paths; use [PATH NOT FOUND] if unverified>
 - **Steps:** <numbered; each names file(s) and what to write/change/delete>
 - **Deps:** <other D-ids, or "none">
@@ -94,7 +95,7 @@ _Implements: product-brief_<slug>.md · Date: <date>_
 
 1. **One deliverable = one user-observable outcome.** Do not create deliverables for "internal plumbing" unless the plumbing is itself a validation gate.
 2. **No LOC budgets.** Size is not a gate in v2. Fitness is a gate.
-3. **Validation method honesty.** If the brief claims `preview` validation but the deliverable is invisible in a screenshot, escalate the deliverable to TDD and note it.
+3. **Validation method honesty.** Choose the method whose evidence actually proves the deliverable's user-acceptance steps. If the steps require visual confirmation, `preview` or `post-hoc` — not `tdd`. If the steps name observable behavior under real I/O, `integration-test` — not `tdd` with a mocked seam. If the chosen method cannot reproduce the user's verification flow, it is wrong.
 4. **Preview-unavailable fallback.** For `preview`-validated deliverables: in `supervised`/`auto`, pause for PM manual validation if the preview tool can't run; in `yolo`, auto-escalate to TDD and proceed.
 5. **Verify paths.** Every file path must be confirmed via Glob before the draft is presented for review.
 6. **Reuse before creating.** Grep for existing primitives; cite them in "Reused existing patterns."

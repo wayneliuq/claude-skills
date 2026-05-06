@@ -6,7 +6,7 @@
 
 You write what the user should be able to do. The plugin handles everything between that sentence and merged code: clarification, planning, adversarial review, deliverable-by-deliverable execution, and a regression check at the end. You approve **one document** (the product brief). Everything else happens behind the right gates, with the right level of autonomy you choose at the start.
 
-**Version:** 3.2.0
+**Version:** 3.2.1
 **Built for:** Claude Code on Opus 4.7
 **Audience:** non-technical PMs, solo founders, anyone who can describe what good looks like
 
