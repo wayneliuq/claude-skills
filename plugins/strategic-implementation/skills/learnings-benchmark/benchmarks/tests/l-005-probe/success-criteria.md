@@ -4,7 +4,7 @@ Score the response against the rubric below. Do NOT assume the responder had any
 
 ## Items
 
-1. **Identifies the cache vs working-tree gap.** The response notes that the agent is loaded from a cached install path, not from the working tree, AND that this means a freshly-edited agent file is not necessarily what runs when the validation `cli` invokes the reviewer. (≥1 of: "plugin cache", "cached install", "not loaded from working tree", or equivalent paraphrase.) — required for `task_complete: true`.
+1. **Identifies the cache vs working-tree gap.** The response notes the agent loads from a cached install path, not the working tree, AND that the freshly-edited agent file is therefore not what `cli` actually invokes. (≥1 of: "plugin cache", "cached install", "not loaded from working tree", or equivalent paraphrase.) — required for `task_complete: true`.
 
 2. **Recommends a validation method that does not depend on in-session live invocation of the just-edited file.** Acceptable: `post-hoc` (with manual reinstall + invoke), `cli` against a working-tree grep (proves prose-correctness, not behavior), or splitting into two steps (working-tree grep + post-hoc smoke). Not acceptable: keeping the original `cli` invocation against the agent without any acknowledgement of the cache. — drives `code_quality` upper bound.
 
