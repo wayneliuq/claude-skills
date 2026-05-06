@@ -43,7 +43,6 @@ Refuses to run on `main`, `master`, `release/*`, or `prod/*`. The benchmarking b
 - `third_group` — definition of a modified or minimized learnings set (path or inline subset). If present, the run uses three groups (test / control / modified); otherwise two.
 - `trials` — integer; default 3. Auto-bumps to N+2 per cell on stddev > 30% of mean of the primary metric.
 - `max_concurrent_dispatches` — integer; default 4; hard cap 8.
-- `corpus_filter` — restrict Phase 2 task selection to a subset of corpus themes (e.g. `tests` only).
 
 ---
 
@@ -224,7 +223,7 @@ Write `<feature-folder>/run-<id>/report.md`.
 | metric | test (mean ± sd) | control (mean ± sd) | [modified] | Δ (test − control) | sig |
 |---|---|---|---|---|---|
 | bug_count | ... | ... | ... | ... | flag if |Δ| ≤ sd |
-| severity_weighted_bugs | ... | ... | ... | ... | ... |
+| severity_weighted_bugs (= bug_count × severity_max) | ... | ... | ... | ... | ... |
 | task_complete_rate | ... | ... | ... | ... | ... |
 | code_quality | ... | ... | ... | ... | ... |
 | billed_total | ... | ... | ... | ... | ... |
