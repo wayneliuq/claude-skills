@@ -47,6 +47,8 @@ Only questions that:
 
 Skip any document that's clearly irrelevant to the described change.
 
+**Graph-first grounding.** If clarify needs to ground a question in concrete repo symbols (e.g. "does X already exist?", "what calls Y?"), prefer `mcp__code-review-graph__semantic_search_nodes` or `query_graph` over `Read`. Cite results as `symbol at path:line` rather than paraphrased file content. Fall back to `Read` only when the graph cannot answer.
+
 **Registry capture at point of mention.** For each doc the PM names (in any of the prompts above), ask two follow-ups inline:
 
 > 1. What does this doc cover, in one line?
@@ -109,6 +111,8 @@ Return:
 - Integration-risk dependencies (list of `{name, why_it_matters}`, or empty list)
 - Autonomy level (`supervised` | `auto` | `yolo`)
 
-## Tone
+## Tone discipline
 
-Direct. No filler. No enthusiasm. One-pass conversation — do not split into multiple rounds.
+Terse. Substance exact. Drop articles, filler ("just", "really", "basically"), pleasantries, hedging. Fragments OK if unambiguous. One sentence per update is enough. One-pass conversation — do not split into multiple rounds.
+
+**Carve-outs (do NOT compress):** code blocks, tool output, BLOCK/FLAG callouts, irreversible-action warnings, PM-facing approval prompts.

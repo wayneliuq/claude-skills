@@ -62,6 +62,8 @@ Triggered automatically by `executing-plans` when the final deliverable is marke
 
    Capture the answer in the report under `## Visual diff`. A `n` (mismatch) is a FLAG, not a BLOCK — the PM may accept divergence, but it is recorded.
 
+7a. **Final simplify pass (mandatory).** Invoke `strategic-implementation:simplify` against the full feature diff (`git diff <merge-base>...HEAD`). The skill writes `<feature-folder>/simplify-report-NN.md` (next monotonic number, even if mid-execution reports already exist). Capture the report path and the high/med/low counts. PM-disposition is captured the same way as mid-execution reports — `<!-- pm-disposition: apply|defer|dismiss -->` per finding. In `auto`/`yolo`, unfilled dispositions become a FLAG in this report's status, not a BLOCK.
+
 8. **Write** `<feature-folder>/post-execution-report.md`:
 
 ```markdown
@@ -94,11 +96,24 @@ _Date: <date> · Feature: <slug>_
 ## Visual diff
 <bulleted: "D<n>: <mockup-path> — match | mismatch (notes: ...)" or "skipped — no Visual contract entries">
 
+## Simplify final pass
+- Report: `<simplify-report-path>`
+- Findings: <total> (high: <h>, med: <m>, low: <l>)
+- Disposition: <all-filled | <n> unfilled — FLAG>
+
 ## Status
 <PASS / FLAG / BLOCK — BLOCK if regressions unresolved or any goal-backward `no` or any Critical plugin-config finding. Stale registry entries are FLAG in auto/yolo, BLOCK in supervised. Visual mismatches are FLAG. Plugin config: <PASS | FLAG | BLOCK> alongside the overall status.>
 ```
 
 9. If any regression is unresolved or any goal-backward verification returns `no`: surface to PM. Otherwise announce completion.
+
+10. **Token-report telemetry (deterministic).** Invoke the helper script:
+
+    ```bash
+    bash plugins/strategic-implementation/scripts/token-report.sh "<feature-folder>"
+    ```
+
+    Verify `<feature-folder>/token-report.md` landed; do NOT read or interpret its contents — the script is the source of truth, the skill never spends model tokens on the telemetry. Any `unavailable` sections are expected behavior (transcript format drift, missing rtk, etc.) and never block. Exit code 0 from the script means success; non-zero is a `blocker` deviation.
 
 ---
 
@@ -170,3 +185,11 @@ Triggered when `validation-log.md` accumulates ≥2 meaningful deviations (judgm
 - Never rewrite history. Fixes land as new commits.
 - Never modify the brief. The brief is a frozen approval artifact. If a fix proves the brief was wrong, note it in the report but do not rewrite the brief.
 - Validation log is append-only.
+
+---
+
+## Tone discipline
+
+Terse. Substance exact. Drop articles, filler ("just", "really", "basically"), pleasantries, hedging. Fragments OK if unambiguous. One sentence per update is enough.
+
+**Carve-outs (do NOT compress):** code blocks, tool output, BLOCK/FLAG callouts, irreversible-action warnings, PM-facing approval prompts.

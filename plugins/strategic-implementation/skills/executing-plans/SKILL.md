@@ -31,6 +31,8 @@ In `yolo`: proceed but log a `branch-risk` deviation.
 
 ## Step 1 — Read plan
 
+**Resume check.** If `<feature-folder>/checkpoint.md` already exists (a prior session was interrupted, or context compacted): read it BEFORE the execution plan. Treat it as the source of truth for what's already done. Skip any deliverable already in the `## Done` section; pick up at the deliverable in `## In progress` (or the next `pending` one if `In progress` is empty).
+
 Read `execution-plan.md` fully. Extract: deliverables, DAG order, parallel groups.
 
 Initialize `validation-log.md` at `<feature-folder>/validation-log.md` with header:
@@ -40,7 +42,36 @@ Initialize `validation-log.md` at `<feature-folder>/validation-log.md` with head
 _Feature: <slug> · Started: <date> · Autonomy: <level>_
 ```
 
+If `checkpoint.md` does not yet exist, initialize it at `<feature-folder>/checkpoint.md` with the four-section schema (Done / In progress / Open decisions / Unresolved deviations) — sections may start empty. See "Checkpoint schema" below.
+
 Initialize deviation counter `DEV-001`.
+
+### Checkpoint schema (`<feature-folder>/checkpoint.md`)
+
+A compact, compaction-survivable projection of execution state. One line per entry, no prose. Update at every atomic commit (see Step 2d).
+
+```markdown
+# Checkpoint — <feature slug>
+
+## Done
+- D1 — <name> — <commit-sha-short> — <date>
+
+## In progress
+- D<n> — <name> — started <date>
+
+## Open decisions
+- <one line; resolved by editing the line, not appending>
+
+## Unresolved deviations
+- <one line per active deviation; reference validation-log row id>
+
+<!-- complete: <date> --> (only on final deliverable)
+```
+
+Rules:
+- Same atomic commit as the deliverable's files and `validation-log.md` — never a separate edit.
+- Strict projection of `validation-log.md`; if the two diverge, validation-log wins.
+- On the final deliverable, append the `<!-- complete: <date> -->` marker.
 
 ---
 
@@ -118,13 +149,43 @@ D<n>: <one-sentence outcome>
 
 Example: `D3: add product-brief revision loop`.
 
-Stage only the files named in this deliverable — plus any registry-tracked docs updated in Step 2b under `may-invalidate`, plus the registry file itself with **`Last Updated` bumped to today** for each updated doc's row. All in one atomic commit. Post-execution verifies these advances.
+Stage only the files named in this deliverable — plus any registry-tracked docs updated in Step 2b under `may-invalidate`, plus the registry file itself with **`Last Updated` bumped to today** for each updated doc's row, plus the updated `<feature-folder>/checkpoint.md` (move the deliverable from `## In progress` to `## Done` with its short SHA), plus the updated `validation-log.md`. All in one atomic commit. Post-execution verifies these advances.
 
 ### Step 2e — Mark complete
 
 Before flipping status: if the deliverable has a `Consumer audit` subsection, walk the list. Every entry must be `updated-in-this-deliverable`, `updated-in-D<n>` (where D<n> is already complete or scheduled), `unaffected-because-...`, or `explicit-skip-because-...`. Any entry left as TBD, missing, or contradicted by what was actually changed → log a `consumer-audit-mismatch` deviation and surface to PM before proceeding.
 
 In `execution-plan.md`, update deliverable status: `pending` → `complete`.
+
+### Step 2f — Maybe-invoke simplify (mid-execution trigger)
+
+After the atomic commit lands, decide whether to invoke `strategic-implementation:simplify`. Defaults: `every_n_deliverables = 3`, `loc_threshold = 400` (declared in `simplify/SKILL.md`).
+
+**Skip rule:** if total plan deliverables ≤ 3, do NOT invoke mid-execution. The final pass in `post-execution` regression-check is sufficient.
+
+Otherwise, derive counters from `git log` (no new state file):
+
+```bash
+# Reference point: last simplify-report-NN.md commit, or feature-folder creation if none.
+LAST_REF=$(git log -1 --format=%H -- "<feature-folder>/simplify-report-*.md" 2>/dev/null \
+  || git log --diff-filter=A --format=%H -- "<feature-folder>" | tail -1)
+
+DELIVERABLES_SINCE=$(git log --oneline "$LAST_REF"..HEAD -- "<feature-folder>/checkpoint.md" | wc -l)
+LOC_SINCE=$(git log -p "$LAST_REF"..HEAD -- ':(exclude)<feature-folder>/' | grep -E '^[+-]' | grep -vE '^[+-]{3}' | wc -l)
+```
+
+If `DELIVERABLES_SINCE >= every_n_deliverables` OR `LOC_SINCE >= loc_threshold`: invoke `strategic-implementation:simplify` with the feature folder. The skill writes `<feature-folder>/simplify-report-NN.md` and returns the path.
+
+**Surface the report.** Append to chat:
+
+> Simplify report: `<path>` — <total> findings (high: <h>, med: <m>, low: <l>). Disposition each finding (`<!-- pm-disposition: apply|defer|dismiss -->`) before the next deliverable, or proceed and let unfilled dispositions surface in the deviation log.
+
+**Disposition rules:**
+- `supervised`: pause for PM to fill every finding's disposition before next deliverable.
+- `auto`: proceed; log a `simplify-disposition-pending` deviation only if the next atomic commit lands with unfilled dispositions in the latest report.
+- `yolo`: proceed; log nothing.
+
+The `simplify` skill never auto-edits source. PM-applied changes (when disposition is `apply`) become a follow-up deliverable or land as part of a future deliverable's same-file edits — never as a side-effect of `simplify` itself.
 
 ---
 
@@ -186,13 +247,13 @@ Do not mark complete. Do not proceed to next deliverable. Await PM direction.
 
 ## Deviation logging
 
-A deviation exists on any of: blocker, retry, user-correction, reversal, ambiguity-decision, auto-escalation, yolo-skip, branch-risk, consumer-audit-mismatch, thrash-pause, error-loop-escalation, repro-blocked, spec-ambiguity-redirect, spec-ambiguity-override.
+A deviation exists on any of: blocker, retry, user-correction, reversal, ambiguity-decision, auto-escalation, yolo-skip, branch-risk, consumer-audit-mismatch, thrash-pause, error-loop-escalation, repro-blocked, spec-ambiguity-redirect, spec-ambiguity-override, simplify-disposition-pending.
 
 Append to `validation-log.md`:
 
 ```markdown
 ## DEV-NNN
-**Type:** blocker | retry | user-correction | reversal | ambiguity-decision | auto-escalation | yolo-skip | branch-risk | consumer-audit-mismatch | thrash-pause | error-loop-escalation | repro-blocked | spec-ambiguity-redirect | spec-ambiguity-override
+**Type:** blocker | retry | user-correction | reversal | ambiguity-decision | auto-escalation | yolo-skip | branch-risk | consumer-audit-mismatch | thrash-pause | error-loop-escalation | repro-blocked | spec-ambiguity-redirect | spec-ambiguity-override | simplify-disposition-pending
 **Deliverable:** D<n>
 **Plan said:** <verbatim>
 **Actually:** <what happened>
@@ -233,3 +294,12 @@ On yes: invoke `post-execution` in `learnings-synthesis` mode.
 - No LOC budget — fitness is the gate, not size.
 - Deviation log is append-only. Never rewrite.
 - Hard decisions in the brief and plan are immutable during execution.
+- Every deliverable's atomic commit must touch `<feature-folder>/checkpoint.md` (and `validation-log.md`). This guarantees git-log derived counters elsewhere in the chain stay accurate.
+
+---
+
+## Tone discipline
+
+Terse. Substance exact. Drop articles, filler ("just", "really", "basically"), pleasantries, hedging. Fragments OK if unambiguous. One sentence per update is enough.
+
+**Carve-outs (do NOT compress):** code blocks, tool output, BLOCK/FLAG callouts, irreversible-action warnings, PM-facing approval prompts.
