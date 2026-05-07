@@ -107,6 +107,14 @@ _Date: <date> · Feature: <slug>_
 
 9. If any regression is unresolved or any goal-backward verification returns `no`: surface to PM. Otherwise announce completion.
 
+10. **Token-report telemetry (deterministic).** Invoke the helper script:
+
+    ```bash
+    bash plugins/strategic-implementation/scripts/token-report.sh "<feature-folder>"
+    ```
+
+    Verify `<feature-folder>/token-report.md` landed; do NOT read or interpret its contents — the script is the source of truth, the skill never spends model tokens on the telemetry. Any `unavailable` sections are expected behavior (transcript format drift, missing rtk, etc.) and never block. Exit code 0 from the script means success; non-zero is a `blocker` deviation.
+
 ---
 
 ## Mode: triage

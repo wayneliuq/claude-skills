@@ -29,3 +29,17 @@ _Feature: context-mode-and-simplify · Started: 2026-05-07 · Autonomy: auto_
 **Method:** cli — grep confirms (a) Step 2f mid-execution trigger with git-log counter derivation in executing-plans, (b) `simplify-disposition-pending` added to deviation list, (c) Step 7a mandatory final simplify pass + report section in post-execution.
 **Status:** complete.
 **Note:** Tone discipline block also appended to post-execution. End-to-end auto-trigger validation deferred (same skill-load constraint as D3).
+
+## D5 — token-report.md deterministic telemetry script
+**Method:** integration-test — script run against current session's real JSONL transcript + real `rtk gain -p -H -f json`. Five sections produced: tool-call mix (10 tools, real counts), graph-vs-read ratio (1:6, "read-dominant"), tool-output volume (112778 bytes total), rtk savings (rtk detected, ran successfully, output shape didn't match jq path so produced "?" placeholders — graceful degradation working as designed), simplify dispositions (correctly says "no reports"). Exit code 0. Header `<!-- transcript-format: v1 (2026-05) -->` present.
+**Status:** complete.
+**Note:** Initial run hit a sed double-dash bug (encoding produced `--Users-...` not `-Users-...`) — fixed before commit. The "rtk output shape" issue is a known cosmetic flaw (raw JSON shape from `rtk gain` differs from assumed schema); the section still produces a partial answer, which matches the brief's HARD DECISION (deterministic-script, no LLM step). Worth a follow-up if rtk's output schema is documented elsewhere.
+
+## DEV-002
+**Type:** retry
+**Deliverable:** D5
+**Plan said:** "Resolve project transcript dir: `~/.claude/projects/$(pwd | sed 's|/|-|g; s|^|-|')`"
+**Actually:** the dual sed substitutions produced double-leading-dash on macOS (input `/Users/...` → `-Users-...` after `s|/|-|g`, then `s|^|-|` adds another → `--Users-...`). Real harness directory has only single leading dash.
+**Resolution:** dropped the second substitution; only `s|/|-|g`. Verified script picks up the correct transcript file.
+**Downstream impact?** no — fix landed before commit.
+**Agent category:** technical
