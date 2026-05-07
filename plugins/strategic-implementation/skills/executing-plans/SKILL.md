@@ -31,6 +31,8 @@ In `yolo`: proceed but log a `branch-risk` deviation.
 
 ## Step 1 — Read plan
 
+**Resume check.** If `<feature-folder>/checkpoint.md` already exists (a prior session was interrupted, or context compacted): read it BEFORE the execution plan. Treat it as the source of truth for what's already done. Skip any deliverable already in the `## Done` section; pick up at the deliverable in `## In progress` (or the next `pending` one if `In progress` is empty).
+
 Read `execution-plan.md` fully. Extract: deliverables, DAG order, parallel groups.
 
 Initialize `validation-log.md` at `<feature-folder>/validation-log.md` with header:
@@ -40,7 +42,36 @@ Initialize `validation-log.md` at `<feature-folder>/validation-log.md` with head
 _Feature: <slug> · Started: <date> · Autonomy: <level>_
 ```
 
+If `checkpoint.md` does not yet exist, initialize it at `<feature-folder>/checkpoint.md` with the four-section schema (Done / In progress / Open decisions / Unresolved deviations) — sections may start empty. See "Checkpoint schema" below.
+
 Initialize deviation counter `DEV-001`.
+
+### Checkpoint schema (`<feature-folder>/checkpoint.md`)
+
+A compact, compaction-survivable projection of execution state. One line per entry, no prose. Update at every atomic commit (see Step 2d).
+
+```markdown
+# Checkpoint — <feature slug>
+
+## Done
+- D1 — <name> — <commit-sha-short> — <date>
+
+## In progress
+- D<n> — <name> — started <date>
+
+## Open decisions
+- <one line; resolved by editing the line, not appending>
+
+## Unresolved deviations
+- <one line per active deviation; reference validation-log row id>
+
+<!-- complete: <date> --> (only on final deliverable)
+```
+
+Rules:
+- Same atomic commit as the deliverable's files and `validation-log.md` — never a separate edit.
+- Strict projection of `validation-log.md`; if the two diverge, validation-log wins.
+- On the final deliverable, append the `<!-- complete: <date> -->` marker.
 
 ---
 
@@ -118,7 +149,7 @@ D<n>: <one-sentence outcome>
 
 Example: `D3: add product-brief revision loop`.
 
-Stage only the files named in this deliverable — plus any registry-tracked docs updated in Step 2b under `may-invalidate`, plus the registry file itself with **`Last Updated` bumped to today** for each updated doc's row. All in one atomic commit. Post-execution verifies these advances.
+Stage only the files named in this deliverable — plus any registry-tracked docs updated in Step 2b under `may-invalidate`, plus the registry file itself with **`Last Updated` bumped to today** for each updated doc's row, plus the updated `<feature-folder>/checkpoint.md` (move the deliverable from `## In progress` to `## Done` with its short SHA), plus the updated `validation-log.md`. All in one atomic commit. Post-execution verifies these advances.
 
 ### Step 2e — Mark complete
 
@@ -233,3 +264,12 @@ On yes: invoke `post-execution` in `learnings-synthesis` mode.
 - No LOC budget — fitness is the gate, not size.
 - Deviation log is append-only. Never rewrite.
 - Hard decisions in the brief and plan are immutable during execution.
+- Every deliverable's atomic commit must touch `<feature-folder>/checkpoint.md` (and `validation-log.md`). This guarantees git-log derived counters elsewhere in the chain stay accurate.
+
+---
+
+## Tone discipline
+
+Terse. Substance exact. Drop articles, filler ("just", "really", "basically"), pleasantries, hedging. Fragments OK if unambiguous. One sentence per update is enough.
+
+**Carve-outs (do NOT compress):** code blocks, tool output, BLOCK/FLAG callouts, irreversible-action warnings, PM-facing approval prompts.
