@@ -139,19 +139,22 @@ fi
 
 # ---- Simplify dispositions ----
 SIMPLIFY_SECTION="(no simplify reports in this feature folder)"
-if compgen -G "$FEATURE_FOLDER/simplify-report-*.md" > /dev/null; then
-  REPORTS=( "$FEATURE_FOLDER"/simplify-report-*.md )
+shopt -s nullglob
+REPORTS=( "$FEATURE_FOLDER"/simplify-report-*.md )
+shopt -u nullglob
+if [[ ${#REPORTS[@]} -gt 0 ]]; then
   TOTAL_FINDINGS=0
   APPLIED=0
   DEFERRED=0
   DISMISSED=0
   UNFILLED=0
   for r in "${REPORTS[@]}"; do
-    F=$(grep -c '^### F-' "$r" 2>/dev/null || echo 0)
-    A=$(grep -c '<!-- pm-disposition: apply -->' "$r" 2>/dev/null || echo 0)
-    D=$(grep -c '<!-- pm-disposition: defer -->' "$r" 2>/dev/null || echo 0)
-    X=$(grep -c '<!-- pm-disposition: dismiss -->' "$r" 2>/dev/null || echo 0)
-    U=$(grep -c '<!-- pm-disposition: -->' "$r" 2>/dev/null || echo 0)
+    # grep -c with no matches returns exit 1 + stdout "0"; force a clean integer.
+    F=$(grep -c '^### F-' "$r" 2>/dev/null); F=${F:-0}; F=$(printf '%d' "${F//[^0-9]/}" 2>/dev/null || echo 0)
+    A=$(grep -c '<!-- pm-disposition: apply -->' "$r" 2>/dev/null); A=${A:-0}; A=$(printf '%d' "${A//[^0-9]/}" 2>/dev/null || echo 0)
+    D=$(grep -c '<!-- pm-disposition: defer -->' "$r" 2>/dev/null); D=${D:-0}; D=$(printf '%d' "${D//[^0-9]/}" 2>/dev/null || echo 0)
+    X=$(grep -c '<!-- pm-disposition: dismiss -->' "$r" 2>/dev/null); X=${X:-0}; X=$(printf '%d' "${X//[^0-9]/}" 2>/dev/null || echo 0)
+    U=$(grep -c '<!-- pm-disposition: -->' "$r" 2>/dev/null); U=${U:-0}; U=$(printf '%d' "${U//[^0-9]/}" 2>/dev/null || echo 0)
     TOTAL_FINDINGS=$((TOTAL_FINDINGS + F))
     APPLIED=$((APPLIED + A))
     DEFERRED=$((DEFERRED + D))
