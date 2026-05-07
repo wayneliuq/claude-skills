@@ -25,11 +25,24 @@ Refuses to run on `main`, `master`, `release/*`, or `prod/*`. The benchmarking b
 
 2. `git status --porcelain` → if non-empty:
 
-   > 🛑 **Working tree not clean.** Worktree dispatches branch off the current commit; uncommitted changes leak across groups asymmetrically.
+   > 🛑 **Working tree not clean.** Worker worktrees branch off the current commit; uncommitted changes leak across groups asymmetrically.
    >
    > Remediation: commit or stash, then re-invoke.
 
    Exit.
+
+3. **Resolve the clean base ref.** `BASE_SHA = $(git merge-base HEAD main)`. This is the parent commit before any benchmark commits — every worker and judge worktree is created at this commit so the benchmark machinery, prior runs, and per-run state are absent from the worker's checkout. If `git merge-base` fails (no shared history), abort with: `Refusing to run: cannot resolve clean base off main.`
+
+4. **Ensure the private artifact dir is gitignored.** All ephemeral run state (learnings JSON, dispatched prompts, trial outputs, judge transcripts, in-progress reports) goes under `.benchmark-private/`. If `.benchmark-private/` is not listed in the repo `.gitignore`, append the line and commit the diff as the only tracked change at this stage:
+
+   ```
+   git status --porcelain .gitignore
+   # if missing entry: append, then:
+   git add .gitignore
+   git commit -m "learnings-benchmark: ignore .benchmark-private/ runtime dir"
+   ```
+
+   This is the **last tracked write before all dispatches finish**. Everything between here and Phase 5 lives under `.benchmark-private/` and is invisible to workers (gitignored paths are not propagated by `git worktree add`).
 
 ---
 
@@ -56,7 +69,7 @@ Propose **semantic groupings**. Default heuristic: ≥1 group per `#tag` in `pro
 
 Present the grouping as a numbered list. The user may `accept`, edit inline (rename / move / drop), or `cancel`.
 
-On accept, persist to `<feature-folder>/run-<id>/learnings.json`:
+On accept, persist to `.benchmark-private/<run-id>/learnings.json` (gitignored — workers cannot see it):
 
 ```json
 {
@@ -73,7 +86,7 @@ On accept, persist to `<feature-folder>/run-<id>/learnings.json`:
 }
 ```
 
-`<feature-folder>` is `docs/strategic-implementation/<YYYY-MM-DD>-learnings-benchmark/` (create if absent). `<id>` is a short timestamped slug, e.g. `2026-05-05-1430`.
+`<run-id>` is a short timestamped slug, e.g. `2026-05-05-1430`. The committed final report lives at `<feature-folder>/run-<run-id>/report.md` where `<feature-folder>` is `docs/strategic-implementation/<YYYY-MM-DD>-learnings-benchmark/` — but that directory is NOT created until Phase 5. Until then, every run artifact stays under `.benchmark-private/<run-id>/`.
 
 ---
 
@@ -81,8 +94,8 @@ On accept, persist to `<feature-folder>/run-<id>/learnings.json`:
 
 For each selected group, pick a task:
 
-1. **Corpus first.** Look in `plugins/strategic-implementation/skills/learnings-benchmark/benchmarks/<group_id-or-theme>/<task-slug>/`. If a `task.md` + `success-criteria.md` pair exists, use it.
-2. **Synthesis fallback.** If no corpus task exists, generate one whose deltas would be observable: a small refactor, bug fix, or design choice that the learning's WHEN/DO logic would steer differently than the control. Prefer tasks where the right answer is itself contested.
+1. **Corpus first.** Look in `plugins/strategic-implementation/skills/learnings-benchmark/benchmarks/<group_id-or-theme>/<task-slug>/`. If a `task.md` + `success-criteria.md` pair exists, **read both files into the orchestrator's memory now**. The worker will receive `task.md` content inline through its dispatch prompt — never as a path reference — so it cannot search the worktree for criteria, sibling tasks, or rubrics.
+2. **Synthesis fallback.** If no corpus task exists, generate one whose deltas would be observable: a small refactor, bug fix, or design choice that the learning's WHEN/DO logic would steer differently than the control. Prefer tasks where the right answer is itself contested. Synthesized tasks are written only to `.benchmark-private/<run-id>/tasks/<group_id>.md`, never to a tracked path.
 
 Emit a plan summary table:
 
@@ -102,12 +115,33 @@ User approves or aborts. **If `--dry-run`: print the summary and exit.**
 
 ## Phase 3 — Dispatch
 
-For each `(task × group × trial)`, assemble the worker prompt.
+Each `(task × group × trial)` runs in its own **sanitized throwaway worktree** so the worker cannot grep its way into the benchmark machinery, prior runs, or the learnings corpus.
+
+### Per-trial worktree setup (orchestrator runs these via Bash before dispatch)
+
+```bash
+WORK=.benchmark-private/<run-id>/trial-<n>/worktree
+git worktree add --detach "$WORK" "$BASE_SHA"   # BASE_SHA from Step 0.3 — clean parent of benchmark commits
+# Strip the benchmark machinery + learnings sources from this worktree only.
+# The detached worktree has no upstream; rm here does not affect main or the benchmark branch.
+rm -rf \
+  "$WORK/plugins/strategic-implementation/skills/learnings-benchmark" \
+  "$WORK/plugins/strategic-implementation/agents" \
+  "$WORK/docs/strategic-implementation/project-learnings.md" \
+  "$WORK"/docs/strategic-implementation/*learnings-benchmark* \
+  "$WORK"/.benchmark-private 2>/dev/null || true
+```
+
+The worker therefore sees a checkout of the clean parent commit with all benchmark machinery removed. A grep for `benchmark`, `learning`, `trial`, `rubric`, or this skill's name turns up nothing. Gitignored files from the parent worktree (including `.benchmark-private/`) do NOT propagate to a `git worktree add` — that's load-bearing; do not break it.
+
+### Worker prompt assembly
 
 **Task prompt is byte-identical across groups.** Only the system-augmentation differs:
 - `test`: project-learnings injected verbatim (the relevant group's `learning_text`)
 - `control`: no learnings text
 - `modified` (if defined): the user-provided subset
+
+The prompt carries the task body **inline** (read from corpus or `.benchmark-private/<run-id>/tasks/`). The worker is never told "read `task.md`" or given any path inside `plugins/strategic-implementation/skills/learnings-benchmark/`. The worker is told its working directory is `<absolute-path-to-worktree>` and that it must `cd` there before any file operation.
 
 **Per-trial random nonce.** Prepend a single line to every worker system prompt:
 
@@ -117,15 +151,16 @@ Trial-nonce: <16-hex-random>
 
 This neutralizes API prompt-cache prefix-sharing across trials and groups. Cache reads on the worker prefix should be near zero; any residual asymmetry is bounded.
 
-**Dispatch in waves of `max_concurrent_dispatches`** (NOT a single fan-out). For each call:
+### Dispatch
+
+**Dispatch in waves of `max_concurrent_dispatches`** (NOT a single fan-out). The orchestrator already created the isolated worktree, so do **not** pass `isolation: "worktree"` (that would create a second worktree off the current branch HEAD — the un-sanitized one). For each call:
 
 ```
 Agent(
   subagent_type: "general-purpose",
-  isolation: "worktree",
   model: <pinned>,
   run_in_background: true,
-  prompt: <worker-prompt>
+  prompt: <worker-prompt>   # opens with: "Working directory: <abs WORK path>. cd there before any file operation."
 )
 ```
 
@@ -134,8 +169,10 @@ Record `dispatch_ts` per call.
 ### Worker contract (literal in the dispatch prompt)
 
 The worker MUST:
-1. Complete the task and commit `trial-<n>/output/`.
-2. Commit `trial-<n>/_run-stats.json` with self-recorded fields:
+1. `cd` into the working directory provided in the prompt and perform all file reads/writes there.
+2. **Stay inside the working directory.** Do NOT read or write any file outside it. Do NOT use `../` to navigate above it. Do NOT use absolute paths whose prefix is outside the working directory. The worker is launched from a parent process whose CWD contains unrelated files; reading those would invalidate the trial.
+3. Complete the task. Write outputs to `./output/` inside that working directory (NOT the standard branch tree).
+4. Write `./_run-stats.json` with self-recorded fields:
    ```json
    {
      "input_tokens": <int>,
@@ -146,10 +183,22 @@ The worker MUST:
      "end_iso": "<ISO-8601>"
    }
    ```
-   This is a cross-check against external transcript parse; it does NOT drive decisions.
-3. **MUST NOT spawn sub-agents** (no Task / Agent calls). Sub-agent token costs are invisible to the parent transcript and silently undercount.
+   This is a cross-check against external transcript parse; it does NOT drive decisions. The worker does NOT need to commit; the orchestrator harvests the worktree directly after the agent returns.
+5. **MUST NOT spawn sub-agents** (no Task / Agent calls). Sub-agent token costs are invisible to the parent transcript and silently undercount.
 
-If the worker fails to commit, the trial is marked `lost`.
+### Post-dispatch harvest + cleanup (orchestrator)
+
+When each Agent call returns:
+
+```bash
+# Harvest into the gitignored run-private tree.
+mkdir -p ".benchmark-private/<run-id>/trial-<n>/"
+cp -R "$WORK/output" ".benchmark-private/<run-id>/trial-<n>/output"
+cp     "$WORK/_run-stats.json" ".benchmark-private/<run-id>/trial-<n>/_run-stats.json" 2>/dev/null || true
+git worktree remove --force "$WORK"
+```
+
+If the worker did not produce `./output/`, mark the trial `lost`. If `_run-stats.json` is absent, fall back to transcript parse only (Phase 4 cross-check).
 
 ---
 
@@ -158,18 +207,21 @@ If the worker fails to commit, the trial is marked `lost`.
 ### External capture (primary signal)
 
 Per call:
+- `dispatch_ts` recorded when `Agent(...)` is invoked.
 - `completion_ts` recorded when the Agent return arrives.
 - `wall_clock_seconds = completion_ts − dispatch_ts`.
-- Locate the agent's transcript at `~/.claude/projects/<encoded-worktree-path>/<session>.jsonl`. Parse cumulative `input_tokens`, `output_tokens`, `cache_creation_input_tokens`, `cache_read_input_tokens` from the API response entries.
+- Locate the agent's transcript under `~/.claude/projects/<encoded-orchestrator-cwd>/`. Because workers are dispatched **without** `isolation: "worktree"`, every worker transcript lives under the orchestrator's project path (encoded from the orchestrator's CWD), not under the per-trial worktree path. To attribute a transcript to a trial, scan `*.jsonl` files in that directory and pick the one whose first user-message timestamp falls within `[dispatch_ts, completion_ts]`. Parse cumulative `input_tokens`, `output_tokens`, `cache_creation_input_tokens`, `cache_read_input_tokens` from the API response entries.
 
 Cross-check vs. `_run-stats.json`:
-- transcript located AND cross-check within 10% → `clean`
-- transcript not found → fall back to `_run-stats.json`, mark `transcript-unavailable` (flagged in report)
+- transcript matched by timestamp window AND cross-check within 10% → `clean`
+- transcript not found OR no transcript matches the timestamp window → fall back to `_run-stats.json`, mark `transcript-unavailable` (flagged in report)
 - both missing → `lost`
 
 ### Blind judge
 
-Dispatch a separate `Agent(subagent_type:"general-purpose", model:<pinned>)` per trial with ONLY the rubric, the task description, and the trial's diff/output. The judge MUST NOT see: group label, group name, learnings text, trial number, dispatch order. Each judge invocation is a fresh agent (no batching across trials).
+Dispatch a separate `Agent(subagent_type:"general-purpose", model:<pinned>)` per trial with ONLY the rubric, the task description, and the trial's diff/output — **all passed inline in the prompt**. The judge MUST NOT see: group label, group name, learnings text, trial number, dispatch order, any path under `.benchmark-private/`, any path under `plugins/strategic-implementation/skills/learnings-benchmark/`. Each judge invocation is a fresh agent (no batching across trials).
+
+**Judge isolation.** Use the same sanitized-worktree pattern as workers: create `.benchmark-private/<run-id>/judge-<n>/worktree` off `BASE_SHA`, strip the benchmark machinery, dispatch without `isolation`, then `git worktree remove --force`. The judge's worktree need not contain repo code at all — but using the same pattern keeps it consistent and prevents the judge from greping the repo for context that would leak the run.
 
 **Rubric (fixed; version-tagged in the report header):**
 ```json
@@ -197,7 +249,7 @@ If one group's lost-trial rate exceeds another's by >20% (likely safety-refusal 
 
 ## Phase 5 — Report + commit
 
-Write `<feature-folder>/run-<id>/report.md`.
+Compose the report in `.benchmark-private/<run-id>/report.md`. **Then** create `<feature-folder>/run-<id>/` (this is the first tracked write since Step 0.4) and copy ONLY the final report — no learnings JSON, no trial outputs, no intermediate prompts, no judge transcripts. Those stay in `.benchmark-private/` (gitignored) as the audit trail.
 
 ### Report header
 
@@ -252,11 +304,15 @@ List any `(group × task)` cell with: stddev > 30% of mean on the primary metric
 ### Commit
 
 ```
-git add <feature-folder>/run-<id>/
-git commit -m "learnings-benchmark: run-<id> on <model>"
+mkdir -p <feature-folder>/run-<run-id>/
+cp .benchmark-private/<run-id>/report.md <feature-folder>/run-<run-id>/report.md
+git add <feature-folder>/run-<run-id>/report.md
+git commit -m "learnings-benchmark: run-<run-id> on <model>"
 ```
 
-The commit lands on the benchmarking branch only. **No merge step is offered.** The user merges manually.
+The commit lands on the benchmarking branch only and contains exactly one tracked file (the report). **No merge step is offered.** The user merges manually.
+
+`.benchmark-private/<run-id>/` remains on disk as the local audit trail — workers' raw outputs, judge transcripts, prompts, learnings JSON. It is gitignored, so it never bleeds into future worker dispatches and never lands on the branch. The user may delete it after reviewing the report.
 
 ---
 
@@ -272,6 +328,9 @@ These restate the load-bearing constraints from earlier phases as a single check
 6. **Cache-discounted comparison** for the keep/retire/modify decision (Phase 5).
 7. **Blind judge.** Fresh agent per trial; no group label, no learnings text, no trial number.
 8. **Wave-based dispatch.** No full fan-out; cap at `max_concurrent_dispatches`.
+9. **Sanitized worker worktree.** Every worker (and judge) runs in a worktree created off `BASE_SHA` with `plugins/strategic-implementation/skills/learnings-benchmark/`, `plugins/strategic-implementation/agents/`, `docs/strategic-implementation/project-learnings.md`, and any prior benchmark folder removed. **Do NOT use the Agent `isolation: "worktree"` parameter** — it would create a worktree off the un-sanitized benchmark-branch HEAD.
+10. **No tracked benchmark artifacts during the run.** Between Step 0.4 (`.gitignore` commit) and Phase 5 (report commit), no files are written into the tracked tree of the benchmark branch. All run state lives under `.benchmark-private/<run-id>/`. Violation = workers can grep prior trials' outputs and bias the current trial.
+11. **Inline task delivery.** Worker prompts include the task body inline. Workers are never given a path inside the corpus or any benchmark directory. The corpus exists for orchestrator + reproducibility, not for worker discovery.
 
 ---
 
@@ -279,7 +338,7 @@ These restate the load-bearing constraints from earlier phases as a single check
 
 | Failure | Remediation |
 |---|---|
-| Worker did not commit (worktree auto-cleaned) | Mark `lost`; retry up to 2× per trial. If cell ends N<3 after retries, ABORT before Phase 5. |
+| Worker did not produce `./output/` in its sanitized worktree before the orchestrator's harvest step | Mark `lost`; retry up to 2× per trial. If cell ends N<3 after retries, ABORT before Phase 5. |
 | Transcript not findable at expected path | Fall back to `_run-stats.json`; mark `transcript-unavailable`. If all trials fall back, surface a transcript-path-broken warning (encoded-cwd path may have changed). |
 | Judge returns malformed JSON | Re-dispatch judge once. On second failure, mark cell `unscored`. |
 | Safety-refusal rate differs by >20% across groups | Mark the affected group `unbenchmarkable`. The asymmetry is itself a reportable finding. |
