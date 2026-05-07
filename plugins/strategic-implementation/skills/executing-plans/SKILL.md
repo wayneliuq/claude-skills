@@ -157,6 +157,36 @@ Before flipping status: if the deliverable has a `Consumer audit` subsection, wa
 
 In `execution-plan.md`, update deliverable status: `pending` → `complete`.
 
+### Step 2f — Maybe-invoke simplify (mid-execution trigger)
+
+After the atomic commit lands, decide whether to invoke `strategic-implementation:simplify`. Defaults: `every_n_deliverables = 3`, `loc_threshold = 400` (declared in `simplify/SKILL.md`).
+
+**Skip rule:** if total plan deliverables ≤ 3, do NOT invoke mid-execution. The final pass in `post-execution` regression-check is sufficient.
+
+Otherwise, derive counters from `git log` (no new state file):
+
+```bash
+# Reference point: last simplify-report-NN.md commit, or feature-folder creation if none.
+LAST_REF=$(git log -1 --format=%H -- "<feature-folder>/simplify-report-*.md" 2>/dev/null \
+  || git log --diff-filter=A --format=%H -- "<feature-folder>" | tail -1)
+
+DELIVERABLES_SINCE=$(git log --oneline "$LAST_REF"..HEAD -- "<feature-folder>/checkpoint.md" | wc -l)
+LOC_SINCE=$(git log -p "$LAST_REF"..HEAD -- ':(exclude)<feature-folder>/' | grep -E '^[+-]' | grep -vE '^[+-]{3}' | wc -l)
+```
+
+If `DELIVERABLES_SINCE >= every_n_deliverables` OR `LOC_SINCE >= loc_threshold`: invoke `strategic-implementation:simplify` with the feature folder. The skill writes `<feature-folder>/simplify-report-NN.md` and returns the path.
+
+**Surface the report.** Append to chat:
+
+> Simplify report: `<path>` — <total> findings (high: <h>, med: <m>, low: <l>). Disposition each finding (`<!-- pm-disposition: apply|defer|dismiss -->`) before the next deliverable, or proceed and let unfilled dispositions surface in the deviation log.
+
+**Disposition rules:**
+- `supervised`: pause for PM to fill every finding's disposition before next deliverable.
+- `auto`: proceed; log a `simplify-disposition-pending` deviation only if the next atomic commit lands with unfilled dispositions in the latest report.
+- `yolo`: proceed; log nothing.
+
+The `simplify` skill never auto-edits source. PM-applied changes (when disposition is `apply`) become a follow-up deliverable or land as part of a future deliverable's same-file edits — never as a side-effect of `simplify` itself.
+
 ---
 
 ## Failure Protocol
@@ -217,13 +247,13 @@ Do not mark complete. Do not proceed to next deliverable. Await PM direction.
 
 ## Deviation logging
 
-A deviation exists on any of: blocker, retry, user-correction, reversal, ambiguity-decision, auto-escalation, yolo-skip, branch-risk, consumer-audit-mismatch, thrash-pause, error-loop-escalation, repro-blocked, spec-ambiguity-redirect, spec-ambiguity-override.
+A deviation exists on any of: blocker, retry, user-correction, reversal, ambiguity-decision, auto-escalation, yolo-skip, branch-risk, consumer-audit-mismatch, thrash-pause, error-loop-escalation, repro-blocked, spec-ambiguity-redirect, spec-ambiguity-override, simplify-disposition-pending.
 
 Append to `validation-log.md`:
 
 ```markdown
 ## DEV-NNN
-**Type:** blocker | retry | user-correction | reversal | ambiguity-decision | auto-escalation | yolo-skip | branch-risk | consumer-audit-mismatch | thrash-pause | error-loop-escalation | repro-blocked | spec-ambiguity-redirect | spec-ambiguity-override
+**Type:** blocker | retry | user-correction | reversal | ambiguity-decision | auto-escalation | yolo-skip | branch-risk | consumer-audit-mismatch | thrash-pause | error-loop-escalation | repro-blocked | spec-ambiguity-redirect | spec-ambiguity-override | simplify-disposition-pending
 **Deliverable:** D<n>
 **Plan said:** <verbatim>
 **Actually:** <what happened>

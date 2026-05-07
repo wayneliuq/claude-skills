@@ -24,3 +24,8 @@ _Feature: context-mode-and-simplify · Started: 2026-05-07 · Autonomy: auto_
 **Resolution:** static structure validation via grep; end-to-end on next session reload or via D4's auto-invocation
 **Downstream impact?** no — D4's trigger-logic edit is to skill prompts, not invocation; the prompts are static text that doesn't require the simplify skill to load to be authored correctly
 **Agent category:** technical
+
+## D4 — auto-invocation of simplify (mid-execution + post-execution final pass)
+**Method:** cli — grep confirms (a) Step 2f mid-execution trigger with git-log counter derivation in executing-plans, (b) `simplify-disposition-pending` added to deviation list, (c) Step 7a mandatory final simplify pass + report section in post-execution.
+**Status:** complete.
+**Note:** Tone discipline block also appended to post-execution. End-to-end auto-trigger validation deferred (same skill-load constraint as D3).
