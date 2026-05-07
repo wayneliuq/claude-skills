@@ -6,3 +6,5 @@ Per-repo doc index. Populated at clarify time when the PM names a doc, read by e
 |---|---|---|---|---|
 | `docs/strategic-implementation/2026-04-30-outcome-first-and-mockups/product-brief_outcome-first-and-mockups.md` | brief for outcome-first/mockup/registry feature | 2026-05-01 | spec amendment, version bump | strategic-implementation |
 | `docs/strategic-implementation/<date>-<slug>/checkpoint.md` | per-feature compaction-survivable execution state (Done / In progress / Open decisions / Unresolved deviations) | 2026-05-07 | schema change in `executing-plans` skill | strategic-implementation |
+| `plugins/strategic-implementation/skills/simplify/SKILL.md` | code-level simplicity reviewer (graph-first scan, report-only, never auto-edits) | 2026-05-07 | trigger-rule change, finding-category change, tool-surface change | strategic-implementation |
+| `docs/strategic-implementation/<date>-<slug>/simplify-report-NN.md` | per-run simplify findings with PM-disposition placeholders | 2026-05-07 | report schema change in `simplify` skill | strategic-implementation |

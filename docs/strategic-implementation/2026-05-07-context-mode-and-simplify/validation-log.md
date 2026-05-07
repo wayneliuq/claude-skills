@@ -10,3 +10,17 @@ _Feature: context-mode-and-simplify · Started: 2026-05-07 · Autonomy: auto_
 **Method:** cli — grep confirms checkpoint.md schema, resume rule, and atomic-commit step landed in executing-plans/SKILL.md.
 **Status:** complete.
 **Note:** Dogfooded by writing checkpoint.md for this feature; updated documentation-registry.md as required by may-invalidate.
+
+## D3 — simplify skill packaged in this plugin
+**Method:** cli — static structure check via grep confirms frontmatter (name, description), Attribution section (credits anthropic-skills:simplify and agents/simplify.md), 6 numbered Steps, and 4 finding categories (reuse-miss, dead-code, comment-hygiene, shape/naming).
+**Status:** complete.
+**Note:** End-to-end invocation `/strategic-implementation:simplify` not exercised in this session — skills load on plugin reload, not mid-session. Will be exercised by D4's auto-invocation in next session, or manually after plugin reload. Recorded as a deferred-validation note rather than a deviation (skill loading is environmental, not a build defect).
+
+## DEV-001
+**Type:** repro-blocked
+**Deliverable:** D3
+**Plan said:** "invoke `/strategic-implementation:simplify` on the branch this work commits to; verify the produced `simplify-report-NN.md` exists and contains the four sections"
+**Actually:** new skill files load on plugin reload, not mid-session; cannot invoke the freshly-written skill from the same session that wrote it
+**Resolution:** static structure validation via grep; end-to-end on next session reload or via D4's auto-invocation
+**Downstream impact?** no — D4's trigger-logic edit is to skill prompts, not invocation; the prompts are static text that doesn't require the simplify skill to load to be authored correctly
+**Agent category:** technical
