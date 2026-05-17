@@ -3,7 +3,7 @@
 ## Done
 - ED1 — Drafter discipline + leakage gate — 7a10664 — 2026-05-17
 - ED2 — Create user-validation agent — 2c95ee6 — 2026-05-17
-- ED3 — Alignment scope reduction + review orchestrator wiring — pending-commit — 2026-05-17
+- ED3 — Alignment scope reduction + review orchestrator wiring — 6bde148 — 2026-05-17
 
 ## In progress
 
