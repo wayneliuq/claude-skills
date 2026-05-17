@@ -21,14 +21,17 @@ You receive:
 
 Triggered automatically by `executing-plans` when the final deliverable is marked complete.
 
+The mode is intentionally lean. Across 24 historical regression-check reports, only the dependent-file impact, post-hoc artifact spot-check, plugin-config scan, and final simplify pass produced real catches; the other sections were bookkeeping. This rewrite drops the bookkeeping, gates the conditional checks, and auto-applies trivial fixes the skill already handles (stale registry rows, missing one-line cross-references) rather than nagging the PM for disposition.
+
 ### Steps
 
-1. **Discover modified file set.** Union of:
-   - Files listed across all deliverables in `execution-plan.md`
-   - Files touched in git history since the feature branch diverged (`git diff --name-only <base>..HEAD`)
-2. **Cross-contamination check.** For each modified file, grep the rest of the repo for imports/references. For each dependent, decide: is its behavior potentially affected? Flag dependents whose tests should be rerun.
+1. **Cross-contamination scan.** Build the modified-file set as the union of (a) files listed across all deliverables in `execution-plan.md` and (b) files touched in git history since the feature branch diverged (`git diff --name-only <base>..HEAD`). For each modified file, grep the rest of the repo for imports/references. For each dependent, decide: is its behavior potentially affected? Flag dependents whose tests should be rerun. The modified-file list is an input to this analysis only — it is no longer a standalone report section; surface the filename inline under each dependent finding when relevant.
 
-   **Step 2a — Plugin config security scan.** Gate on whether the modified-file set above includes any path under `.claude/` (settings, hooks, MCP, agent configs). If no `.claude/` path was modified, skip with the line "no plugin-config files touched."
+2. **Goal-backward verification (gated).** Skip with the one-liner "skipped — no post-hoc or mocked-seam matches" under `## Goal-backward verification` if no deliverable in `execution-plan.md` has `Validation: post-hoc` and no `FLAG (mocked-seam)` entry exists in `validation-log.md`.
+
+   Otherwise, build the suspect-set (post-hoc OR mocked-seam) and take the first **3 matches**. For each matched deliverable, read its expected outcome from `execution-plan.md` (not from any commit message, summary, or validation-log narrative). For each named artifact (function / route / consumer / config key / file path), run a single grep and record yes/no — does it exist in the codebase as the plan claims? Append findings to the report under `## Goal-backward verification` as one block per deliverable: `D<n>: <artifact> — yes|no`. Any `no` → status BLOCK.
+
+3. **Plugin config security scan (gated).** Gate on whether the modified-file set includes any path under `.claude/` (settings, hooks, MCP, agent configs). If no `.claude/` path was modified, write the one-liner "no plugin-config files touched" under `## Plugin config security scan` and proceed.
 
    If `.claude/` files were modified, run inlined static checks across **five rule categories**. Apply a placeholder/env-ref exclusion list (`<.*>`, `\$\{?[A-Z_]+\}?`, `placeholder`, `example`, `your-.*-here`, `xxx+`) before any Critical-tier escalation; matches against the exclusion list demote to Medium.
 
@@ -38,82 +41,54 @@ Triggered automatically by `executing-plans` when the final deliverable is marke
    - **MCP risk profile** — `npx -y` in MCP server commands (Medium/log; documented install pattern); `npx -y` combined with unpinned package version or non-registry source (High); hardcoded env values matching key-shapes (High); shell-running MCP servers (High).
    - **Agent config review** — agent definitions with no model spec (Medium/log); unrestricted tool access shape (Medium/log).
 
-   **Severity gating:** Critical → Status `BLOCK` (sets the regression-check status line to BLOCK and halts post-execution sign-off until resolved); High → Status `FLAG`; Medium/log-only → log to report only, no status change.
+   **Severity gating:** Critical → Status `BLOCK` (sets the regression-check status line to BLOCK and halts post-execution sign-off until resolved); High → Status `FLAG`; Medium/log-only → log to report only, no status change. Append findings under `## Plugin config security scan` with one bullet per finding: severity, rule, file, line, snippet (≤80 chars).
 
-   Append findings to `post-execution-report.md` under heading `## Plugin config security scan` with one bullet per finding: severity, rule, file, line, snippet (≤80 chars). If no `.claude/` files modified or no findings, write a one-line "no findings."
+4. **Registry-update verification + small-cross-reference auto-apply.** Load `docs/strategic-implementation/documentation-registry.md` if present. For each `may-invalidate` entry declared by any deliverable in `execution-plan.md`, check whether the corresponding registry row's `Last Updated` advanced past feature start. **Two auto-apply classes are in scope, both bounded to fixes the skill historically performed inline:**
 
-3. **Run the existing test suite.** Use the project's test command (detect from `package.json` / `pyproject.toml` / `Makefile`). Record failures. A test that was passing before this feature and fails now is a regression.
-4. **Author acceptance tests for feature flows.** For every brief deliverable that was not validated via TDD during execution, author an E2E or integration test now that exercises its user-observable outcome. Run it.
-5. **Goal-backward claim verification.** Build the suspect-set: deliverables whose `Validation` is `post-hoc` OR which carry a `FLAG (mocked-seam)` entry in `validation-log.md`. Take the first **3 matches**. If none, skip this step.
+   - **(i) Stale registry rows.** For each stale row where the doc itself was edited in the feature commits OR the row's `may-invalidate` target is plumbed by a deliverable that demonstrably ran (its files exist, its commit landed) → silently bump `Last Updated` to today; append one line to the Status section's `Auto-applied (this run):` bullet list naming the row.
+   - **(ii) Missing one-line cross-references.** If a deliverable's `may-invalidate` declared a doc that should now cross-reference a new artifact (e.g., a new module path, file, or section heading the deliverable introduced), and the registry row was bumped but the doc itself is missing that one-line backlink → insert a one-line backlink at the relevant section heading; append one line to `Auto-applied (this run):` naming the doc.
+   - **Anything else** — doc not edited; `may-invalidate` target unclear; cross-reference location not obvious; multi-line edit required → escalate as FLAG under the Status section's `Registry:` summary; do NOT auto-apply.
 
-   For each matched deliverable, read its expected outcome from `execution-plan.md` (not from any commit message, summary, or validation-log narrative). For each named artifact (function / route / consumer / config key / file path), run a single grep and record yes/no — does it exist in the codebase as the plan claims? Use the acceptance test authored in Step 4 (if any) as one of the yes/no signals.
+   The auto-apply scope is intentionally narrow: it never extends to simplify-report findings, test failures, or source-code changes — those require PM disposition.
 
-   Append findings to the report under `## Goal-backward verification` as one block per deliverable: `D<n>: <artifact> — yes|no`. Any `no` → status BLOCK.
+5. **Final simplify pass (mandatory).** Invoke `strategic-implementation:simplify` against the full feature diff (`git diff <merge-base>...HEAD`). The skill writes `<feature-folder>/simplify-report-NN.md` (next monotonic number, even if mid-execution reports already exist). Capture the report path and the high/med/low counts. PM-disposition is captured the same way as mid-execution reports — `<!-- pm-disposition: apply|defer|dismiss -->` per finding. In `auto`/`yolo`, unfilled dispositions become a FLAG in this report's status, not a BLOCK.
 
-6. **Registry-update verification.** Load `docs/strategic-implementation/documentation-registry.md` if present. For each deliverable's `may-invalidate` entries (from `execution-plan.md`), check the registry row's `Last Updated` is ≥ feature start date. For each **stale entry** (`Last Updated` did not advance), surface:
+6. **Write report + token-report telemetry.** Write `<feature-folder>/post-execution-report.md` using the template below — exactly five top-level sections, in this reader-facing order: Cross-contamination → Goal-backward → Plugin-config → Simplify → Status. The previous report's `## Modified files`, `## Test suite run` (as a section), `## Acceptance tests authored`, `## Registry-update verification` (as a section), and `## Visual diff` are removed; the test-suite and registry signals appear as one-liners inside Status.
 
-   > "Deliverable D<n> declared `may-invalidate <path>` but registry row was not updated. Update the doc now? (y/n/skip)"
+   ```markdown
+   # Post-execution report
+   _Date: <date> · Feature: <slug>_
 
-   On `y` in `supervised`: pause. On `auto` / `yolo`: surface but do not block. Cross-mode rule: stale registry entries block cycle close in `supervised`; in `auto` and `yolo`, they appear in the report as a FLAG but do not BLOCK.
+   ## Cross-contamination
+   <dependents examined; regressions flagged. Modified-file context is inline under each finding (filename + deliverable annotation) — no separate inventory section.>
 
-7. **Visual-contract diff prompt.** For each deliverable in `execution-plan.md` whose `Visual contract:` is non-empty (a mockup file path), prompt:
+   ## Goal-backward verification
+   <one block per matched deliverable: `D<n>: <artifact> — yes|no`, or "skipped — no post-hoc or mocked-seam matches">
 
-   > "Open `<mockup-path>` and compare against the shipped UI for D<n>. Match? (y/n/notes)"
+   ## Plugin config security scan
+   <bulleted findings: severity, rule, file, line, snippet — or "no plugin-config files touched" / "no findings">
 
-   Capture the answer in the report under `## Visual diff`. A `n` (mismatch) is a FLAG, not a BLOCK — the PM may accept divergence, but it is recorded.
+   ## Simplify final pass
+   - Report: `<simplify-report-path>`
+   - Findings: <total> (high: <h>, med: <m>, low: <l>)
+   - Disposition: <all-filled | <n> unfilled — FLAG>
 
-7a. **Final simplify pass (mandatory).** Invoke `strategic-implementation:simplify` against the full feature diff (`git diff <merge-base>...HEAD`). The skill writes `<feature-folder>/simplify-report-NN.md` (next monotonic number, even if mid-execution reports already exist). Capture the report path and the high/med/low counts. PM-disposition is captured the same way as mid-execution reports — `<!-- pm-disposition: apply|defer|dismiss -->` per finding. In `auto`/`yolo`, unfilled dispositions become a FLAG in this report's status, not a BLOCK.
+   ## Status
+   <PASS / FLAG / BLOCK — BLOCK if any goal-backward `no` or any Critical plugin-config finding. Visual mismatches and unfilled simplify dispositions are FLAG. Plugin config: <PASS | FLAG | BLOCK> alongside the overall status.>
+   - Test suite: <one-liner observed from `validation-log.md` — "green per validation-log" | "<n> regressions logged — FLAG" | "n/a — no executable test surface". Reads from the feature's existing validation-log, not from a separate test-suite re-run.>
+   - Registry: <"all current" | "auto-applied: <n> row(s)" | "<n> stale — FLAG">
+   - Auto-applied (this run): <bulleted list of fixes regression-check made without prompting, or "none">
+   ```
 
-8. **Write** `<feature-folder>/post-execution-report.md`:
+   After writing the report, invoke the telemetry helper:
 
-```markdown
-# Post-execution report
-_Date: <date> · Feature: <slug>_
+   ```bash
+   bash plugins/strategic-implementation/scripts/token-report.sh "<feature-folder>"
+   ```
 
-## Modified files
-<bulleted, with "touched by deliverable D<n>" annotations>
+   Verify `<feature-folder>/token-report.md` landed; do NOT read or interpret its contents — the script is the source of truth, the skill never spends model tokens on the telemetry. Any `unavailable` sections are expected behavior (transcript format drift, missing rtk, etc.) and never block. Exit code 0 from the script means success; non-zero is a `blocker` deviation.
 
-## Cross-contamination
-<dependents examined; regressions flagged>
-
-## Plugin config security scan
-<bulleted findings: severity, rule, file, line, snippet — or "no plugin-config files touched" / "no findings">
-
-## Test suite run
-- Command: <...>
-- Result: <n passed, m failed>
-- Regressions: <list or "none">
-
-## Acceptance tests authored
-<list — which criteria, which test files>
-
-## Goal-backward verification
-<one block per matched deliverable, or "skipped — no post-hoc or mocked-seam matches">
-
-## Registry-update verification
-<bulleted: "D<n>: <doc-path> — Last Updated advanced | stale (PM action: <updated|skipped>)" or "skipped — no may-invalidate entries">
-
-## Visual diff
-<bulleted: "D<n>: <mockup-path> — match | mismatch (notes: ...)" or "skipped — no Visual contract entries">
-
-## Simplify final pass
-- Report: `<simplify-report-path>`
-- Findings: <total> (high: <h>, med: <m>, low: <l>)
-- Disposition: <all-filled | <n> unfilled — FLAG>
-
-## Status
-<PASS / FLAG / BLOCK — BLOCK if regressions unresolved or any goal-backward `no` or any Critical plugin-config finding. Stale registry entries are FLAG in auto/yolo, BLOCK in supervised. Visual mismatches are FLAG. Plugin config: <PASS | FLAG | BLOCK> alongside the overall status.>
-```
-
-9. If any regression is unresolved or any goal-backward verification returns `no`: surface to PM. Otherwise announce completion.
-
-10. **Token-report telemetry (deterministic).** Invoke the helper script:
-
-    ```bash
-    bash plugins/strategic-implementation/scripts/token-report.sh "<feature-folder>"
-    ```
-
-    Verify `<feature-folder>/token-report.md` landed; do NOT read or interpret its contents — the script is the source of truth, the skill never spends model tokens on the telemetry. Any `unavailable` sections are expected behavior (transcript format drift, missing rtk, etc.) and never block. Exit code 0 from the script means success; non-zero is a `blocker` deviation.
+If any regression is unresolved or any goal-backward verification returns `no`: surface to PM. Otherwise announce completion.
 
 ---
 
