@@ -72,3 +72,45 @@ Each deliverable's validation will include a path-by-path inspection of the out-
 - Brief D5.1 (reviewer walks step-by-step through named user's actions): ✅ walkthrough[] matrix is the structural artifact.
 - Brief D5.2 (enumerates each step paired with deliverables, or flags unreachable): ✅ supporting_deliverables[] + reachable enum.
 - Brief D6 (catches client-built-no-pipeline loophole with BLOCK naming the unreachable step): ✅ "D1 step 2: real events in their workspace … schema, ingestion, and backend API are explicitly deferred out-of-scope".
+
+---
+
+## ED3 — validation
+
+**Plugin files edited:**
+- `/Users/qiangliu/.claude/plugins/cache/wayneliuq/strategic-implementation/3.3.0/agents/alignment.md` — PMF removed; "Do not review" updated; `flags[].dimension` enum cleaned (dropped `pmf`).
+- `/Users/qiangliu/.claude/plugins/cache/wayneliuq/strategic-implementation/3.3.0/skills/review/SKILL.md` — `user-validation` added to Step 2 generalist tier; "Generalist tier composition" section added; specialist union now includes user-validation's `specialists_needed`; BLOCK propagation + corroboration-dedup updated for the alignment ↔ user-validation pair; Re-review rule extended.
+- `/Users/qiangliu/.claude/plugins/cache/wayneliuq/strategic-implementation/3.3.0/skills/strategic-implementation/SKILL.md` Step 4 — narrative now names three generalists.
+
+**File-on-disk inspection (post-hoc):**
+- alignment.md Scope contains exactly five top-level dimensions (1 brief, 2 consumer-audit, 3 architecture, 4 future-proofing, 5 specialist routing). PMF absent. ✅
+- alignment.md "Do not review" explicitly cedes "PMF, user-validation walkthroughs, and user-reachability checks". ✅
+- alignment.md output schema dimension enum: `brief|consumer-audit|architecture|future-proofing`. `pmf` removed. ✅
+- review/SKILL.md "## Generalist tier composition" section present at line 21, table lists alignment / simplify / user-validation with scope + anti-overlap. ✅
+- review/SKILL.md Step 2 launches three agents in parallel; brief path passed to alignment AND user-validation. ✅
+- review/SKILL.md Step 5 BLOCK propagation includes user-validation; corroboration-dedup note added for "D<n> absent" ↔ "step k of D<n> unreachable" pair. ✅
+- strategic-implementation/SKILL.md Step 4 names three generalists. ✅
+
+**Joint synthetic-plan cli check (D5.2, D5.3, D6 end-to-end):**
+Three agents launched in parallel against the synthetic dashboard plan + brief.
+
+- **alignment (live agent):** BLOCK. Walkthrough rationale produced. ⚠️ Output still contains `dimension: "pmf"` — see DEV-002 below: the live agent loaded at session start; file edits do not take effect until plugin reload.
+- **simplify:** FLAG. Noted that scope-vs-brief mismatch is outside simplify's remit and surfaced it as a flag only — correct boundary respect.
+- **user-validation (invoked via general-purpose loading the file inline):** BLOCK. Produced 4-row walkthrough[] matrix, 3 steps `reachable: no` with `(missing: ...)` annotations on supporting deliverables, HIGH flags on reachability + pmf + interaction-surface. Did NOT directly flag "missing deliverables" — flagged the unreachable acceptance steps as the consequence. Anti-overlap with alignment respected. ✅
+
+**Acceptance step coverage:**
+- D7.2 (alignment scope = 5 dimensions, PMF absent): ✅ file-on-disk.
+- D7.4 (alignment cedes PMF AND walkthroughs): ✅ file-on-disk.
+- D5.1 (three parallel generalists with documented roles): ✅ file-on-disk + observed in joint run.
+- D5.2 (per-step walkthrough): ✅ user-validation produced walkthrough[] matrix.
+- D5.3 / D6 (BLOCK naming unreachable step on client-built-pipeline-missing): ✅ user-validation BLOCKed with "D1 step 2: real events ... schema, ingestion, and backend API explicitly deferred out-of-scope".
+- D7.1 (generalist tier composition documented): ✅ "## Generalist tier composition" section in review/SKILL.md.
+
+## DEV-002
+**Type:** ambiguity-decision
+**Deliverable:** ED3
+**Plan said:** end-to-end run asserts "three generalists run in parallel; `user-validation` BLOCKs naming the unreachable step; `alignment` does NOT flag PMF (because PMF moved); orchestrator surfaces BLOCK"
+**Actually:** alignment did flag `dimension: pmf` in the joint run, because the live alignment agent was loaded at session start before my edits to `agents/alignment.md`. Plugin agents in this runtime do not hot-reload on file change. The on-disk file is correct (verified by grep — Scope has 5 dimensions sans PMF; dimension enum dropped `pmf`).
+**Resolution:** The deliverable's file-on-disk acceptance criteria (D7.2, D7.4, D7.1) are met. The end-to-end "alignment does not flag PMF" piece can only be verified in a fresh session where the plugin re-loads agent definitions from disk. Logging as a runtime caveat; this is not a correctness failure of the edits, only a runtime-reload limitation.
+**Downstream impact?** no — post-execution regression-check will run with the same loaded-at-session-start agents; will use file-on-disk state as ground truth. After upstream sync to GitHub `wayneliuq/strategic-implementation` and a plugin update on the operator's side, the new alignment behavior takes effect.
+**Agent category:** alignment
