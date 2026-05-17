@@ -1,10 +1,11 @@
 # Checkpoint — spec-user-first-and-leakage-review
 
 ## Done
-- ED1 — Drafter discipline + leakage gate — pending-commit — 2026-05-17
+- ED1 — Drafter discipline + leakage gate — 7a10664 — 2026-05-17
+- ED2 — Create user-validation agent — pending-commit — 2026-05-17
 
 ## In progress
-- ED2 — Create user-validation agent — started 2026-05-17
+- ED3 — Alignment scope reduction + review orchestrator wiring — started 2026-05-17
 
 ## Open decisions
 

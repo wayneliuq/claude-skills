@@ -46,3 +46,29 @@ Each deliverable's validation will include a path-by-path inspection of the out-
 **Resolution:** Brief needs a v0.3 revision to soften D4.4 from "(sonnet-class, single agent)" to "materially faster than the generalist tier" — outcome-level. Tracked as post-execution follow-up; does not block plan execution because the live drafter changes are landed and gating mechanism works.
 **Downstream impact?** no — drafter discipline is in place; subsequent deliverables unaffected. Brief revision is a documentation hygiene follow-up.
 **Agent category:** alignment
+
+---
+
+## ED2 — validation
+
+**Plugin file created:** `/Users/qiangliu/.claude/plugins/cache/wayneliuq/strategic-implementation/3.3.0/agents/user-validation.md`
+
+**File inspection (post-hoc):**
+- Frontmatter `name: user-validation`, description references generalist tier + walkthrough role. ✅
+- "Adversarial stance" section present with named soft-failure modes. ✅
+- "Scope" lists 5 dimensions: named user, interaction surface, walkthrough, reachability, PMF. ✅
+- "Do not review" explicitly cedes: missing deliverables → alignment; architecture conformance → alignment; consumer audits → alignment; validation-method honesty → tests; simplicity → simplify; specialist domains → specialists. ✅
+- "Output schema" includes `walkthrough[]` matrix + `flags[]` + `recommendations[]` + `specialists_needed[]`. Cap ~1500 tokens. ✅
+- "Escalation triggers" list BLOCK conditions including the canonical "client-built, pipeline-missing" loophole. ✅
+- "Processing learnings" tags: `#user-validation`, `#pmf`, `#walkthrough`, `#reachability`. ✅
+
+**Synthetic-plan cli test:**
+- Synthetic brief: `/tmp/synthetic-brief-pipeline-missing.md` — Project Activity Dashboard; named user is an end-user in the shipped product; success signal is "real events appear within seconds".
+- Synthetic plan: `/tmp/synthetic-plan-pipeline-missing.md` — D1 ships UI + 5-row mock array + stub modal; D2 ships empty state with cleared mock; activity schema / ingestion / `/activity` API all explicitly out-of-scope.
+- Invoked via `Agent` with `subagent_type: general-purpose` (new subagent type not yet registered in this session; agent prompt was loaded from the user-validation.md file inline).
+- **Result:** `status: BLOCK`. Walkthrough enumerated 4 acceptance steps, named supporting deliverables per step, marked 2 as `reachable: no` (D1 step 2: real events absent because schema/ingestion/API deferred; D1 step 3: stub modal not real detail). Two HIGH flags on reachability; one HIGH flag on PMF recognizability. Did NOT flag "missing deliverables" directly — flagged the unreachable acceptance steps instead, respecting the anti-overlap rule with alignment.
+
+**Acceptance step coverage:**
+- Brief D5.1 (reviewer walks step-by-step through named user's actions): ✅ walkthrough[] matrix is the structural artifact.
+- Brief D5.2 (enumerates each step paired with deliverables, or flags unreachable): ✅ supporting_deliverables[] + reachable enum.
+- Brief D6 (catches client-built-no-pipeline loophole with BLOCK naming the unreachable step): ✅ "D1 step 2: real events in their workspace … schema, ingestion, and backend API are explicitly deferred out-of-scope".
