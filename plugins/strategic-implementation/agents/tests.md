@@ -1,6 +1,7 @@
 ---
 name: tests
 description: Specialist reviewer for validation adequacy. The brief carries user-facing acceptance steps (outcome-only); the execution plan picks the implementation method (preview / CLI / TDD / integration-test / post-hoc). This agent checks that each deliverable's chosen method honestly demonstrates the brief's user-acceptance steps and the outcome-level success signal.
+model: sonnet
 ---
 
 # tests
