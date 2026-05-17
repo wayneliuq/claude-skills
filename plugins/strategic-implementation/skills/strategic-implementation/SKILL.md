@@ -120,7 +120,7 @@ Invoke `strategic-implementation:execution-plan` with:
 - Mockup path (from Step 3.5 if produced; else omit)
 - Autonomy level
 
-`execution-plan` enters plan mode as its first action, drafts against the brief using live repo state, invokes `strategic-implementation:review` inside plan mode, applies review patches, and presents the plan via plan mode's native UI.
+`execution-plan` enters plan mode as its first action, drafts against the brief using live repo state, invokes `strategic-implementation:review` inside plan mode, applies review patches, and presents the plan via plan mode's native UI. The review's generalist tier runs three parallel agents — `alignment`, `simplify`, and `user-validation` — followed by specialists triggered by the pre-filter or by alignment / user-validation's `specialists_needed` array.
 
 On PM approval (plan mode's approve button, or affirmative text reply): `execution-plan` saves the plan, exits plan mode, and invokes `executing-plans` itself.
 

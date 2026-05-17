@@ -18,11 +18,13 @@ You produce `product-brief_<slug>.md` — the single PM-approvable artifact for 
 1. **No code.** Not even snippets. The PM does not read code.
 2. **No jargon without a parenthetical.** If you must say "idempotent," write "idempotent (safe to run twice)."
 3. **Every deliverable is user-observable.** If the PM cannot tell from a demo that a deliverable landed, it does not belong in the brief — move it into execution-plan as internal plumbing.
-4. **Every deliverable declares user-facing acceptance steps** — a short numbered list answering the question *"how would a human, using this product, know this worked?"* Outcome-only. No implementation details, no test names, no methods. Each step is something the PM (or a representative user) could perform and observe themselves. The brief intentionally does **not** name an implementation method (`preview` / `cli` / `tdd` / `integration-test` / `post-hoc`) — that choice belongs to execution-plan, derived from these steps plus integration-risk class. Naming a method here would bias downstream review and limit honest test selection. Reviewers flag any deliverable missing user-facing acceptance steps.
-5. **HARD DECISIONs are explicit.** A PM statement with tight language ("must," "non-negotiable," "only way") becomes a `[HARD DECISION]` row and cannot be reversed by reviewers downstream.
-6. **Compact decision rows.** One line each. Full tradeoff tables only for items marked `[HARD DECISION]` or when the PM explicitly asks for one.
-7. **Inline markdown feedback markers.** In revise mode, the PM's `<!-- pm: ... -->` comments in the existing brief are addressed in-place and removed. Do not leave them behind.
-8. **Working backwards is section 1.** The release-note paragraph is written before any deliverables are listed. If clarify passed `working-backwards: TBD`, write `TBD — open question` verbatim — do not fabricate one. Same rule for `success-signal: TBD`.
+4. **Define the user.** §2 must open with `**Who is the user of this feature:**` naming a concrete audience — the segment of the product's userbase, an internal team, a specific role, etc. For internal-team users, also name the team's interaction surface (a specific skill, Claude Code, a dashboard, a shared doc, a CLI). `TBD — open question` is allowed only when the user is genuinely ambiguous; never fabricate a persona. The named user is what every acceptance step must be performable by.
+5. **Every deliverable declares user-facing acceptance steps** — a short numbered list answering the question *"how would the named target user, using this product, know this worked?"* Outcome-only. Every step must be performable by that user within the limits of their declared tooling/interaction surface. End-user (client) targets: only actions through the shipped product. Internal-team targets: only actions inside the team's declared surface. No implementation details, no test names, no methods. The brief intentionally does **not** name an implementation method (`preview` / `cli` / `tdd` / `integration-test` / `post-hoc`) — that choice belongs to execution-plan, derived from these steps plus integration-risk class. Naming a method here would bias downstream review and limit honest test selection. Reviewers flag any deliverable missing user-facing acceptance steps.
+6. **No implementation leakage in §2 or §5.** Deliverable descriptions, acceptance steps, and HARD DECISION rows must not name a specific library, package, file path, function name, framework feature, data structure, algorithm, schema column, wire-format detail, or test artifact. The forbidden altitude is anything a non-engineer wouldn't recognize from using the product. **Allowed at strategic altitude:** the named target user's interaction surface; couplings of the form "shared with component X" or "reuses the existing X model" (component identity is allowed, technique is not); the user-observable thing itself, if that thing IS a specific tool/skill being adopted. Implementation belongs in execution-plan, not the brief.
+7. **HARD DECISIONs are explicit AND stay at strategic altitude.** A PM statement with tight language ("must," "non-negotiable," "only way") becomes a `[HARD DECISION]` row and cannot be reversed by reviewers downstream. Each HARD DECISION must be one of: (a) a user-observable behavior the PM is locking in; (b) a coupling at "shared with component X" altitude; (c) a PM-verbatim constraint. A HARD DECISION must not name a specific library/package/technique unless that technique is itself the user-observable thing being decided.
+8. **Compact decision rows.** One line each. Full tradeoff tables only for items marked `[HARD DECISION]` or when the PM explicitly asks for one.
+9. **Inline markdown feedback markers.** In revise mode, the PM's `<!-- pm: ... -->` comments in the existing brief are addressed in-place and removed. Do not leave them behind.
+10. **Working backwards is section 1.** The release-note paragraph is written before any deliverables are listed. If clarify passed `working-backwards: TBD`, write `TBD — open question` verbatim — do not fabricate one. Same rule for `success-signal: TBD`.
 
 ---
 
@@ -48,11 +50,13 @@ _Slug: <slug> · Date: <YYYY-MM-DD> · Autonomy: <level>_
 
 ## 2. What the user does / sees
 
-For each deliverable, write the user-observable description and the acceptance steps a human would take to confirm it works. No implementation methods, no test names — outcome-only steps a PM could perform.
+**Who is the user of this feature:** <Name a concrete audience — a specific segment of the product's userbase, an internal team, a role. For internal-team users, also name the team's interaction surface (a specific skill, Claude Code, a dashboard, a shared doc, a CLI). Write `TBD — open question` verbatim only if the user is genuinely ambiguous; do not fabricate.>
+
+For each deliverable, write the user-observable description and the acceptance steps the named user above would take to confirm it works, within the limits of their declared tooling/interaction surface. No implementation methods, no test names — outcome-only steps the named user could perform.
 
 ### D1 — <one-sentence user-observable description>
 **How a user verifies:**
-1. <Concrete action a human takes — open page X, run feature Y from the UI, observe field Z>
+1. <Concrete action the named user takes within their interaction surface — open page X, run feature Y from the UI, observe field Z>
 2. <Next step / observation>
 3. <...continue until the outcome is unambiguously confirmed>
 
@@ -91,11 +95,59 @@ For each deliverable, write the user-observable description and the acceptance s
 
 ### After writing
 
-Return the absolute path to the brief and announce:
+Run the **Leakage gate** (see below) before announcing to the PM. The gate runs the fast leakage reviewer against the freshly written brief. The announcement and path-return are gated on PASS or explicit PM override.
+
+On PASS, return the absolute path to the brief and announce:
 
 > "Product brief drafted at `<path>`. Review inline — add `<!-- pm: ... -->` comments for revisions, or reply 'approve' to proceed to execution planning."
 
 Do NOT auto-advance. The PM approves the brief explicitly.
+
+---
+
+## Leakage gate (both modes)
+
+Invoke the fast leakage reviewer after writing the brief, before the PM announcement. The reviewer is invoked inline via the `Agent` tool with `model: "sonnet"` (no standalone agent file). Inline prompt:
+
+> You are a fast leakage reviewer for product briefs. Your only job is to find implementation details that leaked into a brief that should be implementation-agnostic.
+>
+> Read the brief at `<brief-path>` in full.
+>
+> **What counts as leakage (FLAG)** — a phrase in §1 (Working backwards), §2 (What the user does / sees, including the target-user line, deliverables, and acceptance steps), §3 (Success signal), §4 (Boundaries), or §5 (Decisions / HARD DECISIONs) that names any of:
+> - a specific library, package, framework, or runtime;
+> - a specific file path, module path, function name, class name, or symbol;
+> - a specific algorithm or data structure;
+> - a specific API/endpoint shape, schema column, or wire format;
+> - an internal artifact a non-engineer wouldn't recognize from using the product;
+> - a test name, test file, or test framework reference;
+> - an implementation technique below the "shared with component X" altitude.
+>
+> **Allowed (do NOT flag):**
+> - the named target user and their declared interaction surface (required content);
+> - couplings of the form "shared with component X" or "reuses the existing X model";
+> - a phrase that IS the user-observable thing being decided (e.g., the brief is literally about adopting a specific tool as the user-facing thing);
+> - §6 (Risks & unknowns) and §7 (References & revision log) — these sections may name files/paths/agents;
+> - any "Affected skill files" subsection of §7 — explicitly internal plumbing.
+>
+> **Subject-matter caveat.** If the brief's *product* is a skill, an agent, or some specific internal tool, then references to those skills/agents in §1–§5 are the user-observable things being decided — not leakage. However, naming a *different* tool used to IMPLEMENT them (e.g., "uses library X for the reviewer") is still leakage.
+>
+> Return a terse JSON object (cap ~600 tokens):
+> ```json
+> { "status": "PASS | FLAG",
+>   "findings": [ { "section": "§N or deliverable id", "line_excerpt": "...", "why_leakage": "one sentence" } ],
+>   "notes": "one-sentence overall judgment" }
+> ```
+
+**Gate semantics.**
+
+- **PASS:** proceed to the PM announcement.
+- **FLAG:** surface findings to the PM with line excerpts.
+  - In `auto`/`yolo`: drafter MAY attempt one self-revision pass on obviously safe findings (e.g., swap a specific library name for "shared with component X" framing) before surfacing the remainder. Self-revision counts as a brief edit and appends a revision-log entry. After self-revision, re-run the gate once; whatever findings remain go to the PM.
+  - In `supervised`: do not self-revise; surface findings as-is.
+- The drafter never returns the success announcement (and never returns a brief path as "ready for execution-plan") until status is PASS.
+- If the PM explicitly overrides a finding ("override this — `<one-line justification>`"), append the justification to §7 revision log and treat the finding as resolved. Override protocol is intentionally minimal; richer override syntax may be added when needed.
+
+**Fallback.** If the `Agent` tool's `model` override is unavailable at call time, invoke with the default model and the same prompt — slower but functionally equivalent. The discipline still holds.
 
 ---
 
@@ -122,7 +174,9 @@ Steps:
 
 ### After revising
 
-Return the path and announce:
+Run the **Leakage gate** (see above) before announcing to the PM. The gate must PASS (or the PM must override remaining findings) before the announcement.
+
+On PASS, return the path and announce:
 
 > "Brief revised (v0.N). Review inline or reply 'approve' to proceed."
 
