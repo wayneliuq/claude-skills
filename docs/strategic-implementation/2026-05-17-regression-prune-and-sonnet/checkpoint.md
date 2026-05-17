@@ -2,7 +2,7 @@
 
 ## Done
 - D1 — tests reviewer model downgrade — 593a95b — 2026-05-17
-- D2 — regression-check report prune + auto-apply — <sha-pending> — 2026-05-17
+- D2 — regression-check report prune + auto-apply — 00b8115 — 2026-05-17
 
 ## In progress
 
