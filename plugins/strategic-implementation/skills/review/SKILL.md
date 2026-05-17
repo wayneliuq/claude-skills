@@ -11,10 +11,24 @@ You are invoked by `execution-plan` (and may be invoked directly by `post-execut
 
 You receive:
 - The full execution plan text
-- The brief path (for cross-reference by `alignment` and `tests`)
+- The brief path (for cross-reference by `alignment`, `user-validation`, and `tests`)
 - Document reference locations (architecture, UX/PMF, security, schema) — pass through to specialists as applicable
 - Filtered project-learnings block (optional)
 - Autonomy level
+
+---
+
+## Generalist tier composition
+
+Three generalist reviewers run in parallel on every plan. Their scopes are deliberately non-overlapping; anti-overlap rules live in each agent's prompt and are enforced by the orchestrator's dedup-with-corroboration logic in Step 5.
+
+| Agent | Owns | Does NOT review |
+|---|---|---|
+| [`alignment`](../../agents/alignment.md) | Brief alignment (every deliverable in brief → in plan), consumer audit on shape change, architecture-doc conformance, future-proofing/naming/repo-coherence, specialist routing. | PMF, user walkthroughs, user-reachability — ceded to `user-validation`. Simplicity → `simplify`. Test correctness → `tests`. Specialist domains → specialists. |
+| [`simplify`](../simplify/SKILL.md) | Whether a shorter path exists from the brief's success signal to the plan; returns PASS or ALTERNATIVE. | Per-file code style. Reviewer dimensions owned by other agents. |
+| [`user-validation`](../../agents/user-validation.md) | Named target user, declared interaction surface, per-acceptance-step walkthrough, end-to-end reachability of the user path (including the "client-built, pipeline-missing" loophole), PMF / deliverable-recognizability. | Missing deliverables (alignment owns; flag the unreachable step as the consequence instead). Architecture, consumer audits → alignment. Validation-method honesty → `tests`. Simplicity → `simplify`. |
+
+When two agents corroborate the same root cause (e.g. `alignment` flags "D5 absent" while `user-validation` flags "step 3 of D5 unreachable because D5 missing"), Step 5's dedup logic merges them into one entry and raises severity rather than duplicating the flag.
 
 ---
 
@@ -43,14 +57,15 @@ Record the candidate set. Specialists not in the candidate set will not run unle
 Launch in parallel:
 - `strategic-implementation:alignment`
 - `strategic-implementation:simplify`
+- `strategic-implementation:user-validation`
 
 Pass each:
 - The plan
-- The brief path (alignment only)
+- The brief path (alignment AND user-validation — user-validation needs the brief for the named user, declared interaction surface, and acceptance steps)
 - Filtered learnings block (if any, tagged for the respective agent)
 - `max_tokens: 1500` hint in prompt ("Cap output at ~1500 tokens.")
 
-Wait for both.
+Wait for all three.
 
 ---
 
@@ -59,9 +74,10 @@ Wait for both.
 Union of:
 - Pre-filter candidate set (from Step 1)
 - `alignment`'s `specialists_needed` array
+- `user-validation`'s `specialists_needed` array (e.g., user surface broken → `frontend-engineer`)
 
 `tests` is always included.
-`frontend-engineer` is included only if the pre-filter matched OR `alignment` flagged UI/UX.
+`frontend-engineer` is included only if the pre-filter matched OR `alignment` flagged UI/UX OR `user-validation` named it.
 
 If a specialist is in the union but there is clearly no relevant surface (e.g. `frontend-engineer` with zero UI deliverables), skip it and log the skip in the synthesis output.
 
@@ -86,7 +102,7 @@ Merge all agent outputs. Apply:
 1. **Collect** every flag and recommendation.
 2. **Deduplicate.** Two agents flagging the same underlying issue → keep one, note the corroboration.
 3. **Reconcile conflicts.** Prefer the more conservative position. Note the conflict inline.
-4. **Block propagation.** Any specialist `BLOCK` propagates to the overall status. `alignment` BLOCK also propagates.
+4. **Block propagation.** Any specialist `BLOCK` propagates to the overall status. `alignment` BLOCK propagates. `user-validation` BLOCK propagates — typically caused by an unreachable user-acceptance step (the "client-built, pipeline-missing" loophole). When `alignment` flags "D<n> absent" AND `user-validation` flags "step k of D<n> unreachable because D<n> missing", these are the same root cause — dedup into one entry with corroboration noted; severity is the max of the two.
 5. **Alternative path (simplify).** If `simplify` returned `ALTERNATIVE`, carry it through as a top-level field — it requires a PM decision, not a patch.
 6. **Prioritize.** Sort recommendations: high-severity first, then by deliverable id.
 
@@ -115,4 +131,4 @@ Keep total synthesis output terse — the caller uses it, not the PM directly.
 
 ## Re-review
 
-If the caller applies patches and asks for re-review: only re-run specialists whose dimension was patched. Generalist tier re-runs only if ≥2 specialists were re-run or a hard decision was touched.
+If the caller applies patches and asks for re-review: only re-run specialists whose dimension was patched. Generalist tier re-runs only if ≥2 specialists were re-run, a hard decision was touched, OR `user-validation` returned BLOCK on the previous pass (a reachability BLOCK demands a re-walk after patches).

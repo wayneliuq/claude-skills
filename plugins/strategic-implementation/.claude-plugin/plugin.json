@@ -1,6 +1,6 @@
 {
   "name": "strategic-implementation",
-  "version": "3.3.0",
+  "version": "3.4.0",
   "description": "Outcome-first planning-to-execution workflow: clarify → product brief → optional UI mockup → plan-mode execution plan → tiered review → deliverable-gated execution. Per-repo documentation registry.",
   "author": {
     "name": "wayneliuq"
