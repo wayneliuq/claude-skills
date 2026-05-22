@@ -34,6 +34,7 @@ Inside plan mode:
 3. **Library-lifecycle doc pass.** For each integration-risk dependency from clarify, locate the canonical persistence / lifecycle doc (project README, vendor docs, RFC, or in-repo notes). Read the relevant section. Capture: what state persists across what boundaries (per-connection / per-session / per-process / per-deployment), known gotchas, and the doc URL/path. Time-box: aim for 15–30 minutes total across all libraries; if a library has no good docs, note that explicitly. Empty audit is acceptable only if clarify declared `none`.
 4. **Load the documentation registry.** Read `docs/strategic-implementation/documentation-registry.md` if present. For each registry entry, judge whether the deliverables in this brief might invalidate it (touches the path, the area, or the update-trigger condition). Tag each deliverable with `may-invalidate: [doc-paths]` or `may-invalidate: none`. Surface the union of impacted entries in the plan summary at Step 5 so the PM sees what docs this work will require updating.
 5. Load `docs/strategic-implementation/project-learnings.md` if it exists. Filter entries for relevance to this brief's deliverables. Inject matching entries when invoking `review`.
+6. **Load brief sidecar.** Read `<feature-folder>/brief-meta.yaml` if present. Capture `specialists_recommended:` — this list is forwarded to `review` to narrow specialist selection. Absent sidecar or empty list → forward an empty list; `review`'s pre-filter still applies mandatory triggers.
 
 ---
 
@@ -112,6 +113,7 @@ Still inside plan mode, invoke `strategic-implementation:review` with:
 - The brief path
 - The document reference locations from the brief
 - The filtered project-learnings block (if any)
+- `specialists_recommended:` from `brief-meta.yaml` (may be empty list)
 - Autonomy level
 
 The `review` skill runs tiered: `alignment` + `simplify` first, then specialists on flags. It returns a consolidated JSON patch list and status.

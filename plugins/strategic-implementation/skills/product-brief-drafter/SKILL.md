@@ -97,6 +97,8 @@ For each deliverable, write the user-observable description and the acceptance s
 
 Run the **Leakage gate** (see below) before announcing to the PM. The gate runs the fast leakage reviewer against the freshly written brief. The announcement and path-return are gated on PASS or explicit PM override.
 
+After leakage gate PASS, also emit the **specialist recommendation sidecar** (see below) — `brief-meta.yaml` in the feature folder. This is the drafter's narrow hint to `review` about which specialists the brief actually warrants; it bypasses the trigger-token pre-filter's tendency to over-trigger.
+
 On PASS, return the absolute path to the brief and announce:
 
 > "Product brief drafted at `<path>`. Review inline — add `<!-- pm: ... -->` comments for revisions, or reply 'approve' to proceed to execution planning."
@@ -151,6 +153,36 @@ Invoke the fast leakage reviewer after writing the brief, before the PM announce
 
 ---
 
+## Specialist recommendation sidecar (both modes)
+
+After the leakage gate PASSes, write `brief-meta.yaml` to the feature folder alongside the brief. This sidecar is **not** PM-facing — it is consumed by `execution-plan` and forwarded to `review` to narrow specialist selection. The brief itself stays PM-clean.
+
+### Sidecar format
+
+```yaml
+# Internal metadata for review. Not PM-facing.
+specialists_recommended:
+  - <one of: boundaries, runtime-risk, frontend-engineer, technical-expert>
+notes: <one sentence explaining the selection>
+```
+
+`tests` is always run by `review` and is not listed here. Omit `specialists_recommended:` entirely (or leave empty list) when no specialist warrants explicit recommendation — the pre-filter still applies its mandatory triggers.
+
+### Selection rule
+
+Recommend a specialist only when the brief itself names a concern in that specialist's domain. The bar is "the brief talks about this," not "this might be relevant downstream."
+
+| Specialist | Recommend when the brief explicitly names |
+|---|---|
+| `boundaries` | auth/permission/role surfaces, new endpoints, schema changes, secrets/credentials/PII handling, externally-reachable surfaces |
+| `runtime-risk` | non-trivial dependencies (especially those from clarify's integration-risk list), caching/queues/background work, hot paths, latency-sensitive surfaces |
+| `frontend-engineer` | a new screen, a flow with ≥2 user-visible steps, an information-architecture change, or a UI mockup was produced |
+| `technical-expert` | adoption of a new library/framework/runtime, or a step-ordering risk the brief itself surfaces |
+
+Default to **fewer** recommendations. An empty list is the correct answer for backend-only refactors or single-control UI tweaks. Over-recommendation is the failure mode this sidecar exists to prevent.
+
+---
+
 ## Mode: revise
 
 **Plan-mode entry-check:** if plan mode is active, call `ExitPlanMode` before writing files. (`execution-plan` is the only skill exempt from this rule.)
@@ -175,6 +207,8 @@ Steps:
 ### After revising
 
 Run the **Leakage gate** (see above) before announcing to the PM. The gate must PASS (or the PM must override remaining findings) before the announcement.
+
+If the revision changed scope (added/removed a deliverable, changed an interaction surface, added a HARD DECISION, added/removed an integration-risk-relevant dependency), refresh `brief-meta.yaml` per the **Specialist recommendation sidecar** section. Otherwise leave the sidecar as-is.
 
 On PASS, return the path and announce:
 
