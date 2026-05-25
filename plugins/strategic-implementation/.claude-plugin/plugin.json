@@ -1,7 +1,7 @@
 {
   "name": "strategic-implementation",
-  "version": "3.5.1",
-  "description": "Outcome-first planning-to-execution workflow: clarify → product brief → optional UI mockup → plan-mode execution plan → tiered review → deliverable-gated execution. Per-repo documentation registry.",
+  "version": "3.6.0",
+  "description": "Outcome-first planning-to-execution workflow: clarify → product brief → optional UI mockup → plan-mode execution plan → tiered review → deliverable-gated execution. Per-repo documentation registry. v3.6 adds harness-fired hooks for deterministic chapter rotation, goal evaluation, simplify trigger, edit-thrashing, error-loop, and validation-log surfacing.",
   "author": {
     "name": "wayneliuq"
   },

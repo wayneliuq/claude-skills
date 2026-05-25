@@ -46,6 +46,62 @@ If `checkpoint.md` does not yet exist, initialize it at `<feature-folder>/checkp
 
 Initialize deviation counter `DEV-001`.
 
+### Initialize hook state (deterministic-trigger layer)
+
+The plugin ships harness-fired hooks (`plugins/strategic-implementation/hooks/hooks.json`) that detect deliverable commits, edit-thrashing, error-loops, simplify thresholds, validation-log additions, and chapter completion deterministically — without depending on the agent to remember to check. Hooks are no-ops unless an active state file exists.
+
+Write `.claude/strategic-implementation/state.json` (relative to repo root, NOT the feature folder — hooks read from a fixed location). Use the following shape:
+
+```json
+{
+  "active": true,
+  "feature_folder": "<feature-folder>",
+  "feature_slug": "<slug>",
+  "autonomy": "<level>",
+  "chapter_size": 5,
+  "current_chapter": 1,
+  "deliverables_done_in_chapter": [],
+  "deliverables_since_last_simplify": 0,
+  "loc_since_last_simplify": 0,
+  "simplify_thresholds": {"deliverables": 3, "loc": 400},
+  "current_deliverable_edit_counts": {},
+  "consecutive_failures": 0,
+  "total_deliverables": <N>,
+  "plan_path": "<feature-folder>/execution-plan.md",
+  "brief_success_signal": "<verbatim success signal from brief>",
+  "last_counted_sha": "",
+  "pending_chapter_rotation": false,
+  "pending_simplify": false,
+  "pending_thrash_pause": false,
+  "pending_error_loop": false,
+  "pending_deviation_surface": false,
+  "validation_log_last_mtime": ""
+}
+```
+
+Then emit the chapter-1 `<active-goal>` block to chat (the goal evaluator reads it from conversation):
+
+```
+<active-goal chapter="1" range="D1..D5">
+condition: complete deliverables D1 through D5 as specified in <plan-path>. Each must commit atomically with subject `D<n>: ...`, validation per its declared method recorded in validation-log.md, and checkpoint.md advanced.
+brief success signal: <verbatim from brief>
+constraints:
+  - No edits outside file lists declared in deliverables D1..D5
+  - No amending prior deliverable commits
+  - Every Edit/Write announces `touched: <files> deliverable: D<n>` in chat
+  - Stop and surface to PM on any BLOCK or unresolved ⚠️ in validation-log.md
+turn-cap: stop after 40 turns and surface checkpoint.md to PM
+</active-goal>
+```
+
+**On chapter rollover the hook itself emits the next block** — the agent does not re-write it. When the bash-counter hook detects the 5th deliverable commit in the current chapter, the Stop orchestrator rotates and injects the next chapter's `<active-goal>` as next-turn guidance. The agent reads the injected guidance and continues with the new chapter binding. No paste, no skill-mediated check.
+
+**Touched-file announcement (constraint compliance).** After every Edit/Write batch within a deliverable, announce in chat:
+
+> `touched: <comma-separated files> deliverable: D<n>`
+
+This is the only signal the goal evaluator has into file-scope drift. Skipping it means the evaluator cannot verify the "no edits outside declared list" constraint — silent drift becomes possible. Treat the announcement as part of the deliverable's build phase, not optional.
+
 ### Checkpoint schema (`<feature-folder>/checkpoint.md`)
 
 A compact, compaction-survivable projection of execution state. One line per entry, no prose. Update at every atomic commit (see Step 2d).
@@ -108,8 +164,8 @@ Implement the deliverable per its steps. Rules:
   - Clean up only code YOUR changes made unused — leave pre-existing dead code alone.
   - Do not "improve" adjacent code.
 - **Rework guardrails (per-deliverable counters):**
-  - **Edit-thrashing:** track Edit/Write tool calls per file within the current deliverable. On the 4th edit to the same file (>3 edits), pause: re-read the brief and the deliverable's plan block before any further Edit/Write to that file. Log a `thrash-pause` deviation. In `auto`, decide and proceed; in `supervised`, surface and pause.
-  - **Error-loop:** track consecutive tool failures. On the 3rd consecutive failure of any tool call within the current deliverable without a strategy change, do not retry. Escalate to `post-execution:triage` with the error trace as the reported issue. Log an `error-loop-escalation` deviation.
+  - **Edit-thrashing:** the `hook-edit-tracker.sh` hook tracks Edit/Write tool calls per file and sets `pending_thrash_pause` on the 4th edit to the same file (>3 edits). The Stop orchestrator surfaces this as injected guidance — pause, re-read the brief and the deliverable's plan block before any further Edit/Write to that file. Log a `thrash-pause` deviation. In `auto`, decide and proceed; in `supervised`, surface and pause. The agent's own in-text counter remains a fallback if hooks are disabled.
+  - **Error-loop:** the `hook-error-tracker.sh` hook tracks consecutive tool failures and sets `pending_error_loop` at 3 consecutive failures. The Stop orchestrator surfaces "do not retry; escalate to triage" as injected guidance. Escalate to `post-execution:triage` with the error trace as the reported issue. Log an `error-loop-escalation` deviation. Hook is primary; in-text counter is fallback.
 
 **Registry-tracked doc bundle.** If the deliverable's `may-invalidate` field is non-empty, after building primary changes, prompt the PM:
 
@@ -159,7 +215,9 @@ In `execution-plan.md`, update deliverable status: `pending` → `complete`.
 
 ### Step 2f — Maybe-invoke simplify (mid-execution trigger)
 
-After the atomic commit lands, decide whether to invoke `strategic-implementation:simplify`. Defaults: `every_n_deliverables = 3`, `loc_threshold = 400` (declared in `simplify/SKILL.md`).
+**Primary trigger:** the `hook-bash-counter.sh` hook detects the deliverable commit and sets `pending_simplify` when thresholds cross. The Stop orchestrator surfaces "invoke simplify now" as injected guidance on the next turn. The agent acts on that injected guidance — no need to compute counters in-skill.
+
+**Fallback (hooks disabled or skipped):** compute counters via `git log` directly. Defaults: `every_n_deliverables = 3`, `loc_threshold = 400` (declared in `simplify/SKILL.md`).
 
 **Skip rule:** if total plan deliverables ≤ 3, do NOT invoke mid-execution. The final pass in `post-execution` regression-check is sufficient.
 
@@ -275,6 +333,13 @@ When all deliverables are marked complete:
 3. `post-execution` writes `post-execution-report.md` and reports back.
 4. If the report status is `PASS`: announce feature complete.
 5. If `FLAG` or `BLOCK`: surface to PM; do not declare complete until resolved.
+6. **Deactivate hook state.** Set `.active = false` in `.claude/strategic-implementation/state.json` so subsequent sessions on the same repo do not trigger goal-evaluator or counter hooks. Use:
+
+   ```bash
+   jq '.active = false' .claude/strategic-implementation/state.json \
+     > .claude/strategic-implementation/state.json.tmp \
+     && mv .claude/strategic-implementation/state.json.tmp .claude/strategic-implementation/state.json
+   ```
 
 ### Learnings trigger
 
