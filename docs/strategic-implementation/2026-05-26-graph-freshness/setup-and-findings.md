@@ -54,3 +54,19 @@ sh scripts/install-graph-freshness-hooks.sh --uninstall  # rollback (removes onl
 **Verified on install:** axiph & memory.line & wayne-life-os got post-merge; axiph's pre-commit left untouched (timestamp unchanged); claude-skills' pre-existing post-merge refreshed in place with the new guard; firing axiph's post-merge advanced its graph's last-updated (cross-repo refresh proof); the hook no-ops cleanly in a graph-less dir; a fresh `git init` repo is seeded from the template.
 
 > ⚠️ **Per-clone caveat:** existing repos need a one-time installer run; the template only auto-covers *new* clones. Re-running the installer is safe (idempotent).
+
+## D4 — Documentation indexing: NOT FEASIBLE (determination)
+
+**Question:** can the graph cover documentation/prose files, not only code? (This repo is 72 `.md` / 7 `.sh` / 4 `.json`, but the graph indexes only the 7 shell files; `languages: bash`.)
+
+**Determination: not feasible within code-review-graph.** Evidence (from the installed package):
+- **No `.md` mapping.** `parser.py` `EXTENSION_TO_LANGUAGE` is a hard-coded dict (python/js/ts/go/.../sh/ipynb/…) with no markdown entry and no CLI flag to add languages or include-globs (`build`/`update` expose only `--repo`, `--skip-flows`, `--skip-postprocess`, `--base`).
+- **AST-only extraction.** The graph models code structure — functions, classes, calls, imports via tree-sitter. Markdown is prose with none of those node types; there is nothing for the existing extractors to produce.
+- **FTS is node-scoped.** `search.py` rebuilds the FTS5 index from the `nodes` table only (name/qualified_name/file_path/signature) — it never indexes raw file text, so even full-text search over `.md` is unavailable.
+- The only in-tool path is **patching the installed package** (add `.md → markdown`, vendor a tree-sitter-markdown grammar, write a heading/section/link node extractor) — i.e. forking the dependency, explicitly ruled out by the repo-mapping brainstorm (`docs/strategic-implementation/2026-05-26-repo-mapping-brainstorm/brainstorm.md`).
+
+**Alternatives surveyed (for a future, separate effort — NOT adopted here):**
+- **Graphify** (`pip install graphifyy`) — *does* index markdown (also PDFs/images), and is designed to *complement* code-review-graph. Caveats: markdown extraction runs through an **optional LLM "Pass 2"** (real token cost, not default); it is **CLI/hook-based, not MCP**; and the strategic-implementation skills are wired to code-review-graph's MCP tools — so adopting it is a separate tool decision, not a config toggle.
+- **GitNexus / Codebase-Memory** — full MCP knowledge-graph engines that *do* index docs, but they would **replace** code-review-graph, contradicting the brainstorm's stay-on-CRG decision.
+
+**Disposition:** D4's brief acceptance step 3 explicitly sanctions a not-feasible report. Markdown indexing is out of scope for this feature; Graphify is the recommended starting point if doc-coverage is pursued later.
