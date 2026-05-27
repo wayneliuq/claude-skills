@@ -12,6 +12,6 @@
 
 ## Unresolved deviations
 - DEV-001 branch-risk — proceeding on main per PM consent (no downstream impact)
-- DEV-002 simplify-disposition-pending — simplify-report-01.md, 2 low findings (lean-dismiss) await PM disposition
+- DEV-002 simplify-disposition-pending — RESOLVED: F-01 applied (installer --help), F-02 dismissed
 
 <!-- complete: 2026-05-26 -->

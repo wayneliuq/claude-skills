@@ -70,7 +70,26 @@ collect_targets() {
   fi
 }
 
+usage() {
+  cat <<EOF
+Usage: $0 [REPO ...] | --uninstall [REPO ...] | --help
+
+  (no args)      install post-merge into every git repo under the scan base,
+                 then set init.templateDir for future clones
+  REPO ...       install only into the given repo paths
+  --uninstall    remove only our hooks + unset init.templateDir (foreign hooks kept)
+  --help         show this message
+
+Effective config (override via env):
+  CRG_REPO_BASE     scan base for (no args) mode : $REPO_BASE
+  CRG_TEMPLATE_DIR  init template dir            : $TEMPLATE_DIR
+EOF
+}
+
 case "${1:-}" in
+  --help|-h)
+    usage
+    exit 0 ;;
   --uninstall)
     shift
     # shellcheck disable=SC2046
@@ -78,6 +97,7 @@ case "${1:-}" in
     exit 0 ;;
 esac
 
+[ "$#" -eq 0 ] && echo "scanning base: $REPO_BASE (override with CRG_REPO_BASE, or pass repo paths)"
 setup_template
 collect_targets "$@" | while IFS= read -r repo; do install_into_repo "$repo"; done
 
