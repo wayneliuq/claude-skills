@@ -1,0 +1,32 @@
+{
+  "active": true,
+  "feature_folder": "docs/strategic-implementation/2026-05-26-graph-freshness/",
+  "feature_slug": "graph-freshness",
+  "autonomy": "auto",
+  "chapter_size": 5,
+  "current_chapter": 1,
+  "deliverables_done_in_chapter": [],
+  "deliverables_since_last_simplify": 0,
+  "loc_since_last_simplify": 0,
+  "simplify_thresholds": {
+    "deliverables": 3,
+    "loc": 400
+  },
+  "current_deliverable_edit_counts": {
+    ".claude/strategic-implementation/state.json": 1,
+    "/Users/qiangliu/.claude/settings.json": 1,
+    "docs/strategic-implementation/2026-05-26-graph-freshness/setup-and-findings.md": 1,
+    "docs/strategic-implementation/2026-05-26-graph-freshness/checkpoint.md": 1
+  },
+  "consecutive_failures": 0,
+  "total_deliverables": 4,
+  "plan_path": "docs/strategic-implementation/2026-05-26-graph-freshness/execution-plan.md",
+  "brief_success_signal": "In any repo on the machine, immediately after a multi-commit pull or at the start of a session, the graph's self-reported 'built at' commit matches the repo's current commit and its file/node counts reflect the current working tree.",
+  "last_counted_sha": "",
+  "pending_chapter_rotation": false,
+  "pending_simplify": false,
+  "pending_thrash_pause": false,
+  "pending_error_loop": false,
+  "pending_deviation_surface": false,
+  "validation_log_last_mtime": ""
+}

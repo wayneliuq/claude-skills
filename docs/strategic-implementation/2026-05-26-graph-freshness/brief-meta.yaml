@@ -1,0 +1,10 @@
+# Internal metadata for review. Not PM-facing.
+specialists_recommended:
+  - runtime-risk
+  - technical-expert
+notes: >
+  runtime-risk — integration-risk deps (code-review-graph CLI persistent-cache
+  staleness semantics; git core.hooksPath global-override behavior) are central.
+  technical-expert — brief surfaces a step-ordering risk: global core.hooksPath
+  override supersedes per-repo .git/hooks, so existing hooks must be migrated
+  before/with the switch or they regress.
