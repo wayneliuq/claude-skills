@@ -1,0 +1,17 @@
+#!/bin/sh
+# code-review-graph freshness: rebuild the graph after a merge/pull so external
+# / batched changes (git pull, rebase, branch switch) don't leave it stale.
+# Claude's own in-session edits are covered by a PostToolUse hook in
+# ~/.claude/settings.json; this covers everything that arrives outside Claude.
+#
+# Canonical template. Installed per-repo by scripts/install-graph-freshness-hooks.sh
+# and seeded into new clones via git init.templateDir. Safe to run anywhere:
+#   - no-op if code-review-graph is not installed
+#   - no-op if the repo has no graph (.code-review-graph/ absent)
+# ORIG_HEAD = pre-merge HEAD, so --base ORIG_HEAD spans the whole pulled range;
+# the bare-update fallback covers fast-forward pulls / absent ORIG_HEAD.
+command -v code-review-graph >/dev/null 2>&1 || exit 0
+[ -d .code-review-graph ] || exit 0
+code-review-graph update --base ORIG_HEAD --skip-flows >/dev/null 2>&1 \
+  || code-review-graph update --skip-flows >/dev/null 2>&1
+exit 0
