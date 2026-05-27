@@ -6,9 +6,30 @@
 
 You write what the user should be able to do. The plugin handles everything between that sentence and merged code: clarification, planning, adversarial review, deliverable-by-deliverable execution, and a regression check at the end. You approve **one document** (the product brief). Everything else happens behind the right gates, with the right level of autonomy you choose at the start.
 
-**Version:** 3.2.1
+**Version:** 3.2.2
 **Built for:** Claude Code on Opus 4.7
 **Audience:** non-technical PMs, solo founders, anyone who can describe what good looks like
+**Requires:** the [`code-review-graph`](https://github.com/tirth8205/code-review-graph) MCP server (see [Dependencies](#dependencies))
+
+---
+
+## Dependencies
+
+### `code-review-graph` (MCP server) — required for full token efficiency
+
+Three skills use the [`code-review-graph`](https://github.com/tirth8205/code-review-graph) MCP server — a persistent, incremental code knowledge graph — to explore the codebase structurally instead of reading whole files:
+
+| Skill | What it uses the graph for |
+|---|---|
+| `clarify` | grounding questions in real symbols (`semantic_search_nodes`, `query_graph`) |
+| `execution-plan` | graph-health pre-flight, finding changed-file blast radius (`get_impact_radius`, `get_architecture_overview`) |
+| `simplify` | reuse-miss / dead-code / large-function detection (`semantic_search_nodes`, `refactor_tool`, `find_large_functions_tool`) |
+
+**Install:** `pip install code-review-graph` (or `uv tool install code-review-graph`), then `code-review-graph install` to register the MCP server with Claude Code, and `code-review-graph build` once per repo to create the graph.
+
+**Graceful degradation.** Every skill that uses the graph has a stale/empty-graph fallback: it emits `FLAG: graph stale … file-read mode` and proceeds by reading files directly. So the plugin **works without** `code-review-graph` — it just loses the token-efficient path. The dependency is a performance dependency, not a hard one.
+
+**Keeping the graph fresh.** The graph silently degrades to file-read mode if it goes stale. To keep it current automatically, this repo ships graph-freshness automation (session-start rebuild, all-editing-tools rebuild trigger, and a `post-merge` hook installer) — see [`docs/strategic-implementation/2026-05-26-graph-freshness/`](../../docs/strategic-implementation/2026-05-26-graph-freshness/setup-and-findings.md). Markdown/prose is **not** indexed by `code-review-graph` (it is AST/code-only); that determination and alternatives are recorded there too.
 
 ---
 
