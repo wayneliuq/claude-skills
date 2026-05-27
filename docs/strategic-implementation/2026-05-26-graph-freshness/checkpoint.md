@@ -2,6 +2,7 @@
 
 ## Done
 - D1 — SessionStart full reparse — 2026-05-26 (settings.json out-of-tree; record in setup-and-findings.md)
+- D2 — All editing tools trigger refresh — 2026-05-26 (matcher widened; out-of-tree)
 
 ## In progress
 
