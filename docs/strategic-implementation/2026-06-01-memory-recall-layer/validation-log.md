@@ -17,6 +17,11 @@ _Feature: memory-recall-layer · Started: 2026-06-01 · Autonomy: auto_
 **Domains:** indexing, recall, sqlite-fts5
 **Approach:** `python3 test_recall.py` builds a real fixture index then drives `recall.search` directly: asserts (1) a docker/login query returns the auth APPROACH with a source pointer, (2) a no-term-overlap query returns nothing (FTS5 MATCH relevance gate), (3) aborted records excluded unless `--include-demoted`, (4) `recall.sh` exits 0 + empty on a missing index (advisory-never-blocks). bm25() ranking, real DB, no mocked seam. recall.sh is the token-report.sh-style thin entrypoint that swallows any crash to silent exit 0.
 
+## APPROACH — D4
+**Method:** post-hoc (cli grep now; live trial deferred per L-005)
+**Domains:** skill-wiring, recall, point-of-need
+**Approach:** cli grep confirms (a) executing-plans Step 2a carries the BM25-only "Point-of-need recall (advisory)" block calling `recall.sh` with informs-never-dictates semantics, and (b) execution-plan Step 6's former N-most-recent `grep` is fully replaced by a `recall.sh` call (old instruction grep count = 0), with "proceed silently" preserved in both. The live, in-session halves (recall fires before build; agent adopts it; plan-time surfacing) load only on plugin reload (L-005) and are scheduled in `post-reload-verification.md` (reviewer = PM; trigger = first run after reload).
+
 ## GOTCHA — D3
 **Domains:** recall, corpus-maturity
 **Lost time on:** expecting sharp relevance from the live real corpus today
