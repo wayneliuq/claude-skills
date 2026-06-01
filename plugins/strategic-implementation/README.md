@@ -15,6 +15,17 @@ You write what the user should be able to do. The plugin handles everything betw
 
 ## Dependencies
 
+### Quick setup (new machine)
+
+Run the bootstrap script — it verifies and (with `--install`) sets up everything below:
+
+```bash
+bash plugins/strategic-implementation/scripts/setup.sh            # --check: report only, no changes
+bash plugins/strategic-implementation/scripts/setup.sh --install  # create venv, install deps
+```
+
+It checks core tools (git, python3+FTS5, jq), installs `code-review-graph`, sets up the memory recall layer (BM25 needs nothing; the optional vector leg gets a persistent venv at `~/.claude/strategic-implementation/.memory-venv` with `sqlite-vec`+`model2vec`), and prints the `export SI_MEMORY_PYTHON=...` line to enable semantic recall. `--build-index` also builds the graph + BM25 index for the current repo. Everything degrades gracefully if a dependency is absent.
+
 ### `code-review-graph` (MCP server) — required for full token efficiency
 
 Three skills use the [`code-review-graph`](https://github.com/tirth8205/code-review-graph) MCP server — a persistent, incremental code knowledge graph — to explore the codebase structurally instead of reading whole files:
