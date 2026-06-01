@@ -66,6 +66,8 @@ _Implements: product-brief_<slug>.md · Date: <date>_
   - `c` — depends on cross-component reactive state coordination
   - `d` — none of the above
 - **User-acceptance steps (from brief):** <numbered list copied verbatim from the brief's "How a user verifies" for this deliverable — the outcome contract>
+- **Macro-deliverable:** <true | false — see authoring rule "Macro-deliverable (narrow exception)". Default false.>
+- **Domains & file partition:** <if Macro-deliverable: true, list each domain → its disjoint path-set (authored AND generated outputs); else `n/a`>
 - **Validation method (chosen here):** <preview | cli | tdd | integration-test | post-hoc> — <exact command / exact behavior to observe / exact test to write>. Must be the method whose evidence actually demonstrates the user-acceptance steps above.
 - **Files:** <specific paths; use [PATH NOT FOUND] if unverified>
 - **Steps:** <numbered; each names file(s) and what to write/change/delete>
@@ -82,6 +84,10 @@ _Implements: product-brief_<slug>.md · Date: <date>_
 
 ## Parallel groups & order
 <textual DAG — which groups run in parallel, which are sequential>
+
+### Workflow decision
+<one line per macro-deliverable: name it, state which criteria (a–d) qualify it and why splitting would lose e2e-validateability. This is the plan-time half of the operator-visible workflow-vs-sequential decision. If no macro-deliverable: "none — all deliverables decomposable / sequential.">
+
 
 ## Reused existing patterns
 <bulleted — point to existing repo primitives being reused. Prevents duplicate abstractions.>
@@ -103,6 +109,7 @@ _Implements: product-brief_<slug>.md · Date: <date>_
 6. **Reuse before creating.** Grep for existing primitives; cite them in "Reused existing patterns."
 7. **Validation honesty per integration-risk class.** Class `a`/`b`/`c` deliverables MUST declare validation as `integration-test`, `preview`, or `post-hoc`. They MUST NOT declare `tdd` if the proposed test would mock the very dependency the deliverable's correctness depends on. Class `d` may use any method. A green unit-test suite that mocks the integration point is not validation — it is orthogonal-to-correctness coverage.
 8. **Consumer audit on shape change.** Any deliverable that changes a data shape (interface / type / schema / payload / return type / function signature) MUST grep its consumers and list every one with a status (`updated-in-this-deliverable`, `updated-in-D<n>`, `unaffected-because-<reason>`, `explicit-skip-because-<reason>`). Hand-wavy enumeration is rejected by review.
+9. **Macro-deliverable (narrow exception).** Default is normal decomposition — split work into the smallest independently-validateable deliverables. A deliverable may be marked `Macro-deliverable: true` ONLY when ALL hold: (a) the outcome spans ≥2 domains (commonly backend / API-contract / frontend); (b) the domains are NOT independently end-to-end-validateable — splitting them loses the ability to validate any sub-part e2e; (c) together they form ONE user-observable outcome; (d) it is large enough that concurrent build meaningfully beats sequential. PLUS an eligibility gate: the domains must own **disjoint file sets — authored AND generated/derived outputs** (no two domains write the same lockfile / index / generated artifact). Expected domain count is small (≤ ~4). If work *can* be split into independently-validateable pieces, it MUST be — a macro-deliverable is not a license to skip honest decomposition. A macro-deliverable IS one deliverable → one atomic `D<n>:` commit (executing-plans runs its domains in one Workflow). Record it in the template's `Macro-deliverable` / `Domains & file partition` fields and name it under "Workflow decision".
 
 ---
 
