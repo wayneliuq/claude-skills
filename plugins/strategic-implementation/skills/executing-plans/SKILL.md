@@ -38,9 +38,17 @@ Read `execution-plan.md` fully. Extract: deliverables, DAG order, parallel group
 Initialize `validation-log.md` at `<feature-folder>/validation-log.md` with header:
 
 ```markdown
+---
+status: in-progress        # in-progress | complete | aborted | superseded
+domains: [<domain>, ...]   # the integration-risk dependencies / areas this work touches
+outcome: TBD                # one phrase; filled at post-execution from the PASS/FLAG/BLOCK verdict
+supersedes: none            # <feature-slug> this work replaces, or `none`
+---
 # Validation log
 _Feature: <slug> · Started: <date> · Autonomy: <level>_
 ```
+
+The YAML frontmatter is **optional and additive** — it is the recall index's facet source (`status` / `domains` drive filtering; `supersedes` retires prior records). Older logs without it remain valid; the indexer tolerates absence. Set `status: aborted` if execution is abandoned before completion, so the work is never surfaced as proven precedent.
 
 If `checkpoint.md` does not yet exist, initialize it at `<feature-folder>/checkpoint.md` with the four-section schema (Done / In progress / Open decisions / Unresolved deviations) — sections may start empty. See "Checkpoint schema" below.
 
@@ -229,6 +237,17 @@ Execution continues; `post-execution` regression-check reads these flags.
 ```
 
 This block is **additive** — it does not change the header or the `DEV-NNN` deviation schema, and absence in older logs is expected (recall tolerates it).
+
+**Gotcha capture (any deliverable that cost avoidable rework).** When a deliverable burned time on a wrong path that a prior lesson would have prevented — or that a future similar deliverable should avoid — append a `## GOTCHA` block. This is the "we lost time on X; do Y first" note, and it is the highest-signal record for point-of-need recall (it directly prevents re-derivation, e.g. rediscovering that an end-to-end test must run in a container first).
+
+```markdown
+## GOTCHA — D<n>
+**Domains:** <areas / integration-risk dependency this applies to>
+**Lost time on:** <the wrong path or wasted assumption>
+**Do instead:** <the corrective action a future similar deliverable should take first>
+```
+
+Also additive; absence is expected in older logs.
 
 If validation fails: apply **Failure Protocol** below.
 
