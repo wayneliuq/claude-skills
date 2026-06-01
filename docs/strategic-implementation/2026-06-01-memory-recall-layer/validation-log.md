@@ -17,6 +17,11 @@ _Feature: memory-recall-layer · Started: 2026-06-01 · Autonomy: auto_
 **Domains:** indexing, recall, sqlite-fts5
 **Approach:** `python3 test_recall.py` builds a real fixture index then drives `recall.search` directly: asserts (1) a docker/login query returns the auth APPROACH with a source pointer, (2) a no-term-overlap query returns nothing (FTS5 MATCH relevance gate), (3) aborted records excluded unless `--include-demoted`, (4) `recall.sh` exits 0 + empty on a missing index (advisory-never-blocks). bm25() ranking, real DB, no mocked seam. recall.sh is the token-report.sh-style thin entrypoint that swallows any crash to silent exit 0.
 
+## APPROACH — D5
+**Method:** integration-test (precision/injection) + post-hoc (live adoption)
+**Domains:** recall, precision-gate, success-signal
+**Approach:** `python3 precision_ab.py --out <feature>/precision-ab-findings.md` loads the COMMITTED `memory-fixtures/labeled-set.json` (thresholds + corpus + per-query relevance labels pinned before the run), materializes the corpus, builds a real FTS5 index, runs recall per query. Result: precision@3=1.0 (≥0.75 target), 0 false positives (unrelated + aborted queries return nothing → aborted-exclusion proven), mean injection 126.5 tok (≤400 budget) → recall is net-token-negative vs re-derivation. The live "agent adopts recall instead of re-deriving" + true point-of-use token delta is post-hoc (post-reload-verification.md, check #2).
+
 ## APPROACH — D4
 **Method:** post-hoc (cli grep now; live trial deferred per L-005)
 **Domains:** skill-wiring, recall, point-of-need
