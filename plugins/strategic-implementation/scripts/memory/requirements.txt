@@ -2,17 +2,30 @@
 #
 # Phase 1a (BM25 / FTS5 recall — the shippable success-signal path):
 #   NO third-party dependencies. Uses the Python standard library only
-#   (sqlite3 with FTS5, which is verified present on the resident interpreter).
+#   (sqlite3 with FTS5, verified present on the resident interpreter).
 #
-# Phase 1b (local-embedding vector leg) adds the pins below. They are listed
-# here for reference but are ONLY needed once the vector leg is enabled, and
-# ONLY on an extension-capable interpreter (the resident python.org build has
-# enable_load_extension compiled out — use a Homebrew python or `apsw`).
-# Uncomment + install exact pins when enabling Phase 1b:
+# ---------------------------------------------------------------------------
+# Phase 1b (local-embedding vector leg) — OPTIONAL, additive.
 #
-#   fastembed==0.3.6
-#   onnxruntime==1.18.1
-#   tokenizers==0.19.1
-#   sqlite-vec==0.1.6
+# Requires an EXTENSION-CAPABLE interpreter: the resident python.org build has
+# enable_load_extension compiled out, so use Homebrew python (verified:
+# /usr/local/opt/python@3/bin/python3, 3.14, enable_load_extension=True).
 #
-# Embedding model (pinned for vector comparability): BAAI/bge-small-en-v1.5 (384-dim)
+# Originally planned fastembed (ONNX) was dropped: fastembed/onnxruntime ship
+# no cp314 wheels, and 3.14 is the only extension-capable interpreter here.
+# model2vec (static embeddings, numpy-based, no onnxruntime) is the substitute:
+# local, free, offline after a one-time model fetch. See DEV-001.
+#
+# Setup (one-time):
+#   /usr/local/opt/python@3/bin/python3 -m venv .memory-venv
+#   .memory-venv/bin/pip install -r requirements.txt   # (uncomment pins below)
+#   export SI_MEMORY_PYTHON="$PWD/.memory-venv/bin/python"
+#   python3 build_index.py --root docs/strategic-implementation --vectors on
+# recall.sh honors $SI_MEMORY_PYTHON for the vector/fusion path (plan-time);
+# the per-deliverable hot path stays BM25-only on the resident interpreter.
+#
+# Pins (verified working on Homebrew python 3.14.5):
+#   sqlite-vec==0.1.9
+#   model2vec==0.8.2
+# Transitive (installed automatically): numpy, safetensors, tokenizers, huggingface-hub.
+# Embedding model (pinned for vector comparability): minishlab/potion-base-8M (256-dim)

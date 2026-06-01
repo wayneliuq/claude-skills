@@ -6,7 +6,12 @@
 set -uo pipefail
 
 HERE="$(cd "$(dirname "$0")" && pwd)"
-PY="$(command -v python3 || true)"
+# Interpreter resolution: SI_MEMORY_PYTHON (an extension-capable interpreter,
+# e.g. a Homebrew-python venv) enables the vector/fusion path; otherwise the
+# resident python3 runs BM25-only. Either way recall degrades to silence.
+PY="${SI_MEMORY_PYTHON:-}"
+[ -n "$PY" ] && [ ! -x "$PY" ] && PY=""        # invalid override → fall back
+[ -z "$PY" ] && PY="$(command -v python3 || true)"
 [ -z "$PY" ] && exit 0
 
 out="$("$PY" "$HERE/recall.py" "$@" 2>/dev/null)" || exit 0

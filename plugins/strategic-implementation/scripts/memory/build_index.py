@@ -38,7 +38,69 @@ def fts5_available() -> bool:
         return False
 
 
-def build(root: Path, db_path: Path, repo_root: Path | None = None) -> dict:
+def load_vec_extension(conn) -> bool:
+    """Try to load sqlite-vec into conn. Returns True on success.
+
+    Catches AttributeError (enable_load_extension compiled out — e.g. the
+    python.org build) AND OperationalError/ImportError, so a non-capable
+    interpreter degrades cleanly to BM25-only rather than crashing.
+    """
+    try:
+        import sqlite_vec
+    except ImportError:
+        return False
+    try:
+        conn.enable_load_extension(True)
+        sqlite_vec.load(conn)
+        conn.enable_load_extension(False)
+        conn.execute("SELECT vec_version()")
+        return True
+    except (AttributeError, sqlite3.OperationalError):
+        return False
+
+
+def _build_vectors(conn, want: str) -> str:
+    """Populate a vec0 table from the FTS5 records. Returns a status string.
+
+    `want`: 'off' | 'on' | 'auto'. 'auto' attempts only if the embedder is
+    importable. Any failure (no embedder, no extension, no capable interpreter)
+    degrades to BM25-only — the vector leg is strictly additive.
+    """
+    if want == "off":
+        return "skipped (off)"
+    import embed
+    if not embed.available():
+        return "skipped (embedder unavailable)"
+    if not load_vec_extension(conn):
+        return "skipped (sqlite-vec/extension-load unavailable on this interpreter)"
+
+    rows = conn.execute(
+        "SELECT rowid, distilled_text FROM records_fts ORDER BY rowid").fetchall()
+    if not rows:
+        return "skipped (empty index)"
+
+    import sqlite_vec
+    dim = embed.DIM
+    # Drop+recreate on dimension mismatch (model change); rebuild-from-scratch
+    # makes this the common path, but the guard is explicit per the plan.
+    existing = conn.execute(
+        "SELECT value FROM index_meta WHERE key='embedding_dim'").fetchone()
+    if existing and existing[0] and existing[0] != str(dim):
+        conn.execute("DROP TABLE IF EXISTS records_vec")
+    conn.execute(f"CREATE VIRTUAL TABLE IF NOT EXISTS records_vec USING vec0(embedding float[{dim}])")
+
+    vecs = embed.embed([t for (_, t) in rows])
+    conn.executemany(
+        "INSERT INTO records_vec(rowid, embedding) VALUES (?, ?)",
+        [(rid, sqlite_vec.serialize_float32(v)) for (rid, _), v in zip(rows, vecs)])
+    conn.executemany(
+        "INSERT OR REPLACE INTO index_meta(key, value) VALUES (?, ?)",
+        [("embedding_model_id", embed.MODEL_ID), ("embedding_dim", str(dim))])
+    return f"built ({len(rows)} vectors, {embed.MODEL_ID}, dim={dim})"
+
+
+def build(root: Path, db_path: Path, repo_root: Path | None = None,
+          vectors: str = "auto") -> dict:
     db_path.parent.mkdir(parents=True, exist_ok=True)
     if db_path.exists():
         db_path.unlink()  # rebuild from scratch — files are the source of truth
@@ -63,6 +125,7 @@ def build(root: Path, db_path: Path, repo_root: Path | None = None) -> dict:
              ("record_count", str(stats["deduped"])),
              ("embedding_model_id", ""), ("embedding_dim", "")],
         )
+        stats["vectors"] = _build_vectors(conn, vectors)
         conn.commit()
     finally:
         conn.close()
@@ -77,6 +140,8 @@ def main(argv=None) -> int:
                     help="index db path (default: <root>/.memory/index.db)")
     ap.add_argument("--repo-root", default=None,
                     help="repo root for source_path pointers (default: inferred)")
+    ap.add_argument("--vectors", choices=["auto", "on", "off"], default="auto",
+                    help="vector leg: auto (if embedder importable), on, or off (default: auto)")
     ap.add_argument("--quiet", action="store_true")
     args = ap.parse_args(argv)
 
@@ -93,7 +158,7 @@ def main(argv=None) -> int:
 
     db_path = Path(args.db) if args.db else root / ".memory" / "index.db"
     repo_root = Path(args.repo_root) if args.repo_root else None
-    stats = build(root, db_path, repo_root)
+    stats = build(root, db_path, repo_root, vectors=args.vectors)
 
     if not args.quiet:
         print(f"memory-index built: {db_path}")
@@ -102,6 +167,7 @@ def main(argv=None) -> int:
         print(f"  records (deduped): {stats['deduped']}")
         print(f"  by type         : {stats['by_type']}")
         print(f"  by status       : {stats['by_status']}")
+        print(f"  vector leg      : {stats.get('vectors', 'n/a')}")
     return 0
 
 
