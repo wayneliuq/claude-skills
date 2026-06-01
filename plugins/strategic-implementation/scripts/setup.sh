@@ -173,11 +173,16 @@ PY
       else warn "vector verify/pre-warm failed (a one-time model fetch needs network)"; fi
     fi
     echo ""
-    echo "         Enable the vector leg by exporting (add to your shell profile):"
-    echo "           export SI_MEMORY_PYTHON=\"$VENV_DIR/bin/python\""
+    if [ "$VENV_DIR" = "$HOME/.claude/strategic-implementation/.memory-venv" ]; then
+      echo "         Vector leg ready — recall auto-discovers this venv at the default path."
+      echo "         No shell export needed. (Optional override: SI_MEMORY_PYTHON=<python>.)"
+    else
+      echo "         Non-default venv dir — export so recall finds it:"
+      echo "           export SI_MEMORY_PYTHON=\"$VENV_DIR/bin/python\""
+    fi
   else
     note "run with --install to create the venv + install vector deps (sqlite-vec, model2vec)"
-    note "then export: SI_MEMORY_PYTHON=\"$VENV_DIR/bin/python\""
+    note "at the default path it is then auto-discovered — no shell export needed"
   fi
 fi
 

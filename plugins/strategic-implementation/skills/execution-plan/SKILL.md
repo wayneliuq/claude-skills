@@ -37,10 +37,10 @@ Inside plan mode:
 6. **Validation-approach recall.** For deliverables that will be cross-domain (`Macro-deliverable`) or `Integration-risk class: a|b|c`, query memory for how similar work was validated before, replacing the former N-most-recent `grep` with a ranked, status-filtered recall over the whole indexed history:
 
    ```bash
-   bash "${CLAUDE_PLUGIN_ROOT}/scripts/memory/recall.sh" "<brief domains + integration-risk class + validation intent>" --domains "<domains>" --k 3
+   bash "${CLAUDE_PLUGIN_ROOT}/scripts/memory/recall.sh" "<brief domains + integration-risk class + validation intent>" --domains "<domains>" --k 3 --fuse
    ```
 
-   This runs once per plan (not per deliverable), so it may use the richer query path (BM25 now; BM25+vector fusion once the vector leg is enabled). It returns ranked distilled approaches with source pointers, drawn from the full corpus and matched by meaning, not just recency or exact wording — and never surfaces aborted/superseded work as precedent. Surface any hits as **advisory** input to the Step 3 validation-method choice (reuse a proven pipeline instead of re-guessing). This is advisory only — it informs, never dictates, the method. Empty output (no index yet, or no good match) → proceed silently (no error, no block). The command degrades to silence on any error.
+   This runs once per plan (not per deliverable), so it uses the richer `--fuse` path (BM25 + vector fusion when the vector leg is available; auto-falls back to BM25-only otherwise). It returns ranked distilled approaches with source pointers, drawn from the full corpus and matched by meaning, not just recency or exact wording — and never surfaces aborted/superseded work as precedent. Surface any hits as **advisory** input to the Step 3 validation-method choice (reuse a proven pipeline instead of re-guessing). This is advisory only — it informs, never dictates, the method. Empty output (no index yet, or no good match) → proceed silently (no error, no block). The command degrades to silence on any error.
 7. **Load brief sidecar.** Read `<feature-folder>/brief-meta.yaml` if present. Capture `specialists_recommended:` — this list is forwarded to `review` to narrow specialist selection. Absent sidecar or empty list → forward an empty list; `review`'s pre-filter still applies mandatory triggers.
 
 ---

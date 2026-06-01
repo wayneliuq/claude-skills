@@ -16,13 +16,13 @@
 # model2vec (static embeddings, numpy-based, no onnxruntime) is the substitute:
 # local, free, offline after a one-time model fetch. See DEV-001.
 #
-# Setup (one-time):
-#   /usr/local/opt/python@3/bin/python3 -m venv .memory-venv
-#   .memory-venv/bin/pip install -r requirements.txt   # (uncomment pins below)
-#   export SI_MEMORY_PYTHON="$PWD/.memory-venv/bin/python"
-#   python3 build_index.py --root docs/strategic-implementation --vectors on
-# recall.sh honors $SI_MEMORY_PYTHON for the vector/fusion path (plan-time);
-# the per-deliverable hot path stays BM25-only on the resident interpreter.
+# Setup (one-time): just run scripts/setup.sh --install. It creates the venv at
+# the DEFAULT path (~/.claude/strategic-implementation/.memory-venv) that
+# recall.sh AUTO-DISCOVERS — no shell export needed. Then build with vectors:
+#   <venv>/bin/python build_index.py --root docs/strategic-implementation --vectors on
+# recall.sh resolution: $SI_MEMORY_PYTHON (optional override) → default venv
+# (auto) → resident python3 (BM25-only). The per-deliverable hot path stays
+# BM25-only regardless (it doesn't pass --fuse, so no embedding model loads).
 #
 # Pins (verified working on Homebrew python 3.14.5):
 #   sqlite-vec==0.1.9
