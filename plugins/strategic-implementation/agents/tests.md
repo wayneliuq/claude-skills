@@ -29,6 +29,9 @@ For each deliverable, check:
 7. **Outcome coverage.** Every user-observable deliverable in the brief has user-acceptance steps AND a chosen validation method whose evidence demonstrates those steps. The brief's success signal also has at least one deliverable contributing to it. Orphan deliverables, missing user-acceptance steps, or an unmappable success signal are FLAGs.
 8. **Fragility and flakiness.** Tests that depend on timing, network, or non-deterministic ordering are FLAGs. Snapshot tests on large artifacts are FLAGs.
 9. **Regression safety.** For changes that touch shared code, the plan specifies how existing tests will be run and what counts as a regression.
+10. **Macro-deliverable end-to-end honesty (HIGH).** If a deliverable is `Macro-deliverable: true`, its validation method MUST demonstrate the **integrated cross-domain outcome** end-to-end — exercising the seam between the domains (e.g. backend ↔ API-contract ↔ frontend together), not each domain in isolation. Per-domain-only validation of a macro-deliverable is a **HIGH-severity FLAG**; name the concrete stronger cross-domain method. Required wording shape:
+   > "D<n> is a macro-deliverable but its `<method>` only exercises `<domain>` — a macro-deliverable's validation must prove the integrated cross-domain outcome end-to-end. Use `integration-test`/`preview`/`post-hoc` over the seam."
+   Escalate to **BLOCK** if no method could possibly prove the integrated outcome (the deliverable should not have been marked macro). A macro-deliverable exists precisely because its parts are not independently e2e-validateable — so validating one part proves nothing about the whole.
 
 Do not review code style, assertion style, or test framework choice. Do not flag missing unit tests — they are intentionally deferred pre-GA.
 
@@ -58,4 +61,4 @@ Weak-but-functional validation is a FLAG with a concrete stronger method.
 
 ## Processing learnings
 
-Apply learnings tagged `#tests`, `#validation`, or `#multi-feature`. Ignore others.
+Apply learnings tagged `#tests`, `#validation`, `#macro`, or `#multi-feature`. Ignore others.
