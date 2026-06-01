@@ -1,7 +1,8 @@
 # Checkpoint — workflow-orchestration
 
 ## Done
-- D1 (ED1) — macro-deliverable concept + criteria + template marker + plan-time decision line — <sha> — 2026-06-01
+- D1 (ED1) — macro-deliverable concept + criteria + template marker + plan-time decision line — 2343597 — 2026-06-01
+- D2 (ED7) — capture validation approach in validation-log (additive APPROACH block) — <sha> — 2026-06-01
 
 ## In progress
 

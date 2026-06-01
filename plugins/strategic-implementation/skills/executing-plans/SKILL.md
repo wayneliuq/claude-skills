@@ -193,6 +193,17 @@ Run the declared validation:
 
 Execution continues; `post-execution` regression-check reads these flags.
 
+**Validation-approach capture (cross-domain / integration-risk deliverables).** When a deliverable is `Macro-deliverable: true` OR `Integration-risk class: a|b|c`, after validation passes append a small block to `validation-log.md` recording the validation **approach actually used** — the pipeline / infrastructure, not just the one-word method (e.g. "docker compose up → integration-test in CI → manual staging smoke"). This is what `execution-plan`'s validation-approach recall later greps so similar future work reuses it instead of re-guessing.
+
+```markdown
+## APPROACH — D<n>
+**Method:** <preview | cli | tdd | integration-test | post-hoc>
+**Domains:** <e.g. backend / api-contract / frontend, or the integration-risk dependency>
+**Approach:** <the actual pipeline / infra used to validate the integrated outcome>
+```
+
+This block is **additive** — it does not change the header or the `DEV-NNN` deviation schema, and absence in older logs is expected (recall tolerates it).
+
 If validation fails: apply **Failure Protocol** below.
 
 ### Step 2d — Commit
