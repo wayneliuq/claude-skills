@@ -2,3 +2,10 @@
 *.zip
 .Rhistory
 plugins/strategic-implementation/_copied-skills/
+
+# Derived, rebuildable memory/recall index (never the source of truth).
+**/.memory/
+# Local Phase-1b embedding venv (extension-capable interpreter).
+**/.memory-venv/
+__pycache__/
+*.pyc

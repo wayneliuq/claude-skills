@@ -56,6 +56,12 @@ The mode is intentionally lean. Across 24 historical regression-check reports, o
 6. **Write report + token-report telemetry.** Write `<feature-folder>/post-execution-report.md` using the template below — exactly five top-level sections, in this reader-facing order: Cross-contamination → Goal-backward → Plugin-config → Simplify → Status. The previous report's `## Modified files`, `## Test suite run` (as a section), `## Acceptance tests authored`, `## Registry-update verification` (as a section), and `## Visual diff` are removed; the test-suite and registry signals appear as one-liners inside Status.
 
    ```markdown
+   ---
+   status: complete           # complete (PASS) | flagged (FLAG) | aborted | superseded — derived from the Status verdict below
+   domains: [<domain>, ...]   # areas / integration-risk dependencies this feature touched
+   outcome: <one phrase>      # what shipped, in a phrase — the recall index surfaces this
+   supersedes: none           # <feature-slug> this work replaces, or `none`
+   ---
    # Post-execution report
    _Date: <date> · Feature: <slug>_
 

@@ -1,0 +1,62 @@
+{
+  "_doc": "Committed, self-contained precision fixture. Thresholds + corpus + labels are pinned HERE, before precision_ab.py runs, so the gate is independently reproducible (not self-defined at run time). The corpus is materialized to a tempdir, indexed, and queried. The live 'agent adopts recall instead of re-deriving' half is NOT measured here — it is post-hoc (see post-reload-verification.md).",
+  "thresholds": {
+    "k": 3,
+    "min_score": null,
+    "precision_target": 0.75,
+    "max_injection_tokens": 400
+  },
+  "corpus": [
+    {
+      "path": "2026-05-10-genb-auth/validation-log.md",
+      "content": "---\nstatus: complete\ndomains: [auth]\noutcome: shipped\nsupersedes: none\n---\n# Validation log\n\n## APPROACH — D1\n**Method:** integration-test\n**Domains:** auth\n**Approach:** spin up the auth service in a docker container and hit /login; run the end-to-end test in the container first before any unit tests.\n\n## GOTCHA — D2\n**Domains:** auth\n**Lost time on:** mocking the token refresh in unit tests\n**Do instead:** exercise the real refresh against the containerized service.\n"
+    },
+    {
+      "path": "2026-05-10-genb-auth/post-execution-report.md",
+      "content": "# Post-execution report\n## Status\n**PASS**\n"
+    },
+    {
+      "path": "2026-05-20-genc-search/validation-log.md",
+      "content": "---\nstatus: complete\ndomains: [search]\noutcome: shipped\nsupersedes: none\n---\n# Validation log\n\n## APPROACH — D1\n**Method:** cli\n**Domains:** search\n**Approach:** build the FTS5 full-text index and assert bm25 ranking via the sqlite3 CLI.\n"
+    },
+    {
+      "path": "2026-05-20-genc-search/post-execution-report.md",
+      "content": "# Post-execution report\n## Status\n**PASS**\n"
+    },
+    {
+      "path": "2026-05-25-stub-aborted/spec.md",
+      "content": "# Spec\nA different abandoned approach: run the login flow without any container.\n"
+    }
+  ],
+  "queries": [
+    {
+      "name": "docker-e2e-repeat",
+      "query": "run the login end-to-end test in a docker container first",
+      "domains": ["auth"],
+      "relevant_substrings": ["genb-auth"],
+      "expect_nonempty": true
+    },
+    {
+      "name": "search-index-repeat",
+      "query": "build a full text search index and check bm25 ranking",
+      "domains": ["search"],
+      "relevant_substrings": ["genc-search"],
+      "expect_nonempty": true
+    },
+    {
+      "name": "unrelated-returns-nothing",
+      "query": "xyzzy plugh frobnicate quux",
+      "domains": [],
+      "relevant_substrings": [],
+      "expect_nonempty": false
+    },
+    {
+      "name": "aborted-not-surfaced-as-precedent",
+      "query": "abandoned",
+      "domains": [],
+      "relevant_substrings": [],
+      "expect_nonempty": false,
+      "_note": "Only the aborted stub contains 'abandoned'; it is status-excluded, so recall returns nothing — proving aborted work is never surfaced as precedent."
+    }
+  ]
+}

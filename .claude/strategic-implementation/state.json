@@ -1,7 +1,7 @@
 {
   "active": false,
-  "feature_folder": "docs/strategic-implementation/2026-05-26-graph-freshness/",
-  "feature_slug": "graph-freshness",
+  "feature_folder": "docs/strategic-implementation/2026-06-01-memory-recall-layer",
+  "feature_slug": "memory-recall-layer",
   "autonomy": "auto",
   "chapter_size": 5,
   "current_chapter": 1,
@@ -9,28 +9,29 @@
     "D1",
     "D2",
     "D3",
-    "D4"
+    "D4",
+    "D5",
+    "D6"
   ],
   "deliverables_since_last_simplify": 4,
-  "loc_since_last_simplify": 539,
+  "loc_since_last_simplify": 873,
   "simplify_thresholds": {
     "deliverables": 3,
     "loc": 400
   },
   "current_deliverable_edit_counts": {
-    "docs/strategic-implementation/2026-05-26-graph-freshness/simplify-report-02.md": 1,
-    "docs/strategic-implementation/2026-05-26-graph-freshness/post-execution-report.md": 2,
-    "scripts/install-graph-freshness-hooks.sh": 1,
-    "docs/strategic-implementation/2026-05-26-graph-freshness/checkpoint.md": 1
+    "docs/strategic-implementation/2026-06-01-memory-recall-layer/checkpoint.md": 1,
+    "docs/strategic-implementation/2026-06-01-memory-recall-layer/simplify-report-02.md": 1,
+    "docs/strategic-implementation/2026-06-01-memory-recall-layer/post-execution-report.md": 1
   },
   "consecutive_failures": 0,
-  "total_deliverables": 4,
-  "plan_path": "docs/strategic-implementation/2026-05-26-graph-freshness/execution-plan.md",
-  "brief_success_signal": "In any repo on the machine, immediately after a multi-commit pull or at the start of a session, the graph's self-reported 'built at' commit matches the repo's current commit and its file/node counts reflect the current working tree.",
-  "last_counted_sha": "b917c153010dbe2971ed6d5bce9fa058e468f3ed",
-  "pending_chapter_rotation": false,
+  "total_deliverables": 6,
+  "plan_path": "docs/strategic-implementation/2026-06-01-memory-recall-layer/execution-plan.md",
+  "brief_success_signal": "On a pinned known-repeat scenario (the containerized end-to-end test case), the agent adopts the prior approach at deliverable start without rediscovery, and point-of-use tokens are equal-or-lower than a recall-disabled baseline; in aggregate, surfaced recall is referenced more often than ignored with no net increase in point-of-use tokens.",
+  "last_counted_sha": "5e4ff1517f72edeb5177a7fa0a83b090c393026e",
+  "pending_chapter_rotation": true,
   "pending_simplify": true,
-  "pending_thrash_pause": false,
+  "pending_thrash_pause": "plugins/strategic-implementation/scripts/memory/build_index.py",
   "pending_error_loop": false,
   "pending_deviation_surface": false,
   "validation_log_last_mtime": ""

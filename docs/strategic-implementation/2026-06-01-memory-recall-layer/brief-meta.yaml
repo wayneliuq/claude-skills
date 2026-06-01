@@ -1,0 +1,12 @@
+# Internal metadata for review. Not PM-facing.
+specialists_recommended:
+  - runtime-risk
+  - technical-expert
+notes: >
+  runtime-risk: new persistent derived index + local embedding runtime (state/rebuild
+  semantics, refresh-on-change, index staleness) and a recall step added to a hot path
+  (per-deliverable pre-flight). technical-expert: adoption of new local capabilities
+  (embedded vector + full-text store, local embedding model with version-pinning) and a
+  real step-ordering risk (build/backfill index before wiring recall; normalize 3 schema
+  generations before ingest). Not boundaries — local-only, no egress, no auth/PII/endpoints.
+  Not frontend — no UI surface.
