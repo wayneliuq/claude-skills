@@ -6,11 +6,16 @@
 - D3 (ED2) — validation-approach recall load step in execution-plan — 89d3e4f — 2026-06-01
 - D4 (ED3) — tests reviewer macro-deliverable e2e rule + plan method-honesty nudge — 9b0ffdd — 2026-06-01
 - D5 (ED4a) — SPIKE: workflow agent edits land in main tree, no index.lock contention → shared-tree-disjoint is D6's primary mechanism — 6699202 — 2026-06-01
-- D6 (ED4b + folded ED5 fallback, DEV-001) — macro-deliverable single-workflow execution (await-barrier, shared-tree-disjoint, one commit) + capability fallback + resume reconciliation — <sha> — 2026-06-01
+- D6 (ED4b + folded ED5 fallback, DEV-001) — macro-deliverable single-workflow execution (await-barrier, shared-tree-disjoint, one commit) + capability fallback + resume reconciliation — bb8c003 — 2026-06-01
+- D7 (ED5 remainder) — always-announced workflow-vs-sequential decision line (no-macro path) — <sha> — 2026-06-01
 
 ## In progress
+(none — all deliverables complete)
 
 ## Open decisions
 - RESOLVED (D5 spike): ED4b uses shared-tree-disjoint (agents write main tree directly, main thread commits once); worktree-harvest demoted to fallback.
 
 ## Unresolved deviations
+- DEV-002 — D2 concurrency proof + D7 interrupt/resume trial deferred to post-hoc manual follow-ups (operator, post-reinstall). Non-blocking.
+
+<!-- complete: 2026-06-01 -->

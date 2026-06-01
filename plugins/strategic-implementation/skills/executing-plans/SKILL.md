@@ -135,6 +135,8 @@ Rules:
 
 For each deliverable group in DAG order (parallel groups run concurrently, sequential groups run in order). A deliverable marked `Macro-deliverable: true` runs through **Step 2-macro** instead of the per-step loop; every other deliverable runs the normal 2a–2f loop.
 
+**Workflow-vs-sequential decision (always announced).** Emit the operator-visible decision once per run so it is observable even when no workflow is used: if the plan contains no macro-deliverable, announce `decomposable / below-threshold → sequential execution`; otherwise Step 2-macro emits its per-macro `macro-deliverable D<n>: … → workflow` line. This is the execution-time half of brief D5 — the operator always sees why the skill did (or did not) parallelize.
+
 ### Step 2-macro — Macro-deliverable execution (one workflow, one commit)
 
 Fired only when a deliverable is `Macro-deliverable: true`. Emit the operator-visible decision line first: `macro-deliverable D<n>: <reason it qualifies> → workflow`.
