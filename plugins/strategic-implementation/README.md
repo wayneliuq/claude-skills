@@ -31,6 +31,10 @@ Three skills use the [`code-review-graph`](https://github.com/tirth8205/code-rev
 
 **Keeping the graph fresh.** The graph silently degrades to file-read mode if it goes stale. To keep it current automatically, this repo ships graph-freshness automation (session-start rebuild, all-editing-tools rebuild trigger, and a `post-merge` hook installer) — see [`docs/strategic-implementation/2026-05-26-graph-freshness/`](../../docs/strategic-implementation/2026-05-26-graph-freshness/setup-and-findings.md). Markdown/prose is **not** indexed by `code-review-graph` (it is AST/code-only); that determination and alternatives are recorded there too.
 
+### Memory/recall index (Python) — optional, local, graceful
+
+The plugin's **first Python surface** lives under [`scripts/memory/`](scripts/memory/): a derived, rebuildable recall index over the repo's own strategic-implementation markdown (typed/status-aware ingest + SQLite FTS5 BM25). The markdown stays canonical; the index (`docs/strategic-implementation/.memory/index.db`) is git-ignored and rebuilt from files. Phase 1a needs **no third-party dependencies** (stdlib `sqlite3` + FTS5). The optional vector leg (Phase 1b) adds local ONNX embeddings + `sqlite-vec` and requires an extension-capable interpreter (a python.org build has `enable_load_extension` compiled out — use Homebrew python or `apsw`). Recall is always advisory and degrades to silence — it never blocks execution. Include/exclude policy: [`scripts/memory/MEMORY-DOCTYPES.md`](scripts/memory/MEMORY-DOCTYPES.md).
+
 ---
 
 ## Why this plugin exists

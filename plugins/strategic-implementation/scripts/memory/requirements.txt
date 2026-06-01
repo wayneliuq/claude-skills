@@ -1,0 +1,18 @@
+# Memory/recall layer dependencies.
+#
+# Phase 1a (BM25 / FTS5 recall — the shippable success-signal path):
+#   NO third-party dependencies. Uses the Python standard library only
+#   (sqlite3 with FTS5, which is verified present on the resident interpreter).
+#
+# Phase 1b (local-embedding vector leg) adds the pins below. They are listed
+# here for reference but are ONLY needed once the vector leg is enabled, and
+# ONLY on an extension-capable interpreter (the resident python.org build has
+# enable_load_extension compiled out — use a Homebrew python or `apsw`).
+# Uncomment + install exact pins when enabling Phase 1b:
+#
+#   fastembed==0.3.6
+#   onnxruntime==1.18.1
+#   tokenizers==0.19.1
+#   sqlite-vec==0.1.6
+#
+# Embedding model (pinned for vector comparability): BAAI/bge-small-en-v1.5 (384-dim)
