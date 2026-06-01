@@ -1,6 +1,6 @@
 {
   "name": "strategic-implementation",
-  "version": "4.0.0",
+  "version": "4.0.1",
   "description": "Outcome-first planning-to-execution workflow: clarify → product brief → optional UI mockup → plan-mode execution plan → tiered review → deliverable-gated execution. Per-repo documentation registry. v3.6 adds harness-fired hooks for deterministic chapter rotation, goal evaluation, simplify trigger, edit-thrashing, error-loop, and validation-log surfacing. v4.0 adds a local, derived memory/recall layer (BM25 + optional local-embedding vectors) over the repo's own artifacts, surfacing prior approaches at point-of-need, plus a setup.sh dependency bootstrap.",
   "author": {
     "name": "wayneliuq"
