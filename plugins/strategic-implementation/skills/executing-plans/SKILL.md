@@ -33,7 +33,7 @@ In `yolo`: proceed but log a `branch-risk` deviation.
 
 **Resume check.** If `<feature-folder>/checkpoint.md` already exists (a prior session was interrupted, or context compacted): read it BEFORE the execution plan. Treat it as the source of truth for what's already done. Skip any deliverable already in the `## Done` section; pick up at the deliverable in `## In progress` (or the next `pending` one if `In progress` is empty).
 
-Read `execution-plan.md` fully. Extract: deliverables, DAG order, parallel groups.
+Read `execution-plan.md` fully. Extract: deliverables, DAG order, parallel groups, and — per deliverable — the `Macro-deliverable` flag and its `Domains & file partition` (when `Macro-deliverable: true`). A macro-deliverable routes through Step 2-macro below; all others run the normal Step 2a–2f loop.
 
 Initialize `validation-log.md` at `<feature-folder>/validation-log.md` with header:
 
@@ -133,7 +133,31 @@ Rules:
 
 ## Step 2 — Execute DAG
 
-For each deliverable group in DAG order (parallel groups run concurrently, sequential groups run in order):
+For each deliverable group in DAG order (parallel groups run concurrently, sequential groups run in order). A deliverable marked `Macro-deliverable: true` runs through **Step 2-macro** instead of the per-step loop; every other deliverable runs the normal 2a–2f loop.
+
+### Step 2-macro — Macro-deliverable execution (one workflow, one commit)
+
+Fired only when a deliverable is `Macro-deliverable: true`. Emit the operator-visible decision line first: `macro-deliverable D<n>: <reason it qualifies> → workflow`.
+
+**Capability gate.** If the `Workflow` tool is unavailable/disabled (`CLAUDE_CODE_DISABLE_WORKFLOWS`, older CLI) OR this is a resume after interruption → do NOT use a workflow; fall through to the sequential macro build in **Step 2-macro-fallback** (below).
+
+**Workflow path** (capability present):
+1. **Author and run a Workflow** that builds the domains with an explicit barrier — the contract/seam first, then the remaining domains in parallel against it:
+   ```js
+   const seam = await agent(buildContractPrompt)              // barrier: fully resolves before fan-out
+   await parallel(domains.map(d => () => agent(buildDomainPrompt(d, { contract: seam }))))
+   ```
+   Do NOT use `pipeline()` for the seam→fan-out boundary (it has no barrier). Thread the contract artifact (`seam`) into each domain agent so the barrier is also a data handoff.
+2. **Edit mechanism — shared-tree-disjoint (primary).** Per the D5/ED4a spike, workflow `agent()` edits land in the main working tree. Domain agents write their **disjoint file sets** directly in that shared tree. **Build agents run ZERO git commands** (the main thread owns all git) — this makes index.lock contention a non-issue. `agent(isolation:'worktree')` is forbidden. *Fallback only if disjointness can't be guaranteed:* detached worktree per domain + `git -C <wt> diff | git apply` (with `--3way` or sequential-rebuild on apply conflict) — never `cp`-of-output, never `isolation:'worktree'`.
+3. **No nested sub-agents.** Workflow agents build only. Validation (2c), any `simplify`, and the single commit (2d) run on the **main thread after** the workflow returns. For a manual-`preview` macro-deliverable: the workflow builds + runs automatable checks, then hands back "built + checks green" for the human preview after return (workflows cannot pause mid-run).
+4. **One atomic commit.** After validation passes, the main thread makes exactly ONE `D<n>:` commit touching all domain files + `checkpoint.md` + `validation-log.md`. **Invariant: no intermediate per-domain commits land on the branch** — this is what keeps the git-log hook counters correct (a macro-deliverable counts as one deliverable).
+5. **Deferred concurrency proof.** Because an in-session live trial may validate cached behavior, log a `validation-honesty` deviation and surface a one-line follow-up: "Operator: in a fresh session (cache reloaded), re-run this macro-deliverable and confirm concurrent domains in `/workflows`; record the result in `validation-log.md`."
+
+### Step 2-macro-fallback — Sequential macro build
+
+When the capability gate routes here: build the domains **sequentially in the working tree** (contract first, then each domain), run validation, then the same single `D<n>:` atomic commit. Surface: `workflow unavailable → built sequentially`. **Resume reconciliation:** if `checkpoint.md` shows this macro-deliverable in-flight AND the working tree is dirty with its declared domain paths, `git checkout -- <those paths>` (reset to HEAD) before rebuilding — or require a clean tree and surface the discarded partial work — so a mid-workflow interruption never double-applies. This backs the "no lost work" guarantee.
+
+After Step 2-macro (either path) completes its commit, continue to the next deliverable (skip 2a–2f for this one; 2e consumer-audit/2f simplify-trigger still apply via the post-commit hook).
 
 ### Step 2a — Pre-flight env check
 
