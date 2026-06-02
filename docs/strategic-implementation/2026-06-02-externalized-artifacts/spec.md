@@ -181,4 +181,43 @@ Exactly **one committed file per repo** — the only in-repo footprint of the ex
 
 **Distinct from `documentation-registry.md`.** The registry is an in-repo human-facing index of *documentation* (locked decision 3, stays in repo); the locator is the machine pointer to the *external store*. Different purpose, different file — they stay separate.
 
-_Additional sections (backend-neutrality proof, capability flags, chosen target, risks, revision log) are appended by the final deliverable._
+## 12. Backend-neutrality proof
+
+The same record shape (§5: address `<repo-id>/<date-slug>/<artifact-name>`, raw-markdown body) maps onto three structurally diverse stores with **no change to the shape** — only the adapter mapping differs. A git file store, a key-value store, and a hosted notes service are chosen deliberately: the git repo and the notes service jointly stress the backend-neutral confidentiality requirement (§10).
+
+| Contract op / property | GitHub (git file store) | Cloudflare KV (key-value store) | HackMD (hosted notes service) |
+|---|---|---|---|
+| **read-latest** | GET file contents (raw markdown via content negotiation); body returned | GET value by key → raw bytes | GET note (raw markdown via content negotiation) |
+| **version-handle** (opaque) | the file's blob SHA | none → handle ignored | none → handle ignored |
+| **write** | PUT contents with current SHA; stale SHA → conflict surfaced | PUT value (last-write-wins) | PATCH note (last-write-wins) |
+| **list** (prefix `<repo-id>/<date-slug>/`) | list dir / tree by path prefix (native) | list keys by prefix (native) | list notes + filter by title/tag convention (adapter-maintained, no native prefix) |
+| **address mapping** | path = `<repo-id>/<date-slug>/<artifact-name>` (native, 1:1) | key = the address string (native, 1:1) | note title/tag encodes the address; adapter keeps the address↔note-id map (impedance absorbed by adapter, **shape unchanged**) |
+| **raw-markdown** | adapter unwraps base64/raw → identical markdown | raw bytes → identical markdown | raw markdown body → identical |
+| **private (D6)** | private repo, token-gated | account/token-gated, encrypted at rest | note permission = owner-only, token-gated |
+| `conflict-surfacing` | **yes** | no → best-effort | no → best-effort |
+| `bulk-migration` | trivial (single push) | scriptable (per-key PUT) | scriptable (per-note create) |
+
+The record shape is identical in all three columns; every store-specific detail (blob SHA, key string, note-id mapping, base64 unwrapping) is confined to the adapter and to the opaque `version-handle` — **none of it appears in the record**. Where a store lacks a contract feature (KV/HackMD optimistic concurrency; HackMD native hierarchy), the gap is absorbed by a capability flag (§6.5) or by adapter-side encoding, never by mutating the shape.
+
+## 13. Chosen execution target
+
+The implementation pass targets a **single dedicated private GitHub repository** (e.g. `strategic-artifacts`) as the one shared store for every repo the skill runs in — each repo's records under its `<repo-id>/` path. This is decision-complete for an implementer:
+
+- **Store-target coordinates (in each repo's locator):** the artifacts repo `owner/repo`, plus the **branch the records live on** — a single fixed branch (the artifacts repo's default branch). The record path within it is `<repo-id>/<date-slug>/<artifact-name>`.
+- **`repo-id` → concrete resolution:** the consuming repo's locator carries its `repo-id` (its path segment in the artifacts repo). No global registry is needed — the locator is the resolution.
+- **Auth:** as defined in §10 — an out-of-band token from the agent/host environment; never in the locator or any record. (Referenced, not restated, to keep one source of truth.)
+- **Access surface — documented swappable capability:** two ways to reach the store — the official GitHub MCP repos-toolset (~10k-token schema, richer ops) or the zero-schema `gh` CLI (cheaper, sufficient for read/write/list). **Default: `gh` CLI** (lowest token cost; the success-signal "zero token cost to skill-less agents" holds because nothing is loaded unless the skill opts in); the MCP is an optional swap when richer ops are wanted. This is an execution-target capability, not part of the record shape.
+- **Always-latest:** a `read-latest` returns the latest committed record; the adapter requests raw content and bypasses any CDN/propagation-cached read so the body is current.
+- **Conflict-surfacing:** `yes` (blob-SHA optimistic concurrency). **Bulk-migration:** `trivial`, but **forward-only / optional** per locked decision 6 — existing artifacts are not migrated; only new features externalize. The capability exists if the maintainer later chooses to run it.
+
+## 14. Risks & unknowns
+
+- **Offline access.** The store is server-authoritative, so **records are unavailable offline** (no network ⇒ no read/write). The spec acknowledges this explicitly rather than implying local availability; the read-through cache (§8) may still show the last-hydrated copy to a human, but the skill's authoritative reads require connectivity.
+- **Over-abstraction.** Fitting one contract to diverse stores risks a lowest-common-denominator shape. Mitigated: capability flags (§6.5) absorb differences and the neutrality proof (§12) holds the record shape constant as the guard.
+- **Backend leakage.** Risk that a store-specific detail creeps into the record shape. Guard: the independent whole-document audit (this deliverable's validation) hunts §5/§6 for leakage.
+- **Locator drift across worktrees/branches.** The locator is committed, so branches can diverge — but it carries near-static config (`repo-id` + coordinates) and the live catalog comes from the store, so divergence is low-stakes and never authoritative over content.
+- **Self-reference.** This spec and its sibling records are, for now, written in-repo under the pre-externalization scheme; the spec describes a future the skill does not yet follow. Expected, not a defect this pass.
+
+## 15. Revision log
+
+- v0.1 · 2026-06-02 · initial spec — §5 record model + §6 adapter contract (DP1); §7 lifecycle + §8 read-through cache + §9 revision contract (DP2); §10 confidentiality + §11 locator (DP3); §12 backend-neutrality proof + §13 chosen target + §14 risks (DP4). Implements product-brief_externalized-artifacts.md (D1–D7); D2 conflict handling is best-effort per brief v0.4.
