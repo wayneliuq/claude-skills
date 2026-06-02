@@ -125,8 +125,15 @@ def build(root: Path, db_path: Path, repo_root: Path | None = None,
              ("record_count", str(stats["deduped"])),
              ("embedding_model_id", ""), ("embedding_dim", "")],
         )
-        stats["vectors"] = _build_vectors(conn, vectors)
+        # Commit BM25 FIRST so a vector-leg failure (missing embedder, model
+        # download error, extension issue) can never lose the BM25 index.
         conn.commit()
+        try:
+            stats["vectors"] = _build_vectors(conn, vectors)
+            conn.commit()
+        except Exception as e:  # noqa: BLE001 — vectors are strictly additive
+            conn.rollback()  # discard any partial vec writes; BM25 stays committed
+            stats["vectors"] = f"skipped (error: {type(e).__name__})"
     finally:
         conn.close()
     return stats
