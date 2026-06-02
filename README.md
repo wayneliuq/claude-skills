@@ -7,6 +7,7 @@ Personal Claude Code plugins for my development workflow.
 | Plugin | Description |
 |---|---|
 | [`strategic-implementation`](./plugins/strategic-implementation/) | Full planning-to-execution workflow: clarify → architecture → implementation guide → session plan → execute |
+| [`crispr-primer-design`](./plugins/crispr-primer-design/) | Design and genome-verify PCR + nested Sanger primers to validate CRISPR-Cas9 cutting at a gRNA locus (ICE / TIDE / amplicon-NGS) |
 
 ## Using this as a Claude Code marketplace
 

@@ -13,6 +13,12 @@
       "version": "4.1.0",
       "source": "./plugins/strategic-implementation",
       "description": "PM-oriented planning-to-execution workflow: clarify → product brief → plan-mode execution plan → tiered review → deliverable-gated execution"
+    },
+    {
+      "name": "crispr-primer-design",
+      "version": "1.0.0",
+      "source": "./plugins/crispr-primer-design",
+      "description": "Design and genome-verify PCR + nested Sanger primers to validate CRISPR-Cas9 cutting at a gRNA locus (ICE / TIDE / amplicon-NGS)"
     }
   ]
 }

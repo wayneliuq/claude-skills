@@ -1,0 +1,9 @@
+{
+  "name": "crispr-primer-design",
+  "version": "1.0.0",
+  "description": "Design and verify PCR + nested Sanger primers to validate CRISPR-Cas9 cutting at a gRNA locus (ICE / TIDE / amplicon-NGS). One-shot pipeline: resolves the locus (Ensembl with NCBI pseudogene fallback), locates the gRNA and cut site, generates and scores all primer candidates in a single sweep, hard-verifies every primer against the genome, and emits a markdown report + wild-type amplicon FASTA.",
+  "author": {
+    "name": "wayneliuq"
+  },
+  "repository": "https://github.com/wayneliuq/claude-skills"
+}
