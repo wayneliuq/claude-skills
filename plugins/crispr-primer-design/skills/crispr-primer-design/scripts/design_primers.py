@@ -25,6 +25,7 @@ import re
 import sys
 import urllib.request
 import urllib.error
+import urllib.parse
 
 # ---------- Tm calculation ----------
 
@@ -567,7 +568,7 @@ def fmt_primer_table(rows):
 def write_report(out_path, gene, grna, grna_short, amplicon_size, application,
                  pcr_F, pcr_R, nest_F, nest_R, cut_pos_1b, amp_fasta, amp_fasta_path,
                  grna_strand, pam_seq, nuclease, blast_rid=None, blast_url=None,
-                 skipped_pam=False, user_pam=None, multiple_gRNA_hits=None):
+                 skipped_pam=False, user_pam=None, multiple_gRNA_hits=None, chrom=None):
     """Write the markdown report."""
     rows = []
     if pcr_F:
@@ -663,9 +664,10 @@ def write_report(out_path, gene, grna, grna_short, amplicon_size, application,
         f.write(f"FASTA also written to: `{amp_fasta_path}`\n\n")
         if blast_rid and blast_url:
             f.write("## Off-target check (NCBI Primer-BLAST)\n\n")
+            region_note = f"(`{chrom}` if known)" if chrom else ""
             f.write(f"Submitted the PCR primer pair (F: `{pcr_F['seq']}`, R: `{pcr_R['seq']}`) "
                     f"to NCBI Primer-BLAST, restricting the search to the amplicon region "
-                    f"(`{chrom}` if known). Result is processing asynchronously.\n\n")
+                    f"{region_note}. Result is processing asynchronously.\n\n")
             f.write(f"- **RID:** `{blast_rid}`\n")
             f.write(f"- **Poll URL:** {blast_url}\n\n")
         f.write("## Notes\n\n")
@@ -885,7 +887,8 @@ def main():
                  grna_strand, pam_seq, args.nuclease,
                  blast_rid=blast_rid, blast_url=blast_url,
                  skipped_pam=args.skip_pam_check, user_pam=user_pam,
-                 multiple_gRNA_hits=all_matches if len(all_matches) > 1 else None)
+                 multiple_gRNA_hits=all_matches if len(all_matches) > 1 else None,
+                 chrom=chrom)
     print(f"\nDone. Mark cut site: bp {cut_in_amplicon_0based + 1} of the amplicon "
           f"({cut_in_amplicon_0based} 0-based).")
 
