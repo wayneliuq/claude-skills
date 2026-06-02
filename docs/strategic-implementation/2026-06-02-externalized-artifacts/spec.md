@@ -156,4 +156,29 @@ A per-session local materialization of records, so the maintainer reads them in 
 
 No lifecycle stage depends on a human editing a record in place; every feedback path is conversational, and every record is written solely by the skill.
 
-_Additional sections (confidentiality, locator, backend-neutrality proof, chosen target, risks, revision log) are appended by subsequent deliverables._
+## 10. Confidentiality
+
+Artifacts leave the repo into an external store, so the spec mandates the following — stated **backend-neutrally**, so it holds equally for a private git repository and for a hosted notes service:
+
+- **Private by default.** The store holds records under access control such that only an authenticated principal can read or write them. There is no public/unauthenticated read path. (Stores whose only "private" mode is an unguessable URL do not satisfy this.)
+- **Credential supplied out-of-band.** The access credential is resolved at runtime from the agent/host environment (ambient auth). It is **never committed to the repo and never stored in any record** — not in the locator, not in a record body, not in the in-repo durable tier.
+- **Secret-at-rest split.** Confidentiality of artifact **content** is the store's responsibility (private-by-default, access-controlled, encrypted in transit). Confidentiality of the **credential** is the host's responsibility (ambient/secret-managed). The repo holds neither the content nor the credential — only the non-secret locator (§11).
+
+This makes the §11 no-secret rule enforceable rather than aspirational: there is a defined place the credential comes from (the host), and it is explicitly not the repo.
+
+## 11. Locator
+
+Exactly **one committed file per repo** — the only in-repo footprint of the externalized store. It is a pure pointer, not a catalog and not content.
+
+- **Single fixed, discoverable location**, with a defined schema, exactly one such file per repo (not one per feature).
+- **Schema — load-bearing content only:**
+  - `repo-id` — this repo's namespace segment in the shared store (§5.2).
+  - `store-target coordinates` — how to reach the shared store: the abstract address of the store and where within it this repo's records live. (Concrete form is filled by §13 Chosen execution target — e.g. for a git store: the store repo's `owner/repo` plus the branch/ref the records live on.)
+- **No catalog.** The set of features/records is **resolved live from the store** (§5.4), never enumerated in the locator — so the locator does not drift as features are added.
+- **No secret — invariant.** The locator is committed, therefore it **MUST NOT embed any credential / secret / token**. A token in the locator is a defect. It carries only the non-secret coordinates above; the credential is supplied out-of-band (§10).
+- **Skill-maintained, output-only.** Written by the skill at bootstrap (§7 session-entry); never hand-edited.
+- **Recoverable.** A stale or missing locator is reconstructable from a known store (the `repo-id`/coordinates are stable facts), so the locator is never authoritative over record content — the store is.
+
+**Distinct from `documentation-registry.md`.** The registry is an in-repo human-facing index of *documentation* (locked decision 3, stays in repo); the locator is the machine pointer to the *external store*. Different purpose, different file — they stay separate.
+
+_Additional sections (backend-neutrality proof, capability flags, chosen target, risks, revision log) are appended by the final deliverable._
