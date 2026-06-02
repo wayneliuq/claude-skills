@@ -115,4 +115,45 @@ Capabilities a backend MAY or MAY NOT provide are declared as flags, kept strict
 - `conflict-surfacing: yes | no` (see §6.3)
 - `bulk-migration: <trivial | scriptable | unsupported>` — the ease of importing pre-existing artifacts in one shot. **Optional and forward-only:** migration is never a required operation and is not performed unless explicitly chosen (locked decision 6).
 
-_Additional sections (lifecycle, read-through cache, revision contract, confidentiality, locator, backend-neutrality proof, chosen target, risks, revision log) are appended by subsequent deliverables._
+## 7. Lifecycle map
+
+Which records each skill stage reads (R) / writes (W). Bodies live in the store; the cache (§8) is a read-through projection. The durable tier and the locator stay in-repo.
+
+| Stage | Reads | Writes |
+|---|---|---|
+| **session-entry** (orchestrator) | locator (this repo's `repo-id` + reach-the-store coords) | **bootstrap only:** locator (first use in repo); hydrates the active feature's records into the cache |
+| clarify | `documentation-registry.md` (in-repo) | `documentation-registry.md` (in-repo) |
+| product-brief-drafter (draft) | — | `product-brief_<slug>.md`, `brief-meta.yaml` |
+| product-brief-drafter (revise) | `product-brief_<slug>.md` | `product-brief_<slug>.md`, `brief-meta.yaml` |
+| ui-mockup (generate / revise) | `product-brief_<slug>.md`, `mockup.html` | `mockup.html` |
+| execution-plan | `product-brief_<slug>.md`, `brief-meta.yaml`, `mockup.html`, prior-feature records (live), `project-learnings.md` (in-repo), `documentation-registry.md` (in-repo) | `execution-plan.md`, `documentation-registry.md` (in-repo) |
+| review | `execution-plan.md`, `product-brief_<slug>.md`, `brief-meta.yaml`, `project-learnings.md` (in-repo) | — |
+| executing-plans | `execution-plan.md`, `checkpoint.md` | `validation-log.md`, `checkpoint.md`, `simplify-report-NN.md`; per deliverable also `documentation-registry.md` (in-repo) |
+| post-execution | `execution-plan.md`, `validation-log.md`, `checkpoint.md`, `documentation-registry.md` (in-repo) | `post-execution-report.md`, `token-report.md`, `simplify-report-NN.md`; appends `project-learnings.md` (in-repo) |
+| simplify | changed source files | `simplify-report-NN.md` |
+
+**Durable tier — stays in repo, NOT moved:** `project-learnings.md` and `documentation-registry.md` remain in-repo and are read/written in place (marked "(in-repo)" above). Only the per-feature records (§5.1) move to the store.
+
+**Commit no longer carries the artifact body.** executing-plans' per-deliverable atomic commit currently stages the feature folder's record files. Under this spec it stages only **in-repo** items — the locator (when bootstrap wrote it), the `documentation-registry.md` row, and any in-repo source — never the record bodies, which are written to the store out-of-band. The commit thus carries a pointer + index advance, not the artifact content; a clone of the repo gets no record bodies.
+
+## 8. Read-through cache
+
+A per-session local materialization of records, so the maintainer reads them in an editor without a web portal. It is a **derived projection, never the source of truth** — reusing the established `.memory/` discipline (derived, rebuildable, git-ignored, refreshed at session start; see `MEMORY-DOCTYPES.md`).
+
+- **Single fixed location**, outside any worktree's tracked tree (e.g. a per-repo path under the user/cache area keyed by `repo-id`), and **git-ignored** — it is never committed, in any worktree.
+- **Populated at session start** for the **active feature only** (bounded hydration — the cache holds one feature's records, not the whole store, so per-session cost is bounded), and **refreshed when the skill writes** a record.
+- **Disposable / deletable with no data loss:** the store is authoritative; deleting the cache loses nothing and it transparently re-hydrates on next access from the store.
+- **Worktree-independent:** the cache keys off the record **address** (§5.2), not a path inside a checkout, so a new worktree or a new device gets the current records with no manual sync step.
+- **Read-resolution model (makes "always-latest" true):** a record read **resolves through to the store on access** (read-through), not from a stale session-start snapshot. The cache may hold a copy for editor browsing, but a read used by the skill returns the store's latest; the staleness window for a skill-consumed read is therefore zero. (A human eyeballing a cached file may see a copy as fresh as the last hydrate/refresh — acceptable, since humans don't feed the cache back as truth.)
+
+## 9. Revision contract
+
+**Records are output-only.** The skill writes records; the human never edits a record file as a feedback channel (locked decision 5). This replaces the prior file-embedded feedback loops:
+
+- **Brief revision** — previously: PM added `<!-- pm: ... -->` comments inside `product-brief_<slug>.md` and the drafter addressed/removed them. **Now:** the PM gives feedback **conversationally to the agent in chat**; the drafter re-writes the brief record and re-emits it. No inline-comment editing of the record.
+- **Mockup revision** — previously: PM edited `mockup.html` with `<!-- pm: ... -->` comments or wrote a sibling `mockup-feedback.md`. **Now:** feedback is **conversational**; ui-mockup re-writes and re-emits `mockup.html`. The `mockup-feedback.md` sibling channel is retired.
+- **simplify-report disposition** — the `<!-- pm-disposition: apply|defer|dismiss -->` marker, where the PM edits `simplify-report-NN.md` in place, is the same class of file-edit feedback. **Resolution: retired** — disposition is given conversationally (the report record stays output-only); executing-plans records the chosen disposition rather than reading a hand-edited marker.
+
+No lifecycle stage depends on a human editing a record in place; every feedback path is conversational, and every record is written solely by the skill.
+
+_Additional sections (confidentiality, locator, backend-neutrality proof, chosen target, risks, revision log) are appended by subsequent deliverables._

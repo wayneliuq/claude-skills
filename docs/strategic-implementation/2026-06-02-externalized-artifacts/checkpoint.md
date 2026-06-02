@@ -2,6 +2,7 @@
 
 ## Done
 - DP1 — Core record model + adapter contract — 2026-06-02
+- DP2 — Lifecycle map + read-through cache + revision contract — 2026-06-02
 
 ## In progress
 
