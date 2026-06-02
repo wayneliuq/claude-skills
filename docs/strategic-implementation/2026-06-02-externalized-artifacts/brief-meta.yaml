@@ -1,0 +1,13 @@
+# Internal metadata for review. Not PM-facing.
+specialists_recommended:
+  - boundaries
+  - runtime-risk
+  - technical-expert
+notes: >
+  boundaries — confidentiality/secret-handling for artifacts leaving the repo into an
+  external store, now concrete (private repo + access token). runtime-risk — backend
+  API rate limits / consistency / auth lifecycle remain relevant even with D2 relaxed.
+  technical-expert — a specific backend (GitHub, a dedicated private repo) is now the
+  execution target, so the execution plan adopts a concrete integration surface
+  (official MCP and/or gh CLI) whose pitfalls and step-ordering warrant review. No UI
+  surface (no frontend-engineer).

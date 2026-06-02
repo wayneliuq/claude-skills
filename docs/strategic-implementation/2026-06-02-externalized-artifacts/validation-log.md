@@ -1,7 +1,7 @@
 ---
-status: in-progress
+status: complete
 domains: [strategic-implementation, external-store, spec]
-outcome: TBD
+outcome: backend-neutral spec for externalizing per-feature artifacts to one shared store
 supersedes: none
 ---
 # Validation log
