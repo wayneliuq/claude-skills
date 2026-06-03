@@ -1,5 +1,0 @@
-# Internal metadata for review. Not PM-facing.
-specialists_recommended:
-  - technical-expert
-  - runtime-risk
-notes: technical-expert for adopting the new Workflow capability and the contract-seam-first / step-ordering risk the brief surfaces; runtime-risk for the integration-risk Workflow dependency, intra-deliverable concurrency + worktree isolation, and confirming the single-commit model leaves the sequential hook counters unaffected.
