@@ -35,6 +35,12 @@ _Feature: externalized-store-impl · Started: 2026-06-02 · Autonomy: auto_
 **Downstream impact?** no
 **Agent category:** technical
 
+## APPROACH — D4
+**Method:** integration-test (synthetic-flow harness, live) + close-read
+**Domains:** skill-rewiring / github / cross-component routing
+**Approach:** appended the Record-routing convention to all 8 record-touching stages (incl. `review` reader + orchestrator session-entry bootstrap) and added a tested fallback-safe `store.sh put` primitive. Harness drove the rewired write sequence for a synthetic `__e2e__` feature via `put` → 4 records listed in the store, zero happy-path fallback files, no `__e2e__` artifacts in the repo, durable tier untouched; FALLBACK test (fake failing `gh` on PATH) → `put` wrote the in-repo fallback path (nothing dropped); conflict surfaced (exit 3) without fallback. SKILL routing prose verified by close-read; runtime activation deferred to plugin-update (cutover caveat).
+**Note:** simplify F-01 (unused `si_locator_exists`) resolved here — wired as the locator-presence check in `store.sh put`.
+
 ## APPROACH — D3
 **Method:** integration-test (live)
 **Domains:** github / gh-cli / filesystem

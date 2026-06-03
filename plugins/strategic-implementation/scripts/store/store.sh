@@ -76,6 +76,23 @@ case "$cmd" in
     if [ -n "$handle_out" ]; then printf '%s\n' "$newsha" > "$handle_out"; else echo "[store] handle=$newsha" >&2; fi
     ;;
 
+  put)
+    # Fallback-safe write (transition wiring): store the record, or write the in-repo fallback so
+    # a record is NEVER dropped. A surfaced CONFLICT (exit 3) is propagated, not fallen back.
+    #   store.sh put <address> <fallback-path> <file> [--handle-in <h>] [--handle-out <h>]
+    addr="${1:-}"; fallback="${2:-}"; file="${3:-}"; shift 3 2>/dev/null || true
+    [ -n "$addr" ] && [ -n "$fallback" ] && [ -f "${file:-}" ] || die "put: usage put <address> <fallback-path> <file> [...]"
+    assert_valid_address "$addr" || exit 1
+    _fallback() { mkdir -p "$(dirname "$fallback")"; cp "$file" "$fallback"; echo "[store] FALLBACK → in-repo $fallback ($1)" >&2; exit 0; }
+    if ! gh_ok || ! si_locator_exists; then _fallback "no gh/locator"; fi
+    bash "$0" write "$addr" "$file" "$@"; rc=$?
+    case "$rc" in
+      0) exit 0 ;;
+      3) exit 3 ;;                 # conflict surfaced — do NOT fall back (would mask the conflict)
+      *) _fallback "store write failed (rc=$rc)" ;;
+    esac
+    ;;
+
   list)
     prefix="${1:-}"; shift || true
     [ -n "$prefix" ] || die "list: missing <prefix>"

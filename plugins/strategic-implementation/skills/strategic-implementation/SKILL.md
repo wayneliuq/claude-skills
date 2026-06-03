@@ -157,3 +157,21 @@ On the final deliverable's completion, `executing-plans` invokes `strategic-impl
 - Before invoking `product-brief-drafter`, `executing-plans`, or `post-execution`, exit plan mode if active. Never exit plan mode before invoking `execution-plan` (it enters plan mode itself).
 - Hard decisions in the brief are locked; review cannot reverse them.
 - `executing-plans` owns all per-deliverable flow. This skill ends when execution begins.
+
+---
+
+## Record routing — externalized artifact store
+
+Per-feature **records** (this stage's brief / plan / validation-log / checkpoint / reports / mockup / brief-meta — NOT the durable tier) are read and written through the store adapter, not the feature folder directly. Wherever this skill's steps say to write or read `<feature-folder>/<file>`, route it as below; treat `<file>` as the `<artifact-name>` of the record address `<repo-id>/<date-slug>/<artifact-name>`.
+
+- **Write (fallback-safe):** `bash "${CLAUDE_PLUGIN_ROOT}/scripts/store/store.sh" put "<repo-id>/<date-slug>/<file>" "<feature-folder>/<file>" <local-tmp> --handle-out <h>` — stores the record, OR writes the in-repo `<feature-folder>/<file>` fallback if gh/locator is unavailable or the store write fails (a surfaced conflict is NOT fallen back). Then best-effort `cache.sh refresh "<address>" <local-tmp>`.
+- **Read (this feature):** the human-browsable copy is the cache (`cache.sh path <date-slug>`); the authoritative read is `store.sh read "<address>"`.
+- **Read (a PRIOR feature) — live:** `store.sh list "<repo-id>/<prior-date-slug>"` then `store.sh read` per address. Never the active-feature cache (it holds only the active feature).
+- **Per-operation fallback (transition safety):** evaluate immediately before EACH record read/write — if the locator (`docs/strategic-implementation/store-locator.yaml`) is absent (bootstrap not run) or `gh` is unavailable/offline, fall back to the in-repo `<feature-folder>/<file>` path for that operation and note the fallback. If a store write fails mid-operation, fall back to the in-repo path within the same operation so no record is ever dropped.
+- **Durable tier stays in-repo:** `project-learnings.md` and `documentation-registry.md` are read/written in place — never routed to the store.
+
+## Session entry — store bootstrap & hydrate
+
+Before Step 1, ensure the externalized store is reachable for this repo:
+- If `docs/strategic-implementation/store-locator.yaml` is absent, run `bash "${CLAUDE_PLUGIN_ROOT}/scripts/store/bootstrap.sh"` (first-run: ensures the shared private store + this repo's `<repo-id>` namespace, writes the committed locator — no secret). If `gh` is unavailable, skip and operate in in-repo fallback mode.
+- The SessionStart hook hydrates the active feature's records into the local cache automatically; no manual step needed.
