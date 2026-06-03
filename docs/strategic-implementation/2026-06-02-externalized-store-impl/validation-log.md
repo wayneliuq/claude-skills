@@ -34,3 +34,17 @@ _Feature: externalized-store-impl · Started: 2026-06-02 · Autonomy: auto_
 **Resolution:** capture `gh api` stdout first; on non-zero exit return empty; otherwise pipe through `jq -r '.[]?.path // empty'`. Re-validated: never-written feature lists truly empty.
 **Downstream impact?** no
 **Agent category:** technical
+
+## APPROACH — D3
+**Method:** integration-test (live)
+**Domains:** github / gh-cli / filesystem
+**Approach:** seeded a probe feature in the store, ran `cache.sh hydrate` → records mirrored to `~/.cache/strategic-artifacts/<repo-id>/<slug>/` byte-identical; verified the cache dir is outside the repo (git-status clean); `rm -rf` + re-hydrate → intact; hydrated from a repo subdir → identical path (CWD-independent via git-resolved repo-id); `cache.sh session` resolves the active feature from state.json and `--background` returns instantly. Probe + cache cleaned in an EXIT trap.
+
+## DEV-003
+**Type:** retry
+**Deliverable:** D3
+**Plan said:** SessionStart hydrate detaches and returns instantly.
+**Actually:** `cache.sh session` re-invoked itself via `exec "$0"` / `nohup "$0"`, which hit a "cannot execute / permission" error on the relative path.
+**Resolution:** re-invoke through `bash "$0" hydrate …` (foreground `exec bash`, background `nohup bash`) instead of exec'ing the path directly. Re-validated: session rc=0, --background returns instantly.
+**Downstream impact?** no
+**Agent category:** technical
