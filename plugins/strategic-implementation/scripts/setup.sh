@@ -84,6 +84,20 @@ if have jq; then ok "jq $(jq --version)"
 elif brew_install jq; then ok "jq installed"
 else bad "jq missing (hooks + token-report.sh need it)"; note "brew install jq"; fi
 
+# gh — required by the externalized artifact store adapter (scripts/store/). Presence + auth + version floor.
+if have gh; then
+  GHV="$(gh --version 2>/dev/null | sed -nE 's/^gh version ([0-9]+)\.([0-9]+).*/\1.\2/p' | head -1)"
+  GHMAJ="${GHV%%.*}"
+  if [ -n "$GHMAJ" ] && [ "$GHMAJ" -ge 2 ] 2>/dev/null; then
+    if gh auth status >/dev/null 2>&1; then ok "gh $GHV (authenticated — store adapter ready)"
+    else bad "gh $GHV present but not authenticated"; note "run 'gh auth login' (needs 'repo' scope for the private store)"; fi
+  else
+    bad "gh version too old ($GHV; need >= 2.0)"; note "brew upgrade gh"
+  fi
+else
+  bad "gh missing (externalized artifact store needs it)"; note "brew install gh && gh auth login"
+fi
+
 ok "bash ${BASH_VERSION:-unknown}"
 
 # --------------------------------------------------------------------------

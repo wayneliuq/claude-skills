@@ -1,0 +1,7 @@
+# strategic-implementation store locator — machine-maintained, committed, NO secret.
+# Points at the shared store; the credential is supplied out-of-band (gh ambient auth).
+repo_id: "wayneliuq-claude-skills"
+store:
+  kind: github
+  repo: "wayneliuq/strategic-artifacts"
+  branch: "main"
