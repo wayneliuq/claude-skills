@@ -27,10 +27,18 @@ import urllib.request
 import urllib.error
 import urllib.parse
 
-# ---------- Multi-gRNA thresholds ----------
+# ---------- Amplicon + multi-gRNA thresholds ----------
+# Default amplicon size for EVERY design (single, separate, or combined). A
+# uniform 2 kb product lets every locus be amplified under one PCR condition and
+# pooled easily; the cut site is genotyped from nested Sanger primers, so the
+# amplicon being large doesn't hurt ICE/TIDE resolution. Override with
+# --amplicon-size. (Application still drives nested-Sanger distance and the
+# single-read threshold, just not amplicon size.)
+DEFAULT_AMPLICON_SIZE = 2000       # bp, default product for all designs
+#
 # When two (or more) gRNAs target the same gene and their cut sites fall within
-# PCR_COMBINE_MAX_SPAN of each other, a single PCR amplicon (default
-# COMBINED_AMPLICON_DEFAULT bp) is designed to span the whole cluster.
+# PCR_COMBINE_MAX_SPAN of each other, a single PCR amplicon is designed to span
+# the whole cluster.
 #
 # Sanger note: a Sanger trace is a superposition of alleles immediately 3' of
 # any cut it reads through, so one read can only cleanly decompose the FIRST cut
@@ -40,7 +48,6 @@ import urllib.parse
 # their spread is within the clean decomposition window — which is tighter for
 # TIDE than for ICE (SANGER_SINGLE_READ_MAX, by application).
 PCR_COMBINE_MAX_SPAN = 1000        # bp between outermost cut sites
-COMBINED_AMPLICON_DEFAULT = 2000   # bp, default product when combining
 SANGER_SINGLE_READ_MAX = {         # bp; one Sanger read covers this spread (single-cut samples)
     "ICE": 500,
     "TIDE": 200,
@@ -988,10 +995,9 @@ def main():
                     help="One or more gRNA sequences. 20-bp protospacer (most common) OR 23-bp "
                          "protospacer+PAM (auto-detected). Pass multiple gRNAs that target the SAME "
                          "gene/locus to get a single combined design: if their cut sites are within "
-                         f"{PCR_COMBINE_MAX_SPAN} bp, one PCR amplicon (default "
-                         f"{COMBINED_AMPLICON_DEFAULT} bp) spans them all, with an F+R Sanger pair "
-                         "(F decomposes the leftmost cut, R the rightmost). gRNAs farther apart are "
-                         "designed independently.")
+                         f"{PCR_COMBINE_MAX_SPAN} bp, one PCR amplicon spans them all, with an F+R "
+                         "Sanger pair (F decomposes the leftmost cut, R the rightmost). gRNAs farther "
+                         "apart are designed independently.")
     ap.add_argument("--gene", help="Gene symbol (e.g. TCL1A). Conflicts with --locus.")
     ap.add_argument("--locus", help="Explicit locus, e.g. chr14:95712272-95712291, or 14:95712272-95712291, "
                                     "or with comma separators chr14:95,712,272-95,712,291. Conflicts with --gene.")
@@ -999,8 +1005,8 @@ def main():
     ap.add_argument("--assembly", default="GRCh38", help="Assembly label for documentation only")
     ap.add_argument("--application", default="ICE", choices=["ICE", "TIDE", "amplicon-NGS"])
     ap.add_argument("--amplicon-size", type=int, default=None,
-                    help="Target amplicon size in bp (default: 1000 for ICE, 500 for TIDE; "
-                         f"{COMBINED_AMPLICON_DEFAULT} when combining multiple gRNAs).")
+                    help=f"Target amplicon size in bp (default: {DEFAULT_AMPLICON_SIZE} for all designs, "
+                         "so every locus shares one PCR condition).")
     ap.add_argument("--tm-min", type=float, default=57.0)
     ap.add_argument("--tm-max", type=float, default=63.0)
     ap.add_argument("--nuclease", default="spcas9", choices=["spcas9", "cas12a"])
@@ -1027,7 +1033,7 @@ def main():
     gene, chrom, gs, ge = resolve_target(args)
 
     # Fetch one region around the gene/locus big enough to hold every gRNA + flanks.
-    flank = max(explicit_amp or COMBINED_AMPLICON_DEFAULT, 2000)
+    flank = max(explicit_amp or DEFAULT_AMPLICON_SIZE, 2000)
     fetch_start = max(1, gs - flank)
     fetch_end = ge + flank
     print(f"Fetching {chrom}:{fetch_start}-{fetch_end} ({(fetch_end - fetch_start + 1)/1000:.1f} kb)...")
@@ -1036,23 +1042,22 @@ def main():
     # Locate each gRNA + its cut.
     guides = [locate_guide(seq, region_start, chrom, g, up, args) for g, up in grnas]
 
-    # Decide combined vs separate.
+    # Decide combined vs separate. Amplicon defaults to a uniform 2 kb everywhere
+    # (overridable with --amplicon-size) so all loci share one PCR condition.
+    amp_target = explicit_amp or DEFAULT_AMPLICON_SIZE
     if len(guides) == 1:
-        amp_target = explicit_amp or (1000 if application == "ICE" else 500)
         design_amplicon(gene, chrom, guides, args, application, amp_target)
         return
 
     cuts = sorted(g['cut_pos'] for g in guides)
     span = cuts[-1] - cuts[0]
     if span <= PCR_COMBINE_MAX_SPAN:
-        amp_target = explicit_amp or COMBINED_AMPLICON_DEFAULT
         print(f"\n{len(guides)} gRNAs cut within {span} bp (<= {PCR_COMBINE_MAX_SPAN} bp) - "
               f"designing ONE combined amplicon of {amp_target} bp.\n")
         design_amplicon(gene, chrom, guides, args, application, amp_target)
     else:
         print(f"\n{len(guides)} gRNAs cut {span} bp apart (> {PCR_COMBINE_MAX_SPAN} bp) — "
-              f"too far to combine; designing each independently.\n")
-        amp_target = explicit_amp or (1000 if application == "ICE" else 500)
+              f"too far to combine; designing each independently ({amp_target} bp each).\n")
         for g in guides:
             design_amplicon(gene, chrom, [g], args, application, amp_target)
 

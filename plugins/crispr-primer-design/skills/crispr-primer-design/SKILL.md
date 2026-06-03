@@ -19,16 +19,18 @@ description: |
 - **gRNA sequence(s)** — 20–23 nt DNA (convert U→T if RNA). The script auto-detects: 20-bp protospacer, or 23-bp protospacer+PAM (the trailing 3 bp are recorded as the user-annotated PAM but the genome's actual 3 bases 3' of the protospacer are still checked against the nuclease). `--grna` accepts **multiple** sequences — see "Multiple gRNAs on one gene" below.
 - **Target locus** — gene symbol (e.g. `TCL1A`, `OR2W5`) **or** explicit `chrN:start-end` (commas and missing `chr` prefix both accepted). If a gene symbol isn't in Ensembl (typical for pseudogenes), the script falls through to NCBI E-utilities to resolve the coordinates.
 - **Species / assembly** — defaults to `human` / `GRCh38`. Mouse (`GRCm39`), rat (`mRatBN7.2`), and any Ensembl species are supported.
-- **Application** — `ICE` (default), `TIDE`, or `amplicon-NGS`. Drives amplicon size and nested-primer distance.
+- **Application** — `ICE` (default), `TIDE`, or `amplicon-NGS`. Drives nested-Sanger-primer distance and the single-read coverage threshold. (It no longer drives amplicon size — every design defaults to a uniform 2 kb, see below.)
 - Optional: `--amplicon-size`, `--tm-min`, `--tm-max`, `--nuclease` (spcas9 or cas12a), `--skip-pam-check` (use for non-standard nucleases like xCas9/SaCas9, or when you have orthogonal evidence that cutting occurs despite a non-standard PAM), `--output-dir`.
 
-If the user hasn't specified the application, **ask once before invoking** — picking the wrong one (e.g. designing 1 kb for TIDE which wants ~500 bp) wastes bench time.
+If the user hasn't specified the application, **ask once before invoking** — it sets the nested-Sanger-primer distance (ICE 80–150 bp, TIDE 60–120 bp from the cut) and the single-read coverage threshold, which affect how the trace is genotyped.
+
+**Amplicon size defaults to a uniform 2 kb for every design** (single, separate, or combined), so all loci amplify under one PCR condition and pool easily. The cut is genotyped from nested Sanger primers, so a large amplicon doesn't hurt ICE/TIDE resolution. Override per run with `--amplicon-size`.
 
 ## Multiple gRNAs on one gene
 
 `--grna` takes one or more sequences that target the **same** gene/locus (one invocation per gene). **Group the user's gRNAs by gene and call the script once per gene with all of that gene's gRNAs.** The script decides automatically:
 
-- **Cut sites within 1000 bp** → **one combined PCR amplicon** spanning all cuts, default **2 kb** (override with `--amplicon-size`). F primer sits upstream of the leftmost cut, R downstream of the rightmost.
+- **Cut sites within 1000 bp** → **one combined PCR amplicon** spanning all cuts (uniform 2 kb default, override with `--amplicon-size`). F primer sits upstream of the leftmost cut, R downstream of the rightmost.
 - **Cut sites > 1000 bp apart** → can't combine; the script designs each gRNA independently (one report each), exactly as the single-gRNA path.
 - **Sanger primers (combined case)** → always an **F + R pair**: Sanger-F decomposes the leftmost cut, Sanger-R the rightmost. This is mandatory because a Sanger trace is a mixture of alleles immediately 3' of any cut it reads through, so **one read can only cleanly decompose the first cut it reaches** — two co-delivered (dual-cut) edits need both reads regardless of distance. A *single* forward read suffices only when each gRNA is in a **separate single-cut sample** and the cut spread is within the clean decomposition window: **≤ 500 bp for ICE, ≤ 200 bp for TIDE** (TIDE's window is tighter). The report spells out both scenarios.
 
