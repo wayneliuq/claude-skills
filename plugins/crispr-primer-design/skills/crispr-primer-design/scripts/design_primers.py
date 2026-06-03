@@ -207,6 +207,100 @@ def fetch_region(chrom, start_1b, end_1b, species="homo_sapiens"):
     return http_get_text(url), start_1b
 
 
+# ---------- Repeat (RepeatMasker) screening ----------
+
+THREE_PRIME_ANCHOR = 15  # bp; the 3' window that determines priming specificity
+
+
+def fetch_repeats(chrom, start_1b, end_1b, species="homo_sapiens", timeout=30):
+    """Fetch known repeat intervals (RepeatMasker/Dust/TRF) overlapping a region
+    via the Ensembl overlap API.
+
+    Returns a de-duplicated list of (start_1b, end_1b, name) tuples, or None if
+    the lookup fails or the API is unreachable (signals 'screening unavailable'
+    — callers must proceed without filtering rather than crash)."""
+    try:
+        url = (f"{ENSEMBL}/overlap/region/{species}/{chrom}:{start_1b}-{end_1b}"
+               f"?feature=repeat;content-type=application/json")
+        data = http_get_json(url, timeout=timeout)
+    except Exception as e:
+        print(f"  (repeat screening unavailable: {e})")
+        return None
+    if not isinstance(data, list):
+        return None
+    seen = set()
+    repeats = []
+    for r in data:
+        try:
+            s, e = int(r["start"]), int(r["end"])
+        except (KeyError, TypeError, ValueError):
+            continue
+        name = r.get("description") or r.get("feature_type") or "repeat"
+        key = (s, e, name)
+        if key in seen:
+            continue
+        seen.add(key)
+        repeats.append((s, e, name))
+    repeats.sort()
+    return repeats
+
+
+def interval_hits_repeats(a_start_1b, a_end_1b, repeats):
+    """Return the name of the first repeat overlapping [a_start, a_end], else None."""
+    if not repeats:
+        return None
+    for s, e, name in repeats:
+        if s <= a_end_1b and e >= a_start_1b:  # intervals overlap
+            return name
+    return None
+
+
+def primer_3p_anchor(primer, role):
+    """1-based [start, end] of the primer's 3' anchor (last THREE_PRIME_ANCHOR bp
+    in priming direction), in + strand genomic coordinates.
+
+    F primer: 3' end is at end_1b (high coord); anchor extends 5' (lower).
+    R primer: 3' end maps to the lowest + strand coord of its binding site
+    (plus_bind_start); anchor extends toward higher coords."""
+    w = THREE_PRIME_ANCHOR - 1
+    if role == 'F':
+        end = primer['end_1b']
+        return (end - w, end)
+    low = primer['plus_bind_start']
+    return (low, low + w)
+
+
+def annotate_repeats(cands, role, repeats):
+    """Tag each candidate with repeat_3p (bool: 3' anchor overlaps a repeat) and
+    repeat_name. No-op (all clear) when repeats is None/empty."""
+    for c in cands:
+        a_start, a_end = primer_3p_anchor(c, role)
+        name = interval_hits_repeats(a_start, a_end, repeats)
+        c['repeat_3p'] = name is not None
+        c['repeat_name'] = name
+
+
+def primer_repeat_status(primer, role, repeats):
+    """Human-readable repeat status for one chosen primer.
+
+    Returns (status_text, flagged) where flagged is True only when the 3' anchor
+    overlaps a repeat (the specificity-critical case)."""
+    if repeats is None:
+        return ("not screened", False)
+    a_start, a_end = primer_3p_anchor(primer, role)
+    anchor_hit = interval_hits_repeats(a_start, a_end, repeats)
+    if anchor_hit:
+        return (f"3' end overlaps {anchor_hit}", True)
+    if role == 'F':
+        fs, fe = primer['start_1b'], primer['end_1b']
+    else:
+        fs, fe = primer['plus_bind_start'], primer['plus_bind_end']
+    span_hit = interval_hits_repeats(fs, fe, repeats)
+    if span_hit:
+        return (f"3' clear; 5' tail in {span_hit}", False)
+    return ("clear", False)
+
+
 def submit_primer_blast(pcr_F_seq, pcr_R_seq, amplicon_start_1b, amplicon_end_1b,
                        chrom, species="homo_sapiens", timeout=60):
     """Submit the PCR primer pair to NCBI Primer-BLAST for off-target checking.
@@ -380,19 +474,25 @@ def find_pam(seq, region_start_1b, grna_strand, grna_genomic_start, grna_len,
 
 def generate_F_candidates(amp_seq, amp_start_1b, cut_1b, amplicon_size_target,
                           length_range=(18, 22), dist_tolerance=25, dist_step=5,
-                          target_dist=None):
+                          target_dist=None, dist_min=None, dist_max=None):
     """Generate F primer candidates at multiple distances upstream of the cut,
     at multiple lengths. F primer = + strand substring.
 
     target_dist overrides the default (amplicon_size_target // 2). For a combined
     multi-cut amplicon, pass the desired distance upstream of the leftmost cut so
     the final product spans the whole cut cluster.
+
+    dist_min/dist_max override the swept distance range (default target_dist ±
+    dist_tolerance). Used for repeat-avoidance, where the primer may need to move
+    far upstream to clear a repeat while keeping the amplicon under the cap.
     Returns list of dicts: {seq, length, dist_from_cut, start_1b, end_1b}."""
     cut_in_seq = cut_1b - amp_start_1b
     if target_dist is None:
         target_dist = amplicon_size_target // 2
+    lo = dist_min if dist_min is not None else target_dist - dist_tolerance
+    hi = dist_max if dist_max is not None else target_dist + dist_tolerance
     candidates = []
-    for dist in range(target_dist - dist_tolerance, target_dist + dist_tolerance + 1, dist_step):
+    for dist in range(lo, hi + 1, dist_step):
         for L in range(length_range[0], length_range[1] + 1):
             # F primer 5' end is at (cut - dist), 3' end is at (cut - dist + L - 1)
             f5 = cut_1b - dist
@@ -415,19 +515,22 @@ def generate_F_candidates(amp_seq, amp_start_1b, cut_1b, amplicon_size_target,
 
 def generate_R_candidates(amp_seq, amp_start_1b, cut_1b, amplicon_size_target,
                           length_range=(18, 22), dist_tolerance=25, dist_step=5,
-                          target_dist=None):
+                          target_dist=None, dist_min=None, dist_max=None):
     """Generate R primer candidates. R primer = RC of + strand at the binding site.
     The R primer's 3' end is at the 5' end of the binding site on + strand.
 
     target_dist overrides the default (amplicon_size_target // 2). For a combined
     multi-cut amplicon, pass the desired distance downstream of the rightmost cut.
+    dist_min/dist_max override the swept distance range (see generate_F_candidates).
     Returns list with same structure as F candidates, plus 'plus_bind_start'/
     'plus_bind_end' (the binding site on + strand) for downstream verification."""
     cut_in_seq = cut_1b - amp_start_1b
     if target_dist is None:
         target_dist = amplicon_size_target // 2
+    lo = dist_min if dist_min is not None else target_dist - dist_tolerance
+    hi = dist_max if dist_max is not None else target_dist + dist_tolerance
     candidates = []
-    for dist in range(target_dist - dist_tolerance, target_dist + dist_tolerance + 1, dist_step):
+    for dist in range(lo, hi + 1, dist_step):
         for L in range(length_range[0], length_range[1] + 1):
             # R primer 3' end (on primer) is at + strand position (cut + dist)
             # The binding site on + strand is from (cut + dist - L + 1) to (cut + dist)
@@ -538,14 +641,24 @@ def verify_R_matches_genome(primer_seq, plus_bind_start, plus_bind_end, amp_seq,
 # ---------- Selection ----------
 
 def select_best_pcr_pair(F_cands, R_cands, cut_1b, amplicon_size_target, tm_min, tm_max,
-                         amp_min=200, amp_max=1500):
-    """Brute-force: pick the (F, R) pair with the highest joint score.
+                         amp_min=200, amp_max=1500, prefer_clean=True):
+    """Brute-force: pick the (F, R) pair with the highest score.
 
     amp_min/amp_max bound the acceptable product length. Defaults suit a single
     cut; for a combined multi-cut amplicon pass a wider window (e.g. up to
-    amplicon_size_target + a margin) so a ~2 kb product is allowed."""
+    amplicon_size_target + a margin) so a ~2 kb product is allowed.
+
+    When prefer_clean is set and candidates carry a 'repeat_3p' flag (from
+    annotate_repeats), selection is strictly lexicographic:
+      1. both primers' 3' anchors repeat-free  (dominant)
+      2. smallest |amplicon - target|          (next)
+      3. existing joint_score (Tm / clamp / 60±2)  (tiebreak)
+    so a repeat-free primer with the smallest near-target amplicon always wins;
+    a repeat-overlapping primer is chosen only if nothing cleaner exists."""
+    CLEAN = 1_000_000_000_000   # dominates everything
+    SIZE = 10_000_000           # dominates joint_score (max ~6e6), below CLEAN
     best = None
-    best_score = -1e9
+    best_score = -1e18
     for f in F_cands:
         if score_primer(f, tm_min, tm_max) < -1e5:
             continue
@@ -557,8 +670,12 @@ def select_best_pcr_pair(F_cands, R_cands, cut_1b, amplicon_size_target, tm_min,
                 continue
             j = joint_score(f, r, cut_1b, f['start_1b'], r['start_1b'],
                             amplicon_size_target, tm_min, tm_max)
-            if j > best_score:
-                best_score = j
+            score = j
+            if prefer_clean:
+                clean = (not f.get('repeat_3p', False)) + (not r.get('repeat_3p', False))
+                score = clean * CLEAN - abs(amp_len - amplicon_size_target) * SIZE + j
+            if score > best_score:
+                best_score = score
                 best = (f, r)
     return best
 
@@ -637,12 +754,16 @@ def fmt_primer_table(rows):
 
 def write_report(out_path, gene, guides, application, amplicon_size,
                  pcr_F, pcr_R, sanger, amp_fasta, amp_fasta_path,
-                 nuclease, chrom, blast_rid=None, blast_url=None, sanger_note=None):
+                 nuclease, chrom, blast_rid=None, blast_url=None, sanger_note=None,
+                 repeats=None, repeat_check_skipped=False):
     """Write the markdown report.
 
     guides: list of guide dicts (one per gRNA sharing this amplicon). Each has
         grna, strand, cut_pos, pam_seq, user_pam, skipped_pam, all_matches.
     sanger: list of (name, role, primer_dict) where role is 'F' or 'R'.
+    repeats: list of (start,end,name) repeat intervals over the window, or None
+        if screening was unavailable/skipped (repeat_check_skipped distinguishes
+        a deliberate --no-repeat-check from an API failure).
     """
     combined = len(guides) > 1
     amp_actual_len = pcr_R['end_1b'] - pcr_F['start_1b'] + 1
@@ -742,6 +863,40 @@ def write_report(out_path, gene, guides, application, amplicon_size,
             f.write(amp_fasta[i:i + 60] + "\n")
         f.write("```\n\n")
         f.write(f"FASTA also written to: `{amp_fasta_path}`\n\n")
+
+        # Repeat screening section.
+        f.write("## Repeat screening\n\n")
+        if repeat_check_skipped:
+            f.write("Skipped (`--no-repeat-check`). Primers were **not** checked against known "
+                    "repetitive elements — verify specificity via Primer-BLAST below.\n\n")
+        elif repeats is None:
+            f.write("Unavailable — the Ensembl repeat annotation could not be fetched, so primers "
+                    "were **not** screened for repetitive elements. Rely on the Primer-BLAST check "
+                    "below, or rerun later.\n\n")
+        else:
+            screen = [("PCR-F", pcr_F, 'F'), ("PCR-R", pcr_R, 'R')]
+            for name, role, p in sanger:
+                if p:
+                    screen.append((name, p, role))
+            any_flag = False
+            f.write("| Primer | Repeat status |\n|---|---|\n")
+            for label, p, role in screen:
+                status, flagged = primer_repeat_status(p, role, repeats)
+                if flagged:
+                    any_flag = True
+                    status = f"⚠ {status}"
+                f.write(f"| {gene}_{label} | {status} |\n")
+            f.write("\n")
+            if amp_actual_len > amplicon_size + 50:
+                f.write(f"_Amplicon was sized to {amp_actual_len} bp (target {amplicon_size}) to place "
+                        f"the PCR primers in repeat-free sequence._\n\n")
+            if any_flag:
+                f.write("> **A PCR primer's 3′ end still overlaps a repeat** — no repeat-free site was "
+                        "found within the amplicon-size cap. Options: raise `--max-amplicon`, move the "
+                        "opposite primer, or rely on the Primer-BLAST result below before ordering.\n\n")
+            else:
+                f.write("All PCR primer 3′ ends are clear of annotated repeats (Alu/LINE/low-complexity). "
+                        "Sanger primers are informational (they sit inside the amplicon).\n\n")
 
         if blast_rid and blast_url:
             f.write("## Off-target check (NCBI Primer-BLAST)\n\n")
@@ -848,33 +1003,58 @@ def locate_guide(seq, region_start, chrom, grna, user_pam, args):
     }
 
 
-def fetch_amplicon_window(chrom, left_cut, right_cut, amp_target, species):
-    """Fetch the + strand window spanning the cut cluster with primer-picking margin."""
+def fetch_amplicon_window(chrom, left_cut, right_cut, max_amplicon, species):
+    """Fetch the + strand window spanning the cut cluster with primer-picking margin.
+
+    Sized by max_amplicon (the repeat-avoidance cap) so candidate primers can be
+    placed far enough out to clear a repeat while staying inside the fetched seq."""
     span = right_cut - left_cut
     mid = (left_cut + right_cut) // 2
-    win = amp_target + span + 400
+    win = max_amplicon + span + 400
     start = max(1, mid - win // 2)
     end = mid + win // 2
     print(f"Fetching amplicon window {chrom}:{start}-{end}...")
     return fetch_region(chrom, start, end, species)
 
 
-def design_amplicon(gene, chrom, guides, args, application, amp_target):
+def design_amplicon(gene, chrom, guides, args, application, amp_target, max_amplicon):
     """Design one PCR pair + Sanger primers spanning all guides' cut sites, verify,
     and write the report + FASTA. guides may be length 1 (single cut) or more
-    (combined cluster). Returns the markdown path."""
+    (combined cluster). Returns the markdown path.
+
+    max_amplicon caps how large the amplicon may grow when moving a primer out of
+    a repeat (repeat-avoidance)."""
     cuts = sorted(g['cut_pos'] for g in guides)
     left_cut, right_cut = cuts[0], cuts[-1]
     span = right_cut - left_cut
     combined = len(guides) > 1
 
-    amp_seq, amp_start = fetch_amplicon_window(chrom, left_cut, right_cut, amp_target, args.species)
+    amp_seq, amp_start = fetch_amplicon_window(chrom, left_cut, right_cut, max_amplicon, args.species)
+
+    # Repeat screening (RepeatMasker via Ensembl). None = unavailable/skipped.
+    repeats = None
+    if not args.no_repeat_check:
+        repeats = fetch_repeats(chrom, amp_start, amp_start + len(amp_seq) - 1, args.species)
+        if repeats is not None:
+            print(f"  Repeat screening: {len(repeats)} annotated repeat interval(s) in window.")
 
     # PCR candidates: F upstream of the leftmost cut, R downstream of the rightmost.
     print("Generating primer candidates (one pass)...")
     target_dist = max(60, (amp_target - span) // 2)
-    F_cands = generate_F_candidates(amp_seq, amp_start, left_cut, amp_target, target_dist=target_dist)
-    R_cands = generate_R_candidates(amp_seq, amp_start, right_cut, amp_target, target_dist=target_dist)
+    if repeats is not None:
+        # Widen the search so a primer can step out of a repeat while the amplicon
+        # stays under the cap; selection still prefers the smallest clean amplicon.
+        dmin = max(60, target_dist - 25)
+        dmax = max(dmin, max_amplicon - span - 60)
+        F_cands = generate_F_candidates(amp_seq, amp_start, left_cut, amp_target,
+                                        target_dist=target_dist, dist_min=dmin, dist_max=dmax)
+        R_cands = generate_R_candidates(amp_seq, amp_start, right_cut, amp_target,
+                                        target_dist=target_dist, dist_min=dmin, dist_max=dmax)
+        annotate_repeats(F_cands, 'F', repeats)
+        annotate_repeats(R_cands, 'R', repeats)
+    else:
+        F_cands = generate_F_candidates(amp_seq, amp_start, left_cut, amp_target, target_dist=target_dist)
+        R_cands = generate_R_candidates(amp_seq, amp_start, right_cut, amp_target, target_dist=target_dist)
     print(f"  -> {len(F_cands)} F candidates, {len(R_cands)} R candidates")
 
     print(f"Selecting best PCR pair (Tm {args.tm_min}-{args.tm_max} °C, amplicon {amp_target} bp"
@@ -882,7 +1062,7 @@ def design_amplicon(gene, chrom, guides, args, application, amp_target):
     pcr_pair = select_best_pcr_pair(
         F_cands, R_cands, (left_cut + right_cut) // 2, amp_target,
         args.tm_min, args.tm_max,
-        amp_min=max(150, span + 120), amp_max=amp_target + 400)
+        amp_min=max(150, span + 120), amp_max=max_amplicon)
     if pcr_pair is None:
         sys.exit("ERROR: no PCR primer pair meets Tm + amplicon-size constraints. "
                  "Try widening --tm-min/--tm-max or adjusting --amplicon-size.")
@@ -975,7 +1155,8 @@ def design_amplicon(gene, chrom, guides, args, application, amp_target):
     write_report(md_path, gene, guides, application, amp_target,
                  pcr_F, pcr_R, sanger, amp_fasta, fa_path,
                  args.nuclease, chrom, blast_rid=blast_rid, blast_url=blast_url,
-                 sanger_note=sanger_note)
+                 sanger_note=sanger_note,
+                 repeats=repeats, repeat_check_skipped=args.no_repeat_check)
     print(f"Done ({gene}/{label}). Cut site(s) at amplicon bp {', '.join(str(m) for m in cut_marks)}.\n")
     return md_path
 
@@ -1014,6 +1195,14 @@ def main():
                     help="Bypass PAM validation. Use when the nuclease is non-standard (xCas9, SaCas9, "
                          "custom), or when you have user-validated data that the cut still happens. "
                          "The genome's actual 3 bp 3' of the protospacer will be reported as the PAM.")
+    ap.add_argument("--max-amplicon", type=int, default=None,
+                    help="Cap (bp) on how large the amplicon may grow when moving a PCR primer "
+                         "out of a repeat. Default: ceil(1.5 x amplicon target). Raise it if a "
+                         "primer is flagged as still overlapping a repeat.")
+    ap.add_argument("--no-repeat-check", action="store_true",
+                    help="Skip the Ensembl repeat (RepeatMasker) screen entirely. Use offline, or "
+                         "for species/assemblies with poor repeat annotation. Specificity then "
+                         "rests on the Primer-BLAST check alone.")
     ap.add_argument("--output-dir", default=".",
                     help="Directory to write the markdown report and FASTA (default: cwd)")
     args = ap.parse_args()
@@ -1045,8 +1234,13 @@ def main():
     # Decide combined vs separate. Amplicon defaults to a uniform 2 kb everywhere
     # (overridable with --amplicon-size) so all loci share one PCR condition.
     amp_target = explicit_amp or DEFAULT_AMPLICON_SIZE
+    # Repeat-avoidance amplicon cap (how far a primer may move to clear a repeat).
+    max_amplicon = args.max_amplicon or math.ceil(1.5 * amp_target)
+    if max_amplicon < amp_target:
+        sys.exit(f"ERROR: --max-amplicon ({max_amplicon}) is smaller than the amplicon target ({amp_target}).")
+
     if len(guides) == 1:
-        design_amplicon(gene, chrom, guides, args, application, amp_target)
+        design_amplicon(gene, chrom, guides, args, application, amp_target, max_amplicon)
         return
 
     cuts = sorted(g['cut_pos'] for g in guides)
@@ -1054,12 +1248,12 @@ def main():
     if span <= PCR_COMBINE_MAX_SPAN:
         print(f"\n{len(guides)} gRNAs cut within {span} bp (<= {PCR_COMBINE_MAX_SPAN} bp) - "
               f"designing ONE combined amplicon of {amp_target} bp.\n")
-        design_amplicon(gene, chrom, guides, args, application, amp_target)
+        design_amplicon(gene, chrom, guides, args, application, amp_target, max_amplicon)
     else:
         print(f"\n{len(guides)} gRNAs cut {span} bp apart (> {PCR_COMBINE_MAX_SPAN} bp) — "
               f"too far to combine; designing each independently ({amp_target} bp each).\n")
         for g in guides:
-            design_amplicon(gene, chrom, [g], args, application, amp_target)
+            design_amplicon(gene, chrom, [g], args, application, amp_target, max_amplicon)
 
 
 if __name__ == "__main__":
