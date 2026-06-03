@@ -1,6 +1,6 @@
 ---
 name: ui-mockup
-description: Generates a static HTML mockup as the visual contract for non-trivial UI work. Sits between brief approval and execution-plan drafting. One file, inline CSS, no JS framework, no build. Reuses repo design tokens. PM iterates via inline `<!-- pm: -->` comments. Mockup-vs-brief conflicts route back to brief revision.
+description: Generates a static HTML mockup as the visual contract for non-trivial UI work. Sits between brief approval and execution-plan drafting. One file, inline CSS, no JS framework, no build. Reuses repo design tokens. PM iterates via conversational feedback in chat. Mockup-vs-brief conflicts route back to brief revision.
 ---
 
 # ui-mockup
@@ -19,7 +19,7 @@ You produce a single static `mockup.html` that serves as the visual contract for
 2. **Reuse repo styles where they exist.** Discovery order is fixed; the mockup names what it found and what it fell back to.
 3. **No fabrication.** If the brief is silent on a UI element, leave a TODO marker rather than inventing.
 4. **Throwaway, not polished.** The mockup proves layout and IA — not pixel fidelity.
-5. **PM feedback marker.** Inline `<!-- pm: ... -->` comments and a sibling `mockup-feedback.md` are the two iteration channels. Both must be supported.
+5. **PM feedback is conversational.** The PM describes changes in chat; the skill re-emits `mockup.html` (output-only). No inline-comment or sibling-feedback-file editing.
 6. **Conflict-back-to-brief.** A PM comment that contradicts a brief deliverable is not silently applied — the conflict is surfaced and the workflow loops back to brief revision.
 
 ---
@@ -82,7 +82,7 @@ Structure:
 
 Write `<feature-folder>/mockup.html`. Return path and announce:
 
-> "Mockup drafted at `<path>`. Discovery: `<what was found>`. Review by opening the file in a browser. Add `<!-- pm: ... -->` comments inline (or write a sibling `mockup-feedback.md`) and reply 'revise', or reply 'approve' to proceed to execution planning."
+> "Mockup drafted at `<path>`. Discovery: `<what was found>`. Review by opening the file in a browser. Describe any changes in chat and reply 'revise', or reply 'approve' to proceed to execution planning."
 
 Do NOT auto-advance.
 
@@ -95,13 +95,13 @@ Do NOT auto-advance.
 You receive:
 - Path to existing `mockup.html`
 - Brief path (for conflict checks)
-- PM feedback (inline `<!-- pm: ... -->` comments and/or sibling `mockup-feedback.md`)
+- PM feedback (given conversationally in chat)
 
 ### Task — collect feedback
 
-1. Read `mockup.html`. Find every `<!-- pm: ... -->` comment.
-2. Read `<feature-folder>/mockup-feedback.md` if it exists.
-3. Build a list of feedback items, each tagged with its source (inline / feedback-file).
+1. Read `mockup.html` (via the store cache / `store.sh read`).
+2. Take the PM's chat feedback as the list of items.
+3. (no file-embedded feedback — the record is output-only.)
 
 ### Task — conflict scan (per item)
 
@@ -110,8 +110,7 @@ For each feedback item, scan brief deliverables and HARD DECISIONs for textual c
 ### Task — apply non-conflicting items
 
 For each non-conflicting item:
-1. Address the feedback in-place.
-2. Remove the inline `<!-- pm: -->` comment, OR mark the line in `mockup-feedback.md` as `applied`.
+1. Apply the change and re-emit `mockup.html` with it.
 
 ### Task — append revision-log block
 
@@ -129,7 +128,7 @@ Write `mockup.html`. Announce:
 
 **Plan-mode entry-check:** if plan mode is active, call `ExitPlanMode` before writing files. (`execution-plan` is the only skill exempt from this rule.)
 
-Triggered when a PM mockup-feedback item contradicts a brief deliverable or HARD DECISION.
+Triggered when a PM feedback item contradicts a brief deliverable or HARD DECISION.
 
 ### Task — surface the contradiction
 
@@ -141,7 +140,7 @@ Show the PM:
 ### Task — route
 
 - **revise brief** → invoke `strategic-implementation:product-brief-drafter` in `revise` mode, passing the conflict as out-of-band feedback. After brief revision, the orchestrator returns to mockup revision.
-- **abandon mockup change** → drop the feedback item; remove the comment or mark `dropped` in `mockup-feedback.md`. Continue with remaining items.
+- **abandon mockup change** → drop the feedback item. Continue with remaining items.
 
 A mockup never silently overrides the brief. The brief is the contract; the mockup is its visualization.
 

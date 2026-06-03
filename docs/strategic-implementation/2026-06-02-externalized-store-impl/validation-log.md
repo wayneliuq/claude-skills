@@ -41,6 +41,20 @@ _Feature: externalized-store-impl · Started: 2026-06-02 · Autonomy: auto_
 **Approach:** appended the Record-routing convention to all 8 record-touching stages (incl. `review` reader + orchestrator session-entry bootstrap) and added a tested fallback-safe `store.sh put` primitive. Harness drove the rewired write sequence for a synthetic `__e2e__` feature via `put` → 4 records listed in the store, zero happy-path fallback files, no `__e2e__` artifacts in the repo, durable tier untouched; FALLBACK test (fake failing `gh` on PATH) → `put` wrote the in-repo fallback path (nothing dropped); conflict surfaced (exit 3) without fallback. SKILL routing prose verified by close-read; runtime activation deferred to plugin-update (cutover caveat).
 **Note:** simplify F-01 (unused `si_locator_exists`) resolved here — wired as the locator-presence check in `store.sh put`.
 
+## APPROACH — D5
+**Method:** post-hoc (grep + close-read)
+**Domains:** skill-rewiring
+**Approach:** retired the file-edit feedback channels — `<!-- pm: -->` brief/mockup comments, `mockup-feedback.md`, `<!-- pm-disposition: -->` — replacing each with conversational feedback (chat → re-emit the output-only record) per spec §9. Validated by grepping the SKILL set → zero surviving channel instructions, and confirming the brief/mockup revise flows + simplify disposition positively restate conversational feedback.
+
+## DEV-004
+**Type:** ambiguity-decision
+**Deliverable:** D5
+**Plan said:** D5 Files = product-brief-drafter, ui-mockup, simplify, executing-plans.
+**Actually:** the feedback channels also lived in the orchestrator (`strategic-implementation/SKILL.md` brief + mockup revision loops) and `post-execution/SKILL.md` (disposition reference); the planned file list was incomplete. The post-hoc grep caught them.
+**Resolution:** extended D5 to edit those two files too (within the same deliverable) so no channel survives. Confirmed by re-grep → none.
+**Downstream impact?** no
+**Agent category:** alignment
+
 ## APPROACH — D3
 **Method:** integration-test (live)
 **Domains:** github / gh-cli / filesystem

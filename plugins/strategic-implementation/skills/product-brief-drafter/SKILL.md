@@ -23,7 +23,7 @@ You produce `product-brief_<slug>.md` — the single PM-approvable artifact for 
 6. **No implementation leakage in §2 or §5.** Deliverable descriptions, acceptance steps, and HARD DECISION rows must not name a specific library, package, file path, function name, framework feature, data structure, algorithm, schema column, wire-format detail, or test artifact. The forbidden altitude is anything a non-engineer wouldn't recognize from using the product. **Allowed at strategic altitude:** the named target user's interaction surface; couplings of the form "shared with component X" or "reuses the existing X model" (component identity is allowed, technique is not); the user-observable thing itself, if that thing IS a specific tool/skill being adopted. Implementation belongs in execution-plan, not the brief.
 7. **HARD DECISIONs are explicit AND stay at strategic altitude.** A PM statement with tight language ("must," "non-negotiable," "only way") becomes a `[HARD DECISION]` row and cannot be reversed by reviewers downstream. Each HARD DECISION must be one of: (a) a user-observable behavior the PM is locking in; (b) a coupling at "shared with component X" altitude; (c) a PM-verbatim constraint. A HARD DECISION must not name a specific library/package/technique unless that technique is itself the user-observable thing being decided.
 8. **Compact decision rows.** One line each. Full tradeoff tables only for items marked `[HARD DECISION]` or when the PM explicitly asks for one.
-9. **Inline markdown feedback markers.** In revise mode, the PM's `<!-- pm: ... -->` comments in the existing brief are addressed in-place and removed. Do not leave them behind.
+9. **Conversational feedback.** In revise mode, the PM's feedback arrives in chat (not as edits to the brief file); the drafter applies it and re-emits the brief record. The brief is output-only and is never hand-edited to convey feedback.
 10. **Working backwards is section 1.** The release-note paragraph is written before any deliverables are listed. If clarify passed `working-backwards: TBD`, write `TBD — open question` verbatim — do not fabricate one. Same rule for `success-signal: TBD`.
 
 ---
@@ -101,7 +101,7 @@ After leakage gate PASS, also emit the **specialist recommendation sidecar** (se
 
 On PASS, return the absolute path to the brief and announce:
 
-> "Product brief drafted at `<path>`. Review inline — add `<!-- pm: ... -->` comments for revisions, or reply 'approve' to proceed to execution planning."
+> "Product brief drafted at `<path>`. Review it (open the local mirror via the store cache); describe any revisions in chat and I'll re-emit it, or reply 'approve' to proceed to execution planning."
 
 Do NOT auto-advance. The PM approves the brief explicitly.
 
@@ -189,12 +189,12 @@ Default to **fewer** recommendations. An empty list is the correct answer for ba
 
 You receive:
 - Path to the existing brief
-- PM inline feedback (embedded as `<!-- pm: ... -->` comments in the brief, plus any out-of-band message)
+- PM feedback, given conversationally in chat
 
 Steps:
-1. Read the brief.
-2. Find every `<!-- pm: ... -->` comment. For each: address the feedback in-place, then remove the comment.
-3. Apply any out-of-band feedback from the PM message.
+1. Read the brief (via the store cache / `store.sh read`).
+2. Apply each point of the PM's chat feedback to the brief.
+3. (merged into step 2 — all feedback is conversational.)
 4. Append a revision-log row: `- v0.N · <date> · <one-sentence summary of what changed>`.
 5. Write the brief back.
 

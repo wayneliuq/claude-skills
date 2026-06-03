@@ -300,7 +300,7 @@ If `DELIVERABLES_SINCE >= every_n_deliverables` OR `LOC_SINCE >= loc_threshold`:
 
 **Surface the report.** Append to chat:
 
-> Simplify report: `<path>` — <total> findings (high: <h>, med: <m>, low: <l>). Disposition each finding (`<!-- pm-disposition: apply|defer|dismiss -->`) before the next deliverable, or proceed and let unfilled dispositions surface in the deviation log.
+> Simplify report: `<path>` — <total> findings (high: <h>, med: <m>, low: <l>). Disposition each finding conversationally (apply / defer / dismiss) before the next deliverable, or proceed and let undispositioned findings surface in the deviation log.
 
 **Disposition rules:**
 - `supervised`: pause for PM to fill every finding's disposition before next deliverable.

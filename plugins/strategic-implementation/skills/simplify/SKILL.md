@@ -98,12 +98,10 @@ _Target ref: `<base>...HEAD` · Date: <date> · Mode: <graph-first | read-fallba
 **Why:** <one paragraph; cite graph evidence if applicable, e.g. "duplicates `existing_symbol at other/file.py:88` per semantic_search_nodes>0.85">
 **Suggested action:** <one sentence>
 
-<!-- pm-disposition: -->
-
 ### F-02 — ...
 ```
 
-Each finding ends with the literal line `<!-- pm-disposition: -->`. The PM (or `executing-plans` / `post-execution` running in `supervised`) fills the comment with `apply` / `defer` / `dismiss`. The skill never edits source.
+The report is output-only. The PM dispositions each finding **conversationally** (`apply` / `defer` / `dismiss`) in chat — `executing-plans` / `post-execution` record the disposition; the report file is not hand-edited. The skill never edits source.
 
 ## Step 6 — Output
 

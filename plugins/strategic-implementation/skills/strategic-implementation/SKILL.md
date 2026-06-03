@@ -72,7 +72,7 @@ The drafter writes `product-brief_<slug>.md` to a new feature folder. It returns
 ### Revision loop
 
 The PM reviews the brief. They can:
-- Add inline `<!-- pm: ... -->` comments and reply "revise" → invoke `product-brief-drafter` in `revise` mode.
+- Describe revisions in chat and reply "revise" → invoke `product-brief-drafter` in `revise` mode (the brief record is re-emitted; never hand-edited).
 - Reply "approve" → proceed to Step 4.
 
 Do not prompt the PM to decide — wait for their signal. The loop runs as many times as needed.
@@ -102,8 +102,8 @@ Estimate `<N>` from the brief's UI surface area. `small ≤200`, `medium 200–6
 **On confirm** — invoke `strategic-implementation:ui-mockup` in `generate` mode with the brief path and feature folder. The skill writes `mockup.html` to the feature folder.
 
 **Mockup revision loop.** Mirrors the brief revision loop:
-- PM adds `<!-- pm: ... -->` comments inline (or writes a sibling `mockup-feedback.md`) and replies "revise" → invoke `ui-mockup` in `revise` mode.
-- If a comment contradicts a brief deliverable or HARD DECISION, `ui-mockup` switches to `conflict-back-to-brief` mode and routes back to `product-brief-drafter:revise`. After the brief is revised, the workflow returns to Step 3.5 (re-emit estimate or proceed with revised mockup).
+- PM describes changes in chat and replies "revise" → invoke `ui-mockup` in `revise` mode (the mockup record is re-emitted).
+- If a feedback item contradicts a brief deliverable or HARD DECISION, `ui-mockup` switches to `conflict-back-to-brief` mode and routes back to `product-brief-drafter:revise`. After the brief is revised, the workflow returns to Step 3.5 (re-emit estimate or proceed with revised mockup).
 - PM replies "approve" → proceed to Step 4 with `Mockup path` set.
 
 **On skip** — proceed directly to Step 4 with no `Mockup path`.
