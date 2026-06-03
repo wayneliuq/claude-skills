@@ -27,6 +27,30 @@ import urllib.request
 import urllib.error
 import urllib.parse
 
+# ---------- Multi-gRNA thresholds ----------
+# When two (or more) gRNAs target the same gene and their cut sites fall within
+# PCR_COMBINE_MAX_SPAN of each other, a single PCR amplicon (default
+# COMBINED_AMPLICON_DEFAULT bp) is designed to span the whole cluster.
+#
+# Sanger note: a Sanger trace is a superposition of alleles immediately 3' of
+# any cut it reads through, so one read can only cleanly decompose the FIRST cut
+# it reaches. We therefore always emit an F + R Sanger pair (F decomposes the
+# leftmost cut, R the rightmost). A SINGLE forward read can cover both cut
+# positions only when the cuts are assayed in separate single-cut samples AND
+# their spread is within the clean decomposition window — which is tighter for
+# TIDE than for ICE (SANGER_SINGLE_READ_MAX, by application).
+PCR_COMBINE_MAX_SPAN = 1000        # bp between outermost cut sites
+COMBINED_AMPLICON_DEFAULT = 2000   # bp, default product when combining
+SANGER_SINGLE_READ_MAX = {         # bp; one Sanger read covers this spread (single-cut samples)
+    "ICE": 500,
+    "TIDE": 200,
+    "AMPLICON-NGS": 500,
+}
+
+
+def sanger_single_read_max(application):
+    return SANGER_SINGLE_READ_MAX.get(application.upper(), 500)
+
 # ---------- Tm calculation ----------
 
 # SantaLucia 1998 unified nearest-neighbor parameters (dH kcal/mol, dS cal/mol/K)
@@ -191,46 +215,53 @@ def submit_primer_blast(pcr_F_seq, pcr_R_seq, amplicon_start_1b, amplicon_end_1b
         # Primer-BLAST POST endpoint
         endpoint = "https://www.ncbi.nlm.nih.gov/tools/primer-blast/primertool.cgi"
         # Species for Primer-BLAST: scientific name, not Ensembl slug
-        sci_name = {"homo_sapiens": "Homo sapiens", "mus_musculus": "Mus musculus"}.get(species, "Homo sapiens")
-        # Build the form payload
+        sci_name = {"homo_sapiens": "Homo sapiens", "mus_musculus": "Mus musculus",
+                    "rattus_norvegicus": "Rattus norvegicus"}.get(species, "Homo sapiens")
+        # Build the form payload. Field names mirror the live Primer-BLAST form:
+        #   - PRIMER_LEFT_INPUT / PRIMER_RIGHT_INPUT  (the user-supplied primers)
+        #   - SEARCH_SPECIFIC_PRIMER=on              (check given primers, don't design new ones)
+        #   - PRIMER_SPECIFICITY_DATABASE value is the option *value*, not its label
+        # (The earlier PRIMER5_INPUT/PRIMER3_INPUT names were wrong — the server
+        #  rejected them with "No sequence input was provided".)
         payload = {
-            "PRIMER5_INPUT": pcr_F_seq,
-            "PRIMER3_INPUT": pcr_R_seq,
-            "PRIMER_SPECIFICITY_DATABASE": "Genome (reference subsets from selected organisms)",
+            "PRIMER_LEFT_INPUT": pcr_F_seq,
+            "PRIMER_RIGHT_INPUT": pcr_R_seq,
+            "SEARCH_SPECIFIC_PRIMER": "on",
+            "PRIMER_SPECIFICITY_DATABASE": "PRIMERDB/genome_selected_species",
             "ORGANISM": sci_name,
-            "PRIMER_TASK": "generic",
-            "PRIMER_PICK_LEFT_PRIMER": "",
-            "PRIMER_PICK_INTERNAL_PRIMER": "",
-            "PRIMER_PICK_RIGHT_PRIMER": "",
-            "PRIMER_OPT_SIZE": "20",
-            "PRIMER_MIN_SIZE": "18",
-            "PRIMER_MAX_SIZE": "25",
-            "PRIMER_PRODUCT_MIN": str(max(100, amplicon_end_1b - amplicon_start_1b - 100)),
+            "TM_METHOD": "1",  # SantaLucia 1998
+            "PRIMER_PRODUCT_MIN": str(max(70, amplicon_end_1b - amplicon_start_1b - 100)),
             "PRIMER_PRODUCT_MAX": str(amplicon_end_1b - amplicon_start_1b + 100),
             "PRIMER_MIN_TM": "57.0",
             "PRIMER_OPT_TM": "60.0",
             "PRIMER_MAX_TM": "63.0",
-            "PRIMER_SPECIFICITY_STRING": f"{chrom}:{amplicon_start_1b}-{amplicon_end_1b}",
         }
         body = urllib.parse.urlencode(payload).encode()
         req = urllib.request.Request(endpoint, data=body, headers={
             'Content-Type': 'application/x-www-form-urlencoded',
-            'User-Agent': 'crispr-primer-design/1.0 (off-target check)',
+            'User-Agent': 'Mozilla/5.0 (crispr-primer-design off-target check)',
         })
         with urllib.request.urlopen(req, timeout=timeout) as r:
             html = r.read().decode(errors='replace')
     except Exception as e:
         print(f"  (Primer-BLAST submission failed: {e})")
         return None, None
-    # Extract RID from the response (Primer-BLAST returns an HTML page with a RID)
-    m = re.search(r'PRD-RID=([A-Z0-9]+)', html) or re.search(r'"rid"\s*:\s*"([A-Z0-9]+)"', html) \
-        or re.search(r'Request\s*ID[^>]*>\s*([A-Z0-9]+)', html, re.IGNORECASE)
-    if not m:
-        # Sometimes the response is the immediate results page; the user can find the RID in the URL
-        m = re.search(r'[?&]RID=([A-Z0-9]+)', html)
-    if m:
-        rid = m.group(1)
-        return rid, f"https://www.ncbi.nlm.nih.gov/tools/primer-blast/?RID={rid}"
+    # Surface server-side validation errors instead of silently returning None.
+    err = re.search(r'class="error">\s*(?:<p[^>]*>)?\s*([^<]+)', html)
+    if err and 'error' in err.group(1).lower():
+        print(f"  (Primer-BLAST rejected the submission: {err.group(1).strip()})")
+        return None, None
+    # Modern Primer-BLAST returns a job_key + ctg_time pair; results are polled at
+    #   primertool.cgi?ctg_time=<t>&job_key=<k>
+    jk = re.search(r'job_key=([A-Za-z0-9_\-]+)', html) \
+        or re.search(r'name="job_key"\s*value="([A-Za-z0-9_\-]+)"', html)
+    ct = re.search(r'ctg_time=(\d+)', html) \
+        or re.search(r'name="ctg_time"\s*value="(\d+)"', html)
+    if jk and ct:
+        job_key = jk.group(1)
+        url = ("https://www.ncbi.nlm.nih.gov/tools/primer-blast/primertool.cgi"
+               f"?ctg_time={ct.group(1)}&job_key={job_key}")
+        return job_key, url
     return None, None
 
 
@@ -341,12 +372,18 @@ def find_pam(seq, region_start_1b, grna_strand, grna_genomic_start, grna_len,
 # ---------- Primer candidate generation ----------
 
 def generate_F_candidates(amp_seq, amp_start_1b, cut_1b, amplicon_size_target,
-                          length_range=(18, 22), dist_tolerance=25, dist_step=5):
+                          length_range=(18, 22), dist_tolerance=25, dist_step=5,
+                          target_dist=None):
     """Generate F primer candidates at multiple distances upstream of the cut,
     at multiple lengths. F primer = + strand substring.
+
+    target_dist overrides the default (amplicon_size_target // 2). For a combined
+    multi-cut amplicon, pass the desired distance upstream of the leftmost cut so
+    the final product spans the whole cut cluster.
     Returns list of dicts: {seq, length, dist_from_cut, start_1b, end_1b}."""
     cut_in_seq = cut_1b - amp_start_1b
-    target_dist = amplicon_size_target // 2
+    if target_dist is None:
+        target_dist = amplicon_size_target // 2
     candidates = []
     for dist in range(target_dist - dist_tolerance, target_dist + dist_tolerance + 1, dist_step):
         for L in range(length_range[0], length_range[1] + 1):
@@ -370,13 +407,18 @@ def generate_F_candidates(amp_seq, amp_start_1b, cut_1b, amplicon_size_target,
 
 
 def generate_R_candidates(amp_seq, amp_start_1b, cut_1b, amplicon_size_target,
-                          length_range=(18, 22), dist_tolerance=25, dist_step=5):
+                          length_range=(18, 22), dist_tolerance=25, dist_step=5,
+                          target_dist=None):
     """Generate R primer candidates. R primer = RC of + strand at the binding site.
     The R primer's 3' end is at the 5' end of the binding site on + strand.
+
+    target_dist overrides the default (amplicon_size_target // 2). For a combined
+    multi-cut amplicon, pass the desired distance downstream of the rightmost cut.
     Returns list with same structure as F candidates, plus 'plus_bind_start'/
     'plus_bind_end' (the binding site on + strand) for downstream verification."""
     cut_in_seq = cut_1b - amp_start_1b
-    target_dist = amplicon_size_target // 2
+    if target_dist is None:
+        target_dist = amplicon_size_target // 2
     candidates = []
     for dist in range(target_dist - dist_tolerance, target_dist + dist_tolerance + 1, dist_step):
         for L in range(length_range[0], length_range[1] + 1):
@@ -402,38 +444,42 @@ def generate_R_candidates(amp_seq, amp_start_1b, cut_1b, amplicon_size_target,
 
 # ---------- Scoring ----------
 
-def score_primer(p, tm_min, tm_max, weight_tm=100, weight_clamp=10, weight_gc=5,
-                 weight_no_homopolymer=50, weight_good_gc=5, tm_wallace_target=60):
+PREF_TM_HALF_WINDOW = 2.0  # °C; the "60 ± 2" preferred window
+
+
+def score_primer(p, tm_min, tm_max, pref_half=PREF_TM_HALF_WINDOW):
     """Composite score for a primer candidate. Higher = better.
 
-    The Tm filter uses Wallace (the simple lab formula). The user's target
-    57-63 °C is consistent with Wallace, not with the SantaLucia NN at
-    Phusion conditions (which gives ~70-78 °C for high-GC primers and would
-    require a different target window). We report both Tms in the output but
-    filter on the one the user actually asked for.
+    Selection rule (lexicographic, by descending priority tier):
+      Tier 3  Wallace Tm within target ± pref_half AND a 3' G/C clamp
+      Tier 2  Wallace Tm within target ± pref_half (no 3' clamp)
+      Tier 1  Wallace Tm within the broad [tm_min, tm_max] window
+    Within a tier, closer to the target Tm scores higher. The target is the
+    midpoint of [tm_min, tm_max] (60 °C for the default 57-63 window), so a
+    clamped 58-62 °C primer is always preferred over a clamp-less one even if
+    the clamp-less one is marginally closer to 60 °C. Only when no in-window
+    primer has a clamp do we fall back to the closest-to-target in-window
+    primer; only when nothing lands in the preferred window do we use the
+    broad window.
 
-    The Tm filter is hard: Tm outside [tm_min, tm_max] makes the primer
-    un-selectable (returns very negative score)."""
+    Tm uses Wallace (the simple lab formula); the SantaLucia NN value is
+    reported separately. Homopolymer runs and GC% outside 30-70 are hard
+    rejects (very negative score, same sentinel the callers test with < -1e5)."""
     seq = p['seq']
     if has_homopolymer_run(seq, n=5):
         return -1e6
     gc = gc_content(seq)
     if gc < 30 or gc > 70:
         return -1e6
-    tm = tm_wallace(seq)  # filter on Wallace (matches user's target window)
-    if tm < tm_min or tm > tm_max:
-        return -1e6
-    score = 0
-    # Tm closeness to 60 °C
-    score += weight_tm - abs(tm - tm_wallace_target) * 5
-    # 3' G/C clamp
-    if seq[-1] in 'GC':
-        score += weight_clamp
-    if len(seq) >= 2 and seq[-2] in 'GC':
-        score += weight_clamp // 2
-    # GC content near 50%
-    score += weight_good_gc - abs(gc - 50) * 0.5
-    return score
+    tm = tm_wallace(seq)
+    target = (tm_min + tm_max) / 2.0
+    closeness = 100 - abs(tm - target) * 10  # higher when nearer the target Tm
+    clamp = seq[-1] in 'GC'
+    if abs(tm - target) <= pref_half:
+        return (3_000_000 if clamp else 2_000_000) + closeness
+    if tm_min <= tm <= tm_max:
+        return 1_000_000 + closeness
+    return -1e6
 
 
 def joint_score(f, r, cut_1b, f_5p, r_5p_1b, amplicon_size_target, tm_min, tm_max):
@@ -484,8 +530,13 @@ def verify_R_matches_genome(primer_seq, plus_bind_start, plus_bind_end, amp_seq,
 
 # ---------- Selection ----------
 
-def select_best_pcr_pair(F_cands, R_cands, cut_1b, amplicon_size_target, tm_min, tm_max):
-    """Brute-force: pick the (F, R) pair with the highest joint score."""
+def select_best_pcr_pair(F_cands, R_cands, cut_1b, amplicon_size_target, tm_min, tm_max,
+                         amp_min=200, amp_max=1500):
+    """Brute-force: pick the (F, R) pair with the highest joint score.
+
+    amp_min/amp_max bound the acceptable product length. Defaults suit a single
+    cut; for a combined multi-cut amplicon pass a wider window (e.g. up to
+    amplicon_size_target + a margin) so a ~2 kb product is allowed."""
     best = None
     best_score = -1e9
     for f in F_cands:
@@ -495,7 +546,7 @@ def select_best_pcr_pair(F_cands, R_cands, cut_1b, amplicon_size_target, tm_min,
             if score_primer(r, tm_min, tm_max) < -1e5:
                 continue
             amp_len = r['end_1b'] - f['start_1b'] + 1
-            if amp_len < 200 or amp_len > 1500:
+            if amp_len < amp_min or amp_len > amp_max:
                 continue
             j = joint_score(f, r, cut_1b, f['start_1b'], r['start_1b'],
                             amplicon_size_target, tm_min, tm_max)
@@ -505,20 +556,18 @@ def select_best_pcr_pair(F_cands, R_cands, cut_1b, amplicon_size_target, tm_min,
     return best
 
 
-def select_best_nested_primers(amp_seq, amp_start_1b, cut_1b, nuclease, application):
-    """Pick the best single F and single R primer positioned 80–150 bp from cut
-    (for ICE) or 60–120 bp (for TIDE). These will be the nested Sanger primers."""
+def nested_dist_range(application):
+    """Distance window (bp from cut) for nested Sanger primers."""
     if application.upper() == "TIDE":
-        dist_min, dist_max = 60, 120
-    else:  # ICE and amplicon-NGS
-        dist_min, dist_max = 80, 150
-    f_best = None
-    f_best_score = -1e9
-    r_best = None
-    r_best_score = -1e9
+        return 60, 120
+    return 80, 150  # ICE and amplicon-NGS
+
+
+def pick_nested_F(amp_seq, amp_start_1b, cut_1b, dist_min, dist_max):
+    """Best forward Sanger primer positioned dist_min–dist_max bp upstream of cut_1b."""
+    best, best_score = None, -1e9
     for dist in range(dist_min, dist_max + 1, 5):
         for L in range(18, 23):
-            # F nested
             f5 = cut_1b - dist
             f3 = f5 + L - 1
             f5_in_seq = f5 - amp_start_1b
@@ -527,10 +576,17 @@ def select_best_nested_primers(amp_seq, amp_start_1b, cut_1b, nuclease, applicat
                 fseq = amp_seq[f5_in_seq:f3_in_seq + 1]
                 if len(fseq) == L and not has_homopolymer_run(fseq) and 30 <= gc_content(fseq) <= 70:
                     s = score_primer({'seq': fseq}, 50, 70)  # wider range for nested
-                    if s > f_best_score:
-                        f_best_score = s
-                        f_best = {'seq': fseq, 'length': L, 'start_1b': f5, 'end_1b': f3, 'dist_from_cut': dist}
-            # R nested
+                    if s > best_score:
+                        best_score = s
+                        best = {'seq': fseq, 'length': L, 'start_1b': f5, 'end_1b': f3, 'dist_from_cut': dist}
+    return best
+
+
+def pick_nested_R(amp_seq, amp_start_1b, cut_1b, dist_min, dist_max):
+    """Best reverse Sanger primer positioned dist_min–dist_max bp downstream of cut_1b."""
+    best, best_score = None, -1e9
+    for dist in range(dist_min, dist_max + 1, 5):
+        for L in range(18, 23):
             r3_5p = cut_1b + dist
             r5_5p = r3_5p - L + 1
             r5_in_seq = r5_5p - amp_start_1b
@@ -540,11 +596,18 @@ def select_best_nested_primers(amp_seq, amp_start_1b, cut_1b, nuclease, applicat
                 rseq = plus_seq.translate(str.maketrans("ACGT", "TGCA"))[::-1]
                 if len(rseq) == L and not has_homopolymer_run(rseq) and 30 <= gc_content(rseq) <= 70:
                     s = score_primer({'seq': rseq}, 50, 70)  # wider range for nested
-                    if s > r_best_score:
-                        r_best_score = s
-                        r_best = {'seq': rseq, 'length': L, 'start_1b': r5_5p, 'end_1b': r3_5p,
-                                  'plus_bind_start': r5_5p, 'plus_bind_end': r3_5p, 'dist_from_cut': dist}
-    return f_best, r_best
+                    if s > best_score:
+                        best_score = s
+                        best = {'seq': rseq, 'length': L, 'start_1b': r5_5p, 'end_1b': r3_5p,
+                                'plus_bind_start': r5_5p, 'plus_bind_end': r3_5p, 'dist_from_cut': dist}
+    return best
+
+
+def select_best_nested_primers(amp_seq, amp_start_1b, cut_1b, nuclease, application):
+    """Pick the best single F and single R nested Sanger primer flanking one cut."""
+    dist_min, dist_max = nested_dist_range(application)
+    return (pick_nested_F(amp_seq, amp_start_1b, cut_1b, dist_min, dist_max),
+            pick_nested_R(amp_seq, amp_start_1b, cut_1b, dist_min, dist_max))
 
 
 # ---------- Output ----------
@@ -565,130 +628,370 @@ def fmt_primer_table(rows):
     return "\n".join(lines) + "\n"
 
 
-def write_report(out_path, gene, grna, grna_short, amplicon_size, application,
-                 pcr_F, pcr_R, nest_F, nest_R, cut_pos_1b, amp_fasta, amp_fasta_path,
-                 grna_strand, pam_seq, nuclease, blast_rid=None, blast_url=None,
-                 skipped_pam=False, user_pam=None, multiple_gRNA_hits=None, chrom=None):
-    """Write the markdown report."""
-    rows = []
-    if pcr_F:
-        rows.append({
-            'use': 'PCR', 'name': f"{gene}_PCR-F",
-            'seq': pcr_F['seq'], 'length': pcr_F['length'],
-            'tm_w': tm_wallace(pcr_F['seq']), 'tm_nn': tm_santalucia(pcr_F['seq']),
-            'pos': f"+{pcr_F['start_1b']}–{pcr_F['end_1b']}",
-            'clamp': 'yes' if pcr_F['seq'][-1] in 'GC' else 'no',
-        })
-    if pcr_R:
-        rows.append({
-            'use': 'PCR', 'name': f"{gene}_PCR-R",
-            'seq': pcr_R['seq'], 'length': pcr_R['length'],
-            'tm_w': tm_wallace(pcr_R['seq']), 'tm_nn': tm_santalucia(pcr_R['seq']),
-            'pos': f"anneals +{pcr_R['plus_bind_start']}–{pcr_R['plus_bind_end']}",
-            'clamp': 'yes' if pcr_R['seq'][-1] in 'GC' else 'no',
-        })
-    if nest_F:
-        rows.append({
-            'use': 'Sanger', 'name': f"{gene}_Sanger-F",
-            'seq': nest_F['seq'], 'length': nest_F['length'],
-            'tm_w': tm_wallace(nest_F['seq']), 'tm_nn': tm_santalucia(nest_F['seq']),
-            'pos': f"+{nest_F['start_1b']}–{nest_F['end_1b']}",
-            'clamp': 'yes' if nest_F['seq'][-1] in 'GC' else 'no',
-        })
-    if nest_R:
-        rows.append({
-            'use': 'Sanger', 'name': f"{gene}_Sanger-R",
-            'seq': nest_R['seq'], 'length': nest_R['length'],
-            'tm_w': tm_wallace(nest_R['seq']), 'tm_nn': tm_santalucia(nest_R['seq']),
-            'pos': f"anneals +{nest_R['plus_bind_start']}–{nest_R['plus_bind_end']}",
-            'clamp': 'yes' if nest_R['seq'][-1] in 'GC' else 'no',
-        })
-    if pcr_F and pcr_R:
-        amp_actual_len = pcr_R['end_1b'] - pcr_F['start_1b'] + 1
-    else:
-        amp_actual_len = amplicon_size
+def write_report(out_path, gene, guides, application, amplicon_size,
+                 pcr_F, pcr_R, sanger, amp_fasta, amp_fasta_path,
+                 nuclease, chrom, blast_rid=None, blast_url=None, sanger_note=None):
+    """Write the markdown report.
 
-    # Phusion Ta with clamping:
-    # - shouldn't exceed Phusion's practical ceiling (~65 °C)
-    # - shouldn't be more than ~5 °C above the lower-Tm primer (the lower one sets the bound)
-    # - touchdown 65→55 is the standard escape valve for high-GC amplicons
-    tm_f_nn = tm_santalucia(pcr_F['seq']) if pcr_F else None
-    tm_r_nn = tm_santalucia(pcr_R['seq']) if pcr_R else None
-    tm_f_w  = tm_wallace(pcr_F['seq'])    if pcr_F else None
-    tm_r_w  = tm_wallace(pcr_R['seq'])    if pcr_R else None
+    guides: list of guide dicts (one per gRNA sharing this amplicon). Each has
+        grna, strand, cut_pos, pam_seq, user_pam, skipped_pam, all_matches.
+    sanger: list of (name, role, primer_dict) where role is 'F' or 'R'.
+    """
+    combined = len(guides) > 1
+    amp_actual_len = pcr_R['end_1b'] - pcr_F['start_1b'] + 1
+    amp_start_1b = pcr_F['start_1b']
+    cut_positions = sorted(g['cut_pos'] for g in guides)
+
+    rows = [{
+        'use': 'PCR', 'name': f"{gene}_PCR-F",
+        'seq': pcr_F['seq'], 'length': pcr_F['length'],
+        'tm_w': tm_wallace(pcr_F['seq']), 'tm_nn': tm_santalucia(pcr_F['seq']),
+        'pos': f"+{pcr_F['start_1b']}–{pcr_F['end_1b']}",
+        'clamp': 'yes' if pcr_F['seq'][-1] in 'GC' else 'no',
+    }, {
+        'use': 'PCR', 'name': f"{gene}_PCR-R",
+        'seq': pcr_R['seq'], 'length': pcr_R['length'],
+        'tm_w': tm_wallace(pcr_R['seq']), 'tm_nn': tm_santalucia(pcr_R['seq']),
+        'pos': f"anneals +{pcr_R['plus_bind_start']}–{pcr_R['plus_bind_end']}",
+        'clamp': 'yes' if pcr_R['seq'][-1] in 'GC' else 'no',
+    }]
+    for name, role, p in sanger:
+        if not p:
+            continue
+        if role == 'F':
+            pos = f"+{p['start_1b']}–{p['end_1b']}"
+        else:
+            pos = f"anneals +{p['plus_bind_start']}–{p['plus_bind_end']}"
+        rows.append({
+            'use': 'Sanger', 'name': f"{gene}_{name}",
+            'seq': p['seq'], 'length': p['length'],
+            'tm_w': tm_wallace(p['seq']), 'tm_nn': tm_santalucia(p['seq']),
+            'pos': pos, 'clamp': 'yes' if p['seq'][-1] in 'GC' else 'no',
+        })
+
+    tm_f_nn = tm_santalucia(pcr_F['seq'])
+    tm_r_nn = tm_santalucia(pcr_R['seq'])
 
     with open(out_path, 'w', encoding='utf-8') as f:
-        f.write(f"# CRISPR Validation Primer Design — {gene}\n\n")
-        # Pam info
-        pam_line = f"- **PAM (genome):** `{pam_seq}`"
-        if user_pam:
-            pam_line += f"  (user-annotated PAM was `{user_pam}` — {'MATCH' if user_pam.upper() == pam_seq.upper() else 'MISMATCH (see Notes)'})"
-        if skipped_pam:
-            pam_line += "  *(PAM check skipped via --skip-pam-check)*"
-        f.write(f"- **gRNA:** `{grna}` (on {grna_strand} strand)\n")
-        f.write(pam_line + "\n")
-        f.write(f"- **Cut site:** `chr:{cut_pos_1b}`\n")
+        title_suffix = f"{gene} ({len(guides)} gRNAs, combined)" if combined else gene
+        f.write(f"# CRISPR Validation Primer Design — {title_suffix}\n\n")
+
+        for idx, g in enumerate(guides, 1):
+            tag = f" {idx}" if combined else ""
+            pam_line = f"- **PAM{tag} (genome):** `{g['pam_seq']}`"
+            if g['user_pam']:
+                match = 'MATCH' if g['user_pam'].upper() == g['pam_seq'].upper() else 'MISMATCH (see Notes)'
+                pam_line += f"  (user-annotated PAM was `{g['user_pam']}` — {match})"
+            if g['skipped_pam']:
+                pam_line += "  *(PAM check skipped via --skip-pam-check)*"
+            f.write(f"- **gRNA{tag}:** `{g['grna']}` (on {g['strand']} strand)\n")
+            f.write(pam_line + "\n")
+            f.write(f"- **Cut site{tag}:** `{chrom}:{g['cut_pos']}`\n")
+        if combined:
+            span = cut_positions[-1] - cut_positions[0]
+            f.write(f"- **Cut-site span:** {span} bp ({len(guides)} cuts, "
+                    f"{cut_positions[0]}–{cut_positions[-1]})\n")
         f.write(f"- **Nuclease:** {nuclease}\n")
         f.write(f"- **Application:** {application}\n")
         f.write(f"- **Amplicon (target):** {amplicon_size} bp (actual = {amp_actual_len} bp)\n\n")
-        if multiple_gRNA_hits and len(multiple_gRNA_hits) > 1:
-            f.write(f"> **Multiple gRNA matches found ({len(multiple_gRNA_hits)} hits).** Using the leftmost. Other hits:\n")
-            for s, gs, ge, _ in multiple_gRNA_hits[1:6]:
-                f.write(f">  - {s} strand at chr:{gs}-{ge}\n")
-            if len(multiple_gRNA_hits) > 6:
-                f.write(f">  - ... and {len(multiple_gRNA_hits) - 6} more\n")
-            f.write("\n")
+
+        # Multiple-perfect-match warnings (per guide)
+        for idx, g in enumerate(guides, 1):
+            hits = g.get('all_matches') or []
+            if len(hits) > 1:
+                tag = f" (gRNA {idx})" if combined else ""
+                f.write(f"> **Multiple gRNA matches found{tag} ({len(hits)} hits).** Using the leftmost. Other hits:\n")
+                for s, hgs, hge, _ in hits[1:6]:
+                    f.write(f">  - {s} strand at {chrom}:{hgs}-{hge}\n")
+                if len(hits) > 6:
+                    f.write(f">  - ... and {len(hits) - 6} more\n")
+                f.write("\n")
+
         f.write("## Primer set\n\n")
         f.write(fmt_primer_table(rows))
-        if pcr_F and pcr_R and tm_f_nn is not None and tm_r_nn is not None:
-            tm_avg_nn = (tm_f_nn + tm_r_nn) / 2
-            tm_lower_nn = min(tm_f_nn, tm_r_nn)
-            # Phusion Ta heuristic: Ta = min(65, max(tm_avg-3, tm_lower-5))
-            # but never below 55 (would indicate the primers are too cold)
-            ta_initial = min(65, max(tm_avg_nn - 3, tm_lower_nn - 5))
-            ta_initial = max(ta_initial, 55)
-            ta_caveat = ""
-            if tm_avg_nn > 72:
-                ta_caveat = (f"  **Caution:** average NN Tm is {tm_avg_nn:.1f} °C, above Phusion's "
-                             f"practical ceiling — consider touchdown (start 65 °C, ramp −1 °C/cycle to 55 °C, "
-                             f"then 25 cycles at 55 °C) or redesign the primers.")
-            f.write(f"\n**Phusion recommended Ta (starting point):** {ta_initial:.1f} °C  "
-                    f"(formula: min(65 °C, max(Tm_NN_avg − 3 °C, Tm_NN_lower − 5 °C)){ta_caveat}\n\n")
+
+        # Phusion Ta with clamping (same heuristic as single-cut designs).
+        tm_avg_nn = (tm_f_nn + tm_r_nn) / 2
+        tm_lower_nn = min(tm_f_nn, tm_r_nn)
+        ta_initial = max(min(65, max(tm_avg_nn - 3, tm_lower_nn - 5)), 55)
+        ta_caveat = ""
+        if tm_avg_nn > 72:
+            ta_caveat = (f"  **Caution:** average NN Tm is {tm_avg_nn:.1f} °C, above Phusion's "
+                         f"practical ceiling — consider touchdown (start 65 °C, ramp −1 °C/cycle to 55 °C, "
+                         f"then 25 cycles at 55 °C) or redesign the primers.")
+        f.write(f"\n**Phusion recommended Ta (starting point):** {ta_initial:.1f} °C  "
+                f"(formula: min(65 °C, max(Tm_NN_avg − 3 °C, Tm_NN_lower − 5 °C)){ta_caveat}\n\n")
+
+        if sanger_note:
+            f.write("## Sanger sequencing coverage\n\n")
+            f.write(sanger_note + "\n\n")
+
         f.write("## Wild-type amplicon (FASTA — for ICE reference)\n\n")
+        cut_marks = ", ".join(str(c - amp_start_1b + 1) for c in cut_positions)
+        cut_word = "cut" if len(cut_positions) == 1 else "cuts"
         f.write("```fasta\n")
-        f.write(f">{gene}_{grna_short}_amplicon_WT ({amp_actual_len} bp, cut at amplicon bp "
-                f"{cut_pos_1b - pcr_F['start_1b'] + 1 if pcr_F else 'n/a'})\n")
+        f.write(f">{gene}_amplicon_WT ({amp_actual_len} bp, {cut_word} at amplicon bp {cut_marks})\n")
         for i in range(0, len(amp_fasta), 60):
             f.write(amp_fasta[i:i + 60] + "\n")
         f.write("```\n\n")
         f.write(f"FASTA also written to: `{amp_fasta_path}`\n\n")
+
         if blast_rid and blast_url:
             f.write("## Off-target check (NCBI Primer-BLAST)\n\n")
-            region_note = f"(`{chrom}` if known)" if chrom else ""
             f.write(f"Submitted the PCR primer pair (F: `{pcr_F['seq']}`, R: `{pcr_R['seq']}`) "
-                    f"to NCBI Primer-BLAST, restricting the search to the amplicon region "
-                    f"{region_note}. Result is processing asynchronously.\n\n")
-            f.write(f"- **RID:** `{blast_rid}`\n")
-            f.write(f"- **Poll URL:** {blast_url}\n\n")
+                    f"to NCBI Primer-BLAST against the genome database for off-target priming. "
+                    f"The job runs asynchronously (typically a few minutes); open the URL below to "
+                    f"view results.\n\n")
+            f.write(f"- **Job key:** `{blast_rid}`\n")
+            f.write(f"- **Results URL:** {blast_url}\n\n")
+
         f.write("## Notes\n\n")
-        f.write("- **Tm target window (57–63 °C) is the Wallace lab rule**, not the SantaLucia 1998 NN. "
-                "NN values (the more accurate method) are shown in the table for cross-checking against the "
-                "NEB TmCalculator (https://tmcalculator.neb.com/). For high-GC primers, NN Tm can be 10+ °C higher "
-                "than Wallace — order the primers based on NN, not Wallace.\n")
+        f.write("- **Primers were picked on Wallace Tm**, preferring 60 ± 2 °C with a 3' G/C clamp; a clamped "
+                "in-window primer is chosen over a clamp-less one even if the latter is marginally closer to "
+                "60 °C. The 57–63 °C bound is only a fallback when nothing lands in 60 ± 2 °C. NN (SantaLucia "
+                "1998) Tm — the more accurate method — is reported alongside for cross-checking against the "
+                "NEB TmCalculator (https://tmcalculator.neb.com/); for high-GC primers it can run 10+ °C above "
+                "Wallace, so set your anneal temperature from the NN value, not Wallace.\n")
         f.write("- For ICE: paste the FASTA into https://ice.synthego.com/ as the control/wildtype reference.\n")
-        if skipped_pam:
-            f.write("- **PAM check was skipped** (`--skip-pam-check`). The genome's actual 3 bases 3' of the "
-                    "protospacer on the protospacer strand were used as the reported PAM. Verify in your system that "
-                    "your nuclease actually cuts at the reported cut position before ordering primers.\n")
+        if any(g['skipped_pam'] for g in guides):
+            f.write("- **PAM check was skipped** (`--skip-pam-check`) for at least one gRNA. The genome's actual "
+                    "3 bases 3' of the protospacer on the protospacer strand were used as the reported PAM. Verify "
+                    "in your system that your nuclease actually cuts at the reported cut position before ordering.\n")
     print(f"Wrote report to {out_path}")
 
 
+# ---------- Driver helpers ----------
+
+def normalize_grna(raw):
+    """Uppercase, U->T, and auto-split a 23-bp protospacer+PAM input.
+
+    Returns (protospacer, user_pam). Exits on out-of-range length."""
+    grna = raw.upper().replace("U", "T")
+    if len(grna) < 17 or len(grna) > 24:
+        sys.exit(f"ERROR: gRNA length {len(grna)} ({raw}) not in 17-24 range")
+    user_pam = None
+    if len(grna) == 23:
+        tail = grna[20:23]
+        is_ngg = tail[1] == 'G' and tail[2] == 'G'
+        is_tttv = tail[:3] == 'TTT'
+        if is_ngg or is_tttv:
+            user_pam = tail
+            print(f"  Detected 23-bp input ({raw}); first 20 bp = protospacer, last 3 bp ({tail}) = user-annotated PAM.")
+            grna = grna[:20]
+    return grna, user_pam
+
+
+def resolve_target(args):
+    """Resolve --gene/--locus to (gene_label, chrom, gene_start, gene_end)."""
+    if args.locus:
+        m = re.match(r'^\s*(?:chr)?([\w.]+)\s*:\s*([\d,]+)\s*-\s*([\d,]+)\s*$', args.locus)
+        if not m:
+            sys.exit("ERROR: --locus must be in form chrN:start-end (commas optional)")
+        chrom = m.group(1)
+        if not chrom.lower().startswith('chr'):
+            chrom = 'chr' + chrom
+        gs = int(m.group(2).replace(',', ''))
+        ge = int(m.group(3).replace(',', ''))
+        gene = args.locus.replace(':', '_').replace('-', '_').replace(',', '')
+        return gene, chrom, gs, ge
+    gene = args.gene
+    print(f"Resolving {gene} on {args.species}...")
+    try:
+        chrom, gs, ge = resolve_gene_symbol(gene, args.species)
+        print(f"  -> {chrom}:{gs}-{ge}")
+        return gene, chrom, gs, ge
+    except urllib.error.HTTPError as e:
+        if e.code in (400, 404):
+            print(f"  Ensembl lookup failed ({e.code}). Trying NCBI E-utilities as fallback...")
+            try:
+                chrom, gs, ge = resolve_locus_ncbi(gene, args.species)
+                print(f"  -> {chrom}:{gs}-{ge}  (via NCBI; this may be a pseudogene — Ensembl doesn't index it)")
+                return gene, chrom, gs, ge
+            except Exception as e2:
+                sys.exit(f"ERROR: could not resolve {gene} on {args.species} via Ensembl or NCBI: {e2}")
+        raise
+
+
+def locate_guide(seq, region_start, chrom, grna, user_pam, args):
+    """Locate one gRNA in the fetched region and find its PAM + cut.
+
+    Returns a guide dict, or exits on failure."""
+    print(f"Searching for gRNA {grna} (and its reverse complement)...")
+    all_matches = find_guide(seq, region_start, grna, return_all=True)
+    if not all_matches:
+        sys.exit(f"ERROR: gRNA {grna} (or its RC) not found in {chrom}. "
+                 f"Check species/assembly, or the gRNA may be off-target.")
+    if len(all_matches) > 1:
+        print(f"  Found {len(all_matches)} matches in this region. Using the leftmost.")
+    strand, gs, ge, _ = all_matches[0]
+    print(f"  -> on {strand} strand at {chrom}:{gs}-{ge}")
+    pam = find_pam(seq, region_start, strand, gs, len(grna),
+                   args.nuclease, skip_pam_check=args.skip_pam_check, user_pam=user_pam)
+    if not pam:
+        sys.exit(f"ERROR: valid {args.nuclease} PAM not found adjacent to gRNA at "
+                 f"{chrom}:{gs}-{ge}. Check the gRNA sequence, switch enzyme with --nuclease, "
+                 f"or pass --skip-pam-check if your nuclease uses a different PAM.")
+    pam_seq, pam_pos, cut_pos = pam
+    note = "  (PAM check skipped)" if args.skip_pam_check else ""
+    print(f"  -> PAM = {pam_seq} at {chrom}:{pam_pos}, cut at {chrom}:{cut_pos}{note}")
+    return {
+        'grna': grna, 'grna_short': grna[:8], 'strand': strand,
+        'gs': gs, 'ge': ge, 'pam_seq': pam_seq, 'pam_pos': pam_pos, 'cut_pos': cut_pos,
+        'user_pam': user_pam, 'skipped_pam': args.skip_pam_check, 'all_matches': all_matches,
+    }
+
+
+def fetch_amplicon_window(chrom, left_cut, right_cut, amp_target, species):
+    """Fetch the + strand window spanning the cut cluster with primer-picking margin."""
+    span = right_cut - left_cut
+    mid = (left_cut + right_cut) // 2
+    win = amp_target + span + 400
+    start = max(1, mid - win // 2)
+    end = mid + win // 2
+    print(f"Fetching amplicon window {chrom}:{start}-{end}...")
+    return fetch_region(chrom, start, end, species)
+
+
+def design_amplicon(gene, chrom, guides, args, application, amp_target):
+    """Design one PCR pair + Sanger primers spanning all guides' cut sites, verify,
+    and write the report + FASTA. guides may be length 1 (single cut) or more
+    (combined cluster). Returns the markdown path."""
+    cuts = sorted(g['cut_pos'] for g in guides)
+    left_cut, right_cut = cuts[0], cuts[-1]
+    span = right_cut - left_cut
+    combined = len(guides) > 1
+
+    amp_seq, amp_start = fetch_amplicon_window(chrom, left_cut, right_cut, amp_target, args.species)
+
+    # PCR candidates: F upstream of the leftmost cut, R downstream of the rightmost.
+    print("Generating primer candidates (one pass)...")
+    target_dist = max(60, (amp_target - span) // 2)
+    F_cands = generate_F_candidates(amp_seq, amp_start, left_cut, amp_target, target_dist=target_dist)
+    R_cands = generate_R_candidates(amp_seq, amp_start, right_cut, amp_target, target_dist=target_dist)
+    print(f"  -> {len(F_cands)} F candidates, {len(R_cands)} R candidates")
+
+    print(f"Selecting best PCR pair (Tm {args.tm_min}-{args.tm_max} °C, amplicon {amp_target} bp"
+          f"{', combined' if combined else ''})...")
+    pcr_pair = select_best_pcr_pair(
+        F_cands, R_cands, (left_cut + right_cut) // 2, amp_target,
+        args.tm_min, args.tm_max,
+        amp_min=max(150, span + 120), amp_max=amp_target + 400)
+    if pcr_pair is None:
+        sys.exit("ERROR: no PCR primer pair meets Tm + amplicon-size constraints. "
+                 "Try widening --tm-min/--tm-max or adjusting --amplicon-size.")
+    pcr_F, pcr_R = pcr_pair
+    print(f"  F: {pcr_F['seq']}  Tm(W)={tm_wallace(pcr_F['seq']):.0f}  Tm(NN)={tm_santalucia(pcr_F['seq']):.1f}")
+    print(f"  R: {pcr_R['seq']}  Tm(W)={tm_wallace(pcr_R['seq']):.0f}  Tm(NN)={tm_santalucia(pcr_R['seq']):.1f}")
+
+    # Sanger: forward primer reads in from the left cut, reverse from the right cut.
+    print("Selecting Sanger sequencing primers...")
+    dist_min, dist_max = nested_dist_range(application)
+    nest_F = pick_nested_F(amp_seq, amp_start, left_cut, dist_min, dist_max)
+    nest_R = pick_nested_R(amp_seq, amp_start, right_cut, dist_min, dist_max)
+    if nest_F:
+        print(f"  SF: {nest_F['seq']}  Tm(NN)={tm_santalucia(nest_F['seq']):.1f}")
+    if nest_R:
+        print(f"  SR: {nest_R['seq']}  Tm(NN)={tm_santalucia(nest_R['seq']):.1f}")
+
+    # Hard verification gate.
+    print("Verifying all primers against the genome...")
+    ok_f, msg_f = verify_F_matches_genome(pcr_F['seq'], pcr_F['start_1b'], pcr_F['end_1b'], amp_seq, amp_start)
+    ok_r, msg_r = verify_R_matches_genome(pcr_R['seq'], pcr_R['plus_bind_start'], pcr_R['plus_bind_end'], amp_seq, amp_start)
+    if not (ok_f and ok_r):
+        sys.exit(f"ERROR: PCR primer verification failed:\n  F: {msg_f}\n  R: {msg_r}")
+    if nest_F:
+        ok_sf, msg_sf = verify_F_matches_genome(nest_F['seq'], nest_F['start_1b'], nest_F['end_1b'], amp_seq, amp_start)
+        if not ok_sf:
+            sys.exit(f"ERROR: nested Sanger F verification failed: {msg_sf}")
+    if nest_R:
+        ok_sr, msg_sr = verify_R_matches_genome(nest_R['seq'], nest_R['plus_bind_start'], nest_R['plus_bind_end'], amp_seq, amp_start)
+        if not ok_sr:
+            sys.exit(f"ERROR: nested Sanger R verification failed: {msg_sr}")
+    print("  All primers verified.")
+
+    # Build the actual amplicon (+ strand, F 5' to R 5').
+    amp_actual_start = pcr_F['start_1b']
+    amp_actual_end = pcr_R['end_1b']
+    amp_fasta = ''.join(amp_seq[(amp_actual_start - amp_start) + i]
+                        for i in range(amp_actual_end - amp_actual_start + 1))
+    cut_marks = [c - amp_actual_start + 1 for c in cuts]
+
+    # Sanger coverage note + primer labels.
+    if combined:
+        thr = sanger_single_read_max(application)
+        single_read_ok = span <= thr
+        single_read_clause = (
+            f"they span **{span} bp (≤ {thr} bp for {application})**, so a single forward read from "
+            f"**Sanger-F** can decompose whichever cut is present."
+            if single_read_ok else
+            f"they span **{span} bp (> {thr} bp for {application})**, so use **Sanger-F** for the leftmost "
+            f"cut ({cuts[0]}) and **Sanger-R** for the rightmost ({cuts[-1]})."
+        )
+        sanger_note = (
+            f"This amplicon spans {len(guides)} cut sites ({cuts[0]}–{cuts[-1]}, {span} bp apart). "
+            f"A Sanger trace is a mixture of alleles immediately 3' of any cut it reads through, so one read "
+            f"can only cleanly decompose the **first** cut it reaches.\n\n"
+            f"- **Both gRNAs co-delivered (one sample, two cuts):** you need **both** reads — **Sanger-F** "
+            f"decomposes the leftmost cut ({cuts[0]}), **Sanger-R** the rightmost ({cuts[-1]}). One read "
+            f"cannot resolve both, at any distance.\n"
+            f"- **Each gRNA in a separate single-cut sample:** {single_read_clause}"
+        )
+        label = "_".join(g['grna_short'] for g in guides)
+    else:
+        sanger_note = None
+        label = guides[0]['grna_short']
+    sanger = [("Sanger-F", "F", nest_F), ("Sanger-R", "R", nest_R)]
+
+    # Write outputs.
+    os.makedirs(args.output_dir, exist_ok=True)
+    md_path = os.path.join(args.output_dir, f"crispr_primers_{gene}_{label}.md")
+    fa_path = os.path.join(args.output_dir, f"{gene}_{label}_amplicon_WT.fa")
+
+    with open(fa_path, 'w', encoding='utf-8') as f:
+        marks = ", ".join(str(m) for m in cut_marks)
+        cut_word = "cut" if len(cut_marks) == 1 else "cuts"
+        f.write(f">{gene}_{label}_amplicon_WT {chrom}:{amp_actual_start}-{amp_actual_end} "
+                f"({len(amp_fasta)} bp, {cut_word} at amplicon bp {marks})\n")
+        for i in range(0, len(amp_fasta), 60):
+            f.write(amp_fasta[i:i + 60] + "\n")
+    print(f"Wrote amplicon FASTA to {fa_path}")
+
+    # Off-target check (PCR pair only — Sanger primers sit inside the amplicon).
+    print("Submitting PCR primer pair to NCBI Primer-BLAST (off-target check)...")
+    blast_rid, blast_url = submit_primer_blast(
+        pcr_F['seq'], pcr_R['seq'], amp_actual_start, amp_actual_end, chrom, args.species)
+    if blast_rid:
+        print(f"  Primer-BLAST job submitted: {blast_rid}  (poll {blast_url})")
+    else:
+        print("  Primer-BLAST submission failed — do the off-target check manually.")
+
+    write_report(md_path, gene, guides, application, amp_target,
+                 pcr_F, pcr_R, sanger, amp_fasta, fa_path,
+                 args.nuclease, chrom, blast_rid=blast_rid, blast_url=blast_url,
+                 sanger_note=sanger_note)
+    print(f"Done ({gene}/{label}). Cut site(s) at amplicon bp {', '.join(str(m) for m in cut_marks)}.\n")
+    return md_path
+
+
 def main():
+    # Windows consoles default to cp1252, which can't encode characters like
+    # ≤/≥/— that appear in progress messages. Force UTF-8 (with replacement) so
+    # the run never dies on a print(). Report files are already written utf-8.
+    for stream in (sys.stdout, sys.stderr):
+        try:
+            stream.reconfigure(encoding='utf-8', errors='replace')
+        except (AttributeError, ValueError):
+            pass
+
     ap = argparse.ArgumentParser(description="Design CRISPR validation primers (one-shot).")
-    ap.add_argument("--grna", required=True,
-                    help="gRNA sequence. 20-bp protospacer (most common) OR 23-bp protospacer+PAM "
-                         "(auto-detected; the trailing 3 bp are used for PAM annotation only, "
-                         "not validation — the genome's actual 3 bp 3' of the protospacer are checked).")
+    ap.add_argument("--grna", required=True, nargs='+',
+                    help="One or more gRNA sequences. 20-bp protospacer (most common) OR 23-bp "
+                         "protospacer+PAM (auto-detected). Pass multiple gRNAs that target the SAME "
+                         "gene/locus to get a single combined design: if their cut sites are within "
+                         f"{PCR_COMBINE_MAX_SPAN} bp, one PCR amplicon (default "
+                         f"{COMBINED_AMPLICON_DEFAULT} bp) spans them all, with an F+R Sanger pair "
+                         "(F decomposes the leftmost cut, R the rightmost). gRNAs farther apart are "
+                         "designed independently.")
     ap.add_argument("--gene", help="Gene symbol (e.g. TCL1A). Conflicts with --locus.")
     ap.add_argument("--locus", help="Explicit locus, e.g. chr14:95712272-95712291, or 14:95712272-95712291, "
                                     "or with comma separators chr14:95,712,272-95,712,291. Conflicts with --gene.")
@@ -696,7 +999,8 @@ def main():
     ap.add_argument("--assembly", default="GRCh38", help="Assembly label for documentation only")
     ap.add_argument("--application", default="ICE", choices=["ICE", "TIDE", "amplicon-NGS"])
     ap.add_argument("--amplicon-size", type=int, default=None,
-                    help="Target amplicon size in bp (default: 1000 for ICE, 500 for TIDE)")
+                    help="Target amplicon size in bp (default: 1000 for ICE, 500 for TIDE; "
+                         f"{COMBINED_AMPLICON_DEFAULT} when combining multiple gRNAs).")
     ap.add_argument("--tm-min", type=float, default=57.0)
     ap.add_argument("--tm-max", type=float, default=63.0)
     ap.add_argument("--nuclease", default="spcas9", choices=["spcas9", "cas12a"])
@@ -710,187 +1014,47 @@ def main():
 
     if args.gene and args.locus:
         sys.exit("ERROR: pass --gene OR --locus, not both")
-
-    grna = args.grna.upper().replace("U", "T")
-    if len(grna) < 17 or len(grna) > 24:
-        sys.exit(f"ERROR: gRNA length {len(grna)} not in 17-24 range")
-
-    # Auto-detect 23-bp protospacer+PAM: if last 3 bp are a recognizable PAM, split
-    user_pam = None
-    if len(grna) == 23:
-        tail = grna[20:23].upper()
-        # NGG (SpCas9) or TTTV (Cas12a)
-        is_ngg = tail[1] == 'G' and tail[2] == 'G'
-        is_tttv = tail[:3] == 'TTT' or tail == 'TTTG' or tail == 'TTTA' or tail == 'TTTC'
-        if is_ngg or is_tttv:
-            user_pam = tail
-            print(f"  Detected 23-bp input; treating first 20 bp as protospacer, last 3 bp ({tail}) as user-annotated PAM.")
-            grna = grna[:20]
+    if not args.gene and not args.locus:
+        sys.exit("ERROR: pass --gene or --locus")
 
     application = args.application.upper()
-    amp_target = args.amplicon_size
-    if amp_target is None:
-        amp_target = 1000 if application == "ICE" else 500
+    explicit_amp = args.amplicon_size
 
-    # 1. Resolve locus
-    if args.locus:
-        # Accept "chr1:..." or "1:...", with or without comma separators
-        m = re.match(r'^\s*(?:chr)?([\w.]+)\s*:\s*([\d,]+)\s*-\s*([\d,]+)\s*$', args.locus)
-        if not m:
-            sys.exit("ERROR: --locus must be in form chrN:start-end (commas optional)")
-        chrom = m.group(1)
-        if not chrom.lower().startswith('chr'):
-            chrom = 'chr' + chrom
-        gs = int(m.group(2).replace(',', ''))
-        ge = int(m.group(3).replace(',', ''))
-        gene = args.locus.replace(':', '_').replace('-', '_').replace(',', '')
-    else:
-        gene = args.gene
-        print(f"Resolving {gene} on {args.species}...")
-        try:
-            chrom, gs, ge = resolve_gene_symbol(gene, args.species)
-            print(f"  -> {chrom}:{gs}-{ge}")
-        except urllib.error.HTTPError as e:
-            if e.code in (400, 404):
-                print(f"  Ensembl lookup failed ({e.code}). Trying NCBI E-utilities as fallback...")
-                try:
-                    chrom, gs, ge = resolve_locus_ncbi(gene, args.species)
-                    print(f"  -> {chrom}:{gs}-{ge}  (via NCBI; this may be a pseudogene — Ensembl doesn't index it)")
-                except Exception as e2:
-                    sys.exit(f"ERROR: could not resolve {gene} on {args.species} via Ensembl or NCBI: {e2}")
-            else:
-                raise
+    # Normalize all gRNAs (and split any 23-bp protospacer+PAM inputs).
+    grnas = [normalize_grna(raw) for raw in args.grna]
 
-    # 2. Fetch a region around the gene (or locus), then search for the gRNA
-    flank = max(amp_target, 2000)
+    # Resolve the shared target locus once.
+    gene, chrom, gs, ge = resolve_target(args)
+
+    # Fetch one region around the gene/locus big enough to hold every gRNA + flanks.
+    flank = max(explicit_amp or COMBINED_AMPLICON_DEFAULT, 2000)
     fetch_start = max(1, gs - flank)
     fetch_end = ge + flank
     print(f"Fetching {chrom}:{fetch_start}-{fetch_end} ({(fetch_end - fetch_start + 1)/1000:.1f} kb)...")
     seq, region_start = fetch_region(chrom, fetch_start, fetch_end, args.species)
 
-    # 3. Locate gRNA (with all-match support for disambiguation)
-    print(f"Searching for gRNA {grna} (and its reverse complement)...")
-    all_matches = find_guide(seq, region_start, grna, return_all=True)
-    if not all_matches:
-        sys.exit(f"ERROR: gRNA {grna} (or its RC) not found in {chrom}:{fetch_start}-{fetch_end}. "
-                 f"Check species/assembly, or the gRNA may be off-target.")
-    if len(all_matches) > 1:
-        print(f"  Found {len(all_matches)} matches in this region. Using the leftmost.")
-    found = all_matches[0]
-    grna_strand, grna_gs, grna_ge, plus_at_site = found
-    print(f"  -> on {grna_strand} strand at {chrom}:{grna_gs}-{grna_ge}")
+    # Locate each gRNA + its cut.
+    guides = [locate_guide(seq, region_start, chrom, g, up, args) for g, up in grnas]
 
-    # 4. Find PAM and cut
-    pam = find_pam(seq, region_start, grna_strand, grna_gs, len(grna),
-                   args.nuclease, skip_pam_check=args.skip_pam_check, user_pam=user_pam)
-    if not pam:
-        sys.exit(f"ERROR: valid {args.nuclease} PAM not found adjacent to gRNA at "
-                 f"{chrom}:{grna_gs}-{grna_ge}. Check the gRNA sequence, or use --nuclease to "
-                 f"switch enzyme, or pass --skip-pam-check if your nuclease uses a different PAM "
-                 f"or you have orthogonal evidence that cutting still occurs here.")
-    pam_seq, pam_pos, cut_pos = pam
-    if args.skip_pam_check:
-        print(f"  -> PAM (genome) = {pam_seq} at chr {chrom}:{pam_pos}, cut at chr {chrom}:{cut_pos}  (PAM check skipped)")
+    # Decide combined vs separate.
+    if len(guides) == 1:
+        amp_target = explicit_amp or (1000 if application == "ICE" else 500)
+        design_amplicon(gene, chrom, guides, args, application, amp_target)
+        return
+
+    cuts = sorted(g['cut_pos'] for g in guides)
+    span = cuts[-1] - cuts[0]
+    if span <= PCR_COMBINE_MAX_SPAN:
+        amp_target = explicit_amp or COMBINED_AMPLICON_DEFAULT
+        print(f"\n{len(guides)} gRNAs cut within {span} bp (<= {PCR_COMBINE_MAX_SPAN} bp) - "
+              f"designing ONE combined amplicon of {amp_target} bp.\n")
+        design_amplicon(gene, chrom, guides, args, application, amp_target)
     else:
-        print(f"  -> PAM = {pam_seq} at chr {chrom}:{pam_pos}, cut at chr {chrom}:{cut_pos}")
-
-    # 5. Fetch amplicon-window sequence
-    amp_window_size = amp_target + 400  # extra room for primer picking
-    amp_window_start = max(1, cut_pos - amp_window_size // 2)
-    amp_window_end = cut_pos + amp_window_size // 2
-    print(f"Fetching amplicon window {chrom}:{amp_window_start}-{amp_window_end}...")
-    amp_seq, amp_start = fetch_region(chrom, amp_window_start, amp_window_end, args.species)
-
-    # 6. Generate candidates (one pass)
-    print("Generating primer candidates (one pass)...")
-    F_cands = generate_F_candidates(amp_seq, amp_start, cut_pos, amp_target)
-    R_cands = generate_R_candidates(amp_seq, amp_start, cut_pos, amp_target)
-    print(f"  -> {len(F_cands)} F candidates, {len(R_cands)} R candidates")
-
-    # 7. Select best PCR pair
-    print(f"Selecting best PCR pair (Tm {args.tm_min}-{args.tm_max} °C, amplicon {amp_target} bp)...")
-    pcr_pair = select_best_pcr_pair(F_cands, R_cands, cut_pos, amp_target,
-                                     args.tm_min, args.tm_max)
-    if pcr_pair is None:
-        sys.exit("ERROR: no PCR primer pair meets Tm + amplicon-size constraints. "
-                 "Try widening --tm-min/--tm-max or adjusting --amplicon-size.")
-    pcr_F, pcr_R = pcr_pair
-    print(f"  F: {pcr_F['seq']}  Tm(W)={tm_wallace(pcr_F['seq']):.0f}  "
-          f"Tm(NN)={tm_santalucia(pcr_F['seq']):.1f}")
-    print(f"  R: {pcr_R['seq']}  Tm(W)={tm_wallace(pcr_R['seq']):.0f}  "
-          f"Tm(NN)={tm_santalucia(pcr_R['seq']):.1f}")
-
-    # 8. Select nested Sanger primers
-    print("Selecting best nested Sanger primers...")
-    nest_F, nest_R = select_best_nested_primers(amp_seq, amp_start, cut_pos,
-                                                 args.nuclease, application)
-    if nest_F:
-        print(f"  SF: {nest_F['seq']}  Tm(NN)={tm_santalucia(nest_F['seq']):.1f}")
-    if nest_R:
-        print(f"  SR: {nest_R['seq']}  Tm(NN)={tm_santalucia(nest_R['seq']):.1f}")
-
-    # 9. Hard verification gate
-    print("Verifying all primers against the genome...")
-    ok_f, msg_f = verify_F_matches_genome(pcr_F['seq'], pcr_F['start_1b'],
-                                            pcr_F['end_1b'], amp_seq, amp_start)
-    ok_r, msg_r = verify_R_matches_genome(pcr_R['seq'], pcr_R['plus_bind_start'],
-                                            pcr_R['plus_bind_end'], amp_seq, amp_start)
-    if not (ok_f and ok_r):
-        sys.exit(f"ERROR: PCR primer verification failed:\n  F: {msg_f}\n  R: {msg_r}")
-    if nest_F:
-        ok_sf, msg_sf = verify_F_matches_genome(nest_F['seq'], nest_F['start_1b'],
-                                                  nest_F['end_1b'], amp_seq, amp_start)
-        if not ok_sf:
-            sys.exit(f"ERROR: nested Sanger F verification failed: {msg_sf}")
-    if nest_R:
-        ok_sr, msg_sr = verify_R_matches_genome(nest_R['seq'], nest_R['plus_bind_start'],
-                                                  nest_R['plus_bind_end'], amp_seq, amp_start)
-        if not ok_sr:
-            sys.exit(f"ERROR: nested Sanger R verification failed: {msg_sr}")
-    print("  All primers verified.")
-
-    # 10. Build the actual amplicon (from F 5' to R 5' on + strand)
-    amp_actual_start = pcr_F['start_1b']
-    amp_actual_end = pcr_R['end_1b']
-    amp_fasta = ''.join(amp_seq[(amp_actual_start - amp_start) + i]
-                        for i in range(amp_actual_end - amp_actual_start + 1))
-    cut_in_amplicon_0based = cut_pos - amp_actual_start
-
-    # 11. Write outputs
-    os.makedirs(args.output_dir, exist_ok=True)
-    grna_short = grna[:8]
-    md_path = os.path.join(args.output_dir, f"crispr_primers_{gene}_{grna_short}.md")
-    fa_path = os.path.join(args.output_dir, f"{gene}_{grna_short}_amplicon_WT.fa")
-
-    with open(fa_path, 'w', encoding='utf-8') as f:
-        cut_pos_in_amp = cut_in_amplicon_0based + 1
-        f.write(f">{gene}_{grna_short}_amplicon_WT chr{chrom}:{amp_actual_start}-{amp_actual_end} "
-                f"({len(amp_fasta)} bp, cut at amplicon bp {cut_pos_in_amp})\n")
-        for i in range(0, len(amp_fasta), 60):
-            f.write(amp_fasta[i:i + 60] + "\n")
-    print(f"Wrote amplicon FASTA to {fa_path}")
-
-    # 12. Submit PCR primers to Primer-BLAST (off-target check).
-    #     PCR only — nested Sanger primers are guaranteed inside the amplicon.
-    print("Submitting PCR primer pair to NCBI Primer-BLAST (off-target check)...")
-    blast_rid, blast_url = submit_primer_blast(
-        pcr_F['seq'], pcr_R['seq'],
-        amp_actual_start, amp_actual_end, chrom, args.species,
-    )
-    if blast_rid:
-        print(f"  Primer-BLAST RID: {blast_rid}  (poll {blast_url})")
-    else:
-        print("  Primer-BLAST submission failed or RID not parseable — do the off-target check manually.")
-
-    write_report(md_path, gene, grna, grna_short, amp_target, application,
-                 pcr_F, pcr_R, nest_F, nest_R, cut_pos, amp_fasta, fa_path,
-                 grna_strand, pam_seq, args.nuclease,
-                 blast_rid=blast_rid, blast_url=blast_url,
-                 skipped_pam=args.skip_pam_check, user_pam=user_pam,
-                 multiple_gRNA_hits=all_matches if len(all_matches) > 1 else None,
-                 chrom=chrom)
-    print(f"\nDone. Mark cut site: bp {cut_in_amplicon_0based + 1} of the amplicon "
-          f"({cut_in_amplicon_0based} 0-based).")
+        print(f"\n{len(guides)} gRNAs cut {span} bp apart (> {PCR_COMBINE_MAX_SPAN} bp) — "
+              f"too far to combine; designing each independently.\n")
+        amp_target = explicit_amp or (1000 if application == "ICE" else 500)
+        for g in guides:
+            design_amplicon(gene, chrom, [g], args, application, amp_target)
 
 
 if __name__ == "__main__":
