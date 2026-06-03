@@ -1,0 +1,12 @@
+# Internal metadata for review. Not PM-facing.
+specialists_recommended:
+  - boundaries
+  - runtime-risk
+  - technical-expert
+notes: >
+  boundaries — the brief names credential/secret handling (no token in repo/pointer/record)
+  and an externally-reachable private store with access control. runtime-risk — real live
+  GitHub I/O (auth lifecycle, rate limits, network, read-after-write staleness) and a
+  read-through cache are first-class concerns. technical-expert — adopts a new GitHub
+  integration + a script subsystem and has explicit step-ordering risk (phased: infra
+  before rewiring, with a transition fallback). No UI surface (no frontend-engineer).

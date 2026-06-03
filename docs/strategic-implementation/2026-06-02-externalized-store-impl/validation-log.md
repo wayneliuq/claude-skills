@@ -1,7 +1,7 @@
 ---
-status: in-progress
+status: complete
 domains: [github, gh-cli, store-adapter, filesystem, skill-rewiring]
-outcome: TBD
+outcome: GitHub-backed store adapter + locator + read-through cache; stages rewired fallback-safe; conversational feedback
 supersedes: none
 ---
 # Validation log
