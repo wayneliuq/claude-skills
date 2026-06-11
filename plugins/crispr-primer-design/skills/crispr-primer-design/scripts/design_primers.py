@@ -98,22 +98,49 @@ def nn_dH_dS(seq):
     return dH, dS
 
 
-def tm_santalucia(seq, primer_nM=500, na_mM=50):
-    """SantaLucia 1998 NN Tm in °C at given primer & Na+ concentrations.
+def tm_santalucia(seq, primer_nM=500, mon_mM=50.0, mg_mM=1.5, dntp_mM=0.2):
+    """SantaLucia 1998 NN Tm in °C, salt-corrected to PCR buffer conditions.
 
-    Default 500 nM primer (typical PCR) and 50 mM Na+ (typical Phusion buffer).
-    Salt correction is the proper SantaLucia 1998 formula — small at 50 mM, not
-    the older `16.6*log10[Na+]` that drops Tms by 20 °C at low salt.
-    """
+    Defaults model a Phusion reaction: 500 nM primer, 50 mM monovalent (Na+/K+),
+    1.5 mM Mg2+, 0.2 mM dNTP. The base NN parameters are at 1 M Na+; the
+    Owczarzy 2008 monovalent+divalent correction brings the Tm down to the
+    buffer's ionic strength (and back up for the Mg2+ contribution), matching
+    the IDT OligoAnalyzer / NEB TmCalculator values.
+
+    IMPORTANT: the salt correction is applied to 1/Tm (in Kelvin), NOT added to
+    Tm in °C. A prior version added the ~1e-4 correction term straight onto the
+    Celsius value, which is a no-op — so it reported the 1 M Na+ Tm, ~10-14 °C
+    too high for a real buffer. Free [Mg2+] is approximated as total Mg2+ minus
+    dNTP (dNTPs chelate Mg2+ ~1:1)."""
     dH, dS = nn_dH_dS(seq)
     R = 1.987
     C = primer_nM * 1e-9
-    Tm_K = (1000 * dH) / (dS + R * math.log(C / 1))  # x=1 for non-self-complementary
-    Tm_C = Tm_K - 273.15
-    fGC = (seq.count('G') + seq.count('C')) / len(seq)
-    ln_Na = math.log(na_mM / 1000.0)
-    dTm = (4.29 * fGC - 3.95) * 1e-5 * ln_Na + 9.40e-6 * ln_Na ** 2
-    return Tm_C + dTm
+    N = len(seq)
+    # Tm at 1 M Na+ reference. x=1: primer in large excess over template (PCR),
+    # so the relevant strand concentration is the primer concentration itself.
+    Tm_1M = (1000 * dH) / (dS + R * math.log(C / 1))
+    fGC = (seq.count('G') + seq.count('C')) / N
+    inv = 1.0 / Tm_1M  # work in 1/Tm (Kelvin) — that's what the correction adjusts
+    mon = mon_mM / 1000.0
+    mg = max(mg_mM - dntp_mM, 0.0) / 1000.0  # free Mg2+ after dNTP chelation
+
+    if mg <= 0:
+        # Owczarzy 2004 monovalent-only correction.
+        ln_mon = math.log(mon)
+        inv += (4.29 * fGC - 3.95) * 1e-5 * ln_mon + 9.40e-6 * ln_mon ** 2
+    else:
+        # Owczarzy 2008 divalent (+ monovalent) correction.
+        ln_mg = math.log(mg)
+        a, b, c, d = 3.92e-5, -9.11e-6, 6.26e-5, 1.42e-5
+        e, f, g = -4.82e-4, 5.25e-4, 8.31e-5
+        if mon > 0:
+            ln_mon = math.log(mon)
+            a = a * (0.843 - 0.352 * math.sqrt(mon) * ln_mon)
+            d = d * (1.279 - 4.03e-3 * ln_mon - 8.03e-3 * ln_mon ** 2)
+            g = g * (0.486 - 0.258 * ln_mon + 5.25e-3 * ln_mon ** 3)
+        inv += (a + b * ln_mg + fGC * (c + d * ln_mg)
+                + (1.0 / (2 * (N - 1))) * (e + f * ln_mg + g * ln_mg ** 2))
+    return 1.0 / inv - 273.15
 
 
 def tm_wallace(seq):
@@ -681,38 +708,81 @@ def select_best_pcr_pair(F_cands, R_cands, cut_1b, amplicon_size_target, tm_min,
 
 
 def nested_dist_range(application):
-    """Distance window (bp from cut) for nested Sanger primers."""
-    if application.upper() == "TIDE":
-        return 60, 120
-    return 80, 150  # ICE and amplicon-NGS
+    """Distance window (bp from cut) for nested Sanger primers.
+
+    Bind ≥ 250 bp from the cut. A Sanger read's first ~60 bp are low-quality
+    basecalls, and reliable ICE/TIDE decomposition needs ≥ 200 bp of clean,
+    well-aligned trace BEFORE the cut. Sitting the primer 250-330 bp out puts
+    the cut ~190-270 bp into the high-quality part of the read, clearing that
+    200 bp requirement with margin. The window is uniform across applications
+    because the constraint is read quality, not the analysis tool. The picker
+    can still move OUTWARD (never closer) to escape a repeat — see
+    NESTED_REPEAT_EXTEND in pick_nested_F/R. 330 bp + the extension stays well
+    inside the default 2 kb PCR amplicon (PCR primers are ~1 kb from the cut),
+    so the same genomic PCR is reused and only the Sanger reaction re-run."""
+    return 250, 330  # uniform: ICE, TIDE, amplicon-NGS
 
 
-def pick_nested_F(amp_seq, amp_start_1b, cut_1b, dist_min, dist_max):
-    """Best forward Sanger primer positioned dist_min–dist_max bp upstream of cut_1b."""
-    best, best_score = None, -1e9
-    for dist in range(dist_min, dist_max + 1, 5):
+# How far (bp) a nested Sanger primer may be pushed OUTWARD (farther from the
+# cut, never closer) past dist_max to escape a repeat in its 3' anchor.
+NESTED_REPEAT_EXTEND = 150
+
+
+def pick_nested_F(amp_seq, amp_start_1b, cut_1b, dist_min, dist_max, repeats=None):
+    """Best forward Sanger primer whose cut-proximal (3') end is dist_min–dist_max
+    bp upstream of cut_1b.
+
+    `dist` is measured to the primer's 3' end — the base nearest the cut, where
+    the read effectively begins — NOT the 5' end. That way a 250 bp floor means
+    the whole primer is ≥ 250 bp from the cut, so after the ~60 bp low-quality
+    lead-in there is ≥ ~190 bp of clean trace before the cut.
+
+    When repeats are supplied, a candidate whose 3' anchor overlaps a repeat is
+    deprioritized: we prefer the best repeat-free primer, searching OUTWARD up to
+    NESTED_REPEAT_EXTEND bp past dist_max (farther from the cut, never closer) if
+    the standard window is all-repeat. Only if nothing clean exists do we fall
+    back to the best candidate within the original window."""
+    best_clean, best_clean_score = None, -1e9
+    best_any, best_any_score = None, -1e9
+    hi = dist_max + (NESTED_REPEAT_EXTEND if repeats else 0)
+    for dist in range(dist_min, hi + 1, 5):
         for L in range(18, 23):
-            f5 = cut_1b - dist
-            f3 = f5 + L - 1
+            f3 = cut_1b - dist       # 3' (cut-proximal) end, dist bp from the cut
+            f5 = f3 - L + 1
             f5_in_seq = f5 - amp_start_1b
             f3_in_seq = f3 - amp_start_1b
             if 0 <= f5_in_seq and f3_in_seq < len(amp_seq):
                 fseq = amp_seq[f5_in_seq:f3_in_seq + 1]
                 if len(fseq) == L and not has_homopolymer_run(fseq) and 30 <= gc_content(fseq) <= 70:
                     s = score_primer({'seq': fseq}, 50, 70)  # wider range for nested
-                    if s > best_score:
-                        best_score = s
-                        best = {'seq': fseq, 'length': L, 'start_1b': f5, 'end_1b': f3, 'dist_from_cut': dist}
-    return best
+                    cand = {'seq': fseq, 'length': L, 'start_1b': f5, 'end_1b': f3, 'dist_from_cut': dist}
+                    a_start, a_end = primer_3p_anchor(cand, 'F')
+                    clean = repeats is None or interval_hits_repeats(a_start, a_end, repeats) is None
+                    if clean and s > best_clean_score:
+                        best_clean_score, best_clean = s, cand
+                    if dist <= dist_max and s > best_any_score:
+                        best_any_score, best_any = s, cand
+    return best_clean if best_clean else best_any
 
 
-def pick_nested_R(amp_seq, amp_start_1b, cut_1b, dist_min, dist_max):
-    """Best reverse Sanger primer positioned dist_min–dist_max bp downstream of cut_1b."""
-    best, best_score = None, -1e9
-    for dist in range(dist_min, dist_max + 1, 5):
+def pick_nested_R(amp_seq, amp_start_1b, cut_1b, dist_min, dist_max, repeats=None):
+    """Best reverse Sanger primer whose cut-proximal (3') end is dist_min–dist_max
+    bp downstream of cut_1b.
+
+    As in pick_nested_F, `dist` is measured to the primer's cut-proximal end
+    (here the lower + strand coordinate, where the reverse read begins), so the
+    250 bp floor puts the whole primer ≥ 250 bp from the cut.
+
+    Repeat handling mirrors pick_nested_F: prefer a repeat-free 3' anchor,
+    extending OUTWARD (farther downstream of the cut) up to NESTED_REPEAT_EXTEND
+    bp before falling back to the best in-window candidate."""
+    best_clean, best_clean_score = None, -1e9
+    best_any, best_any_score = None, -1e9
+    hi = dist_max + (NESTED_REPEAT_EXTEND if repeats else 0)
+    for dist in range(dist_min, hi + 1, 5):
         for L in range(18, 23):
-            r3_5p = cut_1b + dist
-            r5_5p = r3_5p - L + 1
+            r5_5p = cut_1b + dist       # cut-proximal (3') end, dist bp from the cut
+            r3_5p = r5_5p + L - 1
             r5_in_seq = r5_5p - amp_start_1b
             r3_in_seq = r3_5p - amp_start_1b
             if 0 <= r5_in_seq and r3_in_seq < len(amp_seq):
@@ -720,11 +790,15 @@ def pick_nested_R(amp_seq, amp_start_1b, cut_1b, dist_min, dist_max):
                 rseq = plus_seq.translate(str.maketrans("ACGT", "TGCA"))[::-1]
                 if len(rseq) == L and not has_homopolymer_run(rseq) and 30 <= gc_content(rseq) <= 70:
                     s = score_primer({'seq': rseq}, 50, 70)  # wider range for nested
-                    if s > best_score:
-                        best_score = s
-                        best = {'seq': rseq, 'length': L, 'start_1b': r5_5p, 'end_1b': r3_5p,
-                                'plus_bind_start': r5_5p, 'plus_bind_end': r3_5p, 'dist_from_cut': dist}
-    return best
+                    cand = {'seq': rseq, 'length': L, 'start_1b': r5_5p, 'end_1b': r3_5p,
+                            'plus_bind_start': r5_5p, 'plus_bind_end': r3_5p, 'dist_from_cut': dist}
+                    a_start, a_end = primer_3p_anchor(cand, 'R')
+                    clean = repeats is None or interval_hits_repeats(a_start, a_end, repeats) is None
+                    if clean and s > best_clean_score:
+                        best_clean_score, best_clean = s, cand
+                    if dist <= dist_max and s > best_any_score:
+                        best_any_score, best_any = s, cand
+    return best_clean if best_clean else best_any
 
 
 def select_best_nested_primers(amp_seq, amp_start_1b, cut_1b, nuclease, application):
@@ -910,10 +984,12 @@ def write_report(out_path, gene, guides, application, amplicon_size,
         f.write("## Notes\n\n")
         f.write("- **Primers were picked on Wallace Tm**, preferring 60 ± 2 °C with a 3' G/C clamp; a clamped "
                 "in-window primer is chosen over a clamp-less one even if the latter is marginally closer to "
-                "60 °C. The 57–63 °C bound is only a fallback when nothing lands in 60 ± 2 °C. NN (SantaLucia "
-                "1998) Tm — the more accurate method — is reported alongside for cross-checking against the "
-                "NEB TmCalculator (https://tmcalculator.neb.com/); for high-GC primers it can run 10+ °C above "
-                "Wallace, so set your anneal temperature from the NN value, not Wallace.\n")
+                "60 °C. The 57–63 °C bound is only a fallback when nothing lands in 60 ± 2 °C. The NN (SantaLucia "
+                "1998) Tm reported alongside is the more accurate value and is **salt-corrected to Phusion "
+                "buffer conditions** (500 nM primer, 50 mM monovalent, 1.5 mM Mg2+, 0.2 mM dNTP) via the "
+                "Owczarzy 2008 formula, so it should agree with the NEB TmCalculator (https://tmcalculator.neb.com/, "
+                "set to Phusion) and IDT OligoAnalyzer to within ~1–2 °C. **Set your anneal temperature from the "
+                "NN value, not Wallace** — Wallace ignores salt and sequence context entirely.\n")
         f.write("- For ICE: paste the FASTA into https://ice.synthego.com/ as the control/wildtype reference.\n")
         if any(g['skipped_pam'] for g in guides):
             f.write("- **PAM check was skipped** (`--skip-pam-check`) for at least one gRNA. The genome's actual "
@@ -964,13 +1040,19 @@ def resolve_target(args):
         return gene, chrom, gs, ge
     except urllib.error.HTTPError as e:
         if e.code in (400, 404):
-            print(f"  Ensembl lookup failed ({e.code}). Trying NCBI E-utilities as fallback...")
-            try:
-                chrom, gs, ge = resolve_locus_ncbi(gene, args.species)
-                print(f"  -> {chrom}:{gs}-{ge}  (via NCBI; this may be a pseudogene — Ensembl doesn't index it)")
-                return gene, chrom, gs, ge
-            except Exception as e2:
-                sys.exit(f"ERROR: could not resolve {gene} on {args.species} via Ensembl or NCBI: {e2}")
+            # --- NCBI E-utilities fallback temporarily disabled (the NCBI search
+            #     isn't working right now). Re-enable by uncommenting the block
+            #     below and removing the sys.exit. ---
+            # print(f"  Ensembl lookup failed ({e.code}). Trying NCBI E-utilities as fallback...")
+            # try:
+            #     chrom, gs, ge = resolve_locus_ncbi(gene, args.species)
+            #     print(f"  -> {chrom}:{gs}-{ge}  (via NCBI; this may be a pseudogene — Ensembl doesn't index it)")
+            #     return gene, chrom, gs, ge
+            # except Exception as e2:
+            #     sys.exit(f"ERROR: could not resolve {gene} on {args.species} via Ensembl or NCBI: {e2}")
+            sys.exit(f"ERROR: Ensembl couldn't resolve {gene} on {args.species} ({e.code}), and the NCBI "
+                     f"E-utilities fallback is temporarily disabled. Pass explicit coordinates with "
+                     f"--locus chrN:start-end instead (e.g. from the UCSC Genome Browser or NCBI Gene).")
         raise
 
 
@@ -1073,8 +1155,8 @@ def design_amplicon(gene, chrom, guides, args, application, amp_target, max_ampl
     # Sanger: forward primer reads in from the left cut, reverse from the right cut.
     print("Selecting Sanger sequencing primers...")
     dist_min, dist_max = nested_dist_range(application)
-    nest_F = pick_nested_F(amp_seq, amp_start, left_cut, dist_min, dist_max)
-    nest_R = pick_nested_R(amp_seq, amp_start, right_cut, dist_min, dist_max)
+    nest_F = pick_nested_F(amp_seq, amp_start, left_cut, dist_min, dist_max, repeats=repeats)
+    nest_R = pick_nested_R(amp_seq, amp_start, right_cut, dist_min, dist_max, repeats=repeats)
     if nest_F:
         print(f"  SF: {nest_F['seq']}  Tm(NN)={tm_santalucia(nest_F['seq']):.1f}")
     if nest_R:

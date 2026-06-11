@@ -17,12 +17,14 @@ description: |
 ## Inputs to collect
 
 - **gRNA sequence(s)** — 20–23 nt DNA (convert U→T if RNA). The script auto-detects: 20-bp protospacer, or 23-bp protospacer+PAM (the trailing 3 bp are recorded as the user-annotated PAM but the genome's actual 3 bases 3' of the protospacer are still checked against the nuclease). `--grna` accepts **multiple** sequences — see "Multiple gRNAs on one gene" below.
-- **Target locus** — gene symbol (e.g. `TCL1A`, `OR2W5`) **or** explicit `chrN:start-end` (commas and missing `chr` prefix both accepted). If a gene symbol isn't in Ensembl (typical for pseudogenes), the script falls through to NCBI E-utilities to resolve the coordinates.
+- **Target locus** — gene symbol (e.g. `TCL1A`, `OR2W5`) **or** explicit `chrN:start-end` (commas and missing `chr` prefix both accepted). Resolution is via Ensembl. **The NCBI E-utilities fallback (used for symbols Ensembl doesn't index, e.g. pseudogenes) is temporarily disabled** — if Ensembl can't resolve the symbol, pass explicit coordinates with `--locus`.
 - **Species / assembly** — defaults to `human` / `GRCh38`. Mouse (`GRCm39`), rat (`mRatBN7.2`), and any Ensembl species are supported.
 - **Application** — `ICE` (default), `TIDE`, or `amplicon-NGS`. Drives nested-Sanger-primer distance and the single-read coverage threshold. (It no longer drives amplicon size — every design defaults to a uniform 2 kb, see below.)
 - Optional: `--amplicon-size`, `--tm-min`, `--tm-max`, `--nuclease` (spcas9 or cas12a), `--skip-pam-check` (use for non-standard nucleases like xCas9/SaCas9, or when you have orthogonal evidence that cutting occurs despite a non-standard PAM), `--max-amplicon` (cap for repeat-avoidance expansion; default 1.5× target), `--no-repeat-check` (skip repeat screening — offline or poorly-annotated species), `--output-dir`.
 
-If the user hasn't specified the application, **ask once before invoking** — it sets the nested-Sanger-primer distance (ICE 80–150 bp, TIDE 60–120 bp from the cut) and the single-read coverage threshold, which affect how the trace is genotyped.
+If the user hasn't specified the application, **ask once before invoking** — it sets the single-read coverage threshold, which affects how the trace is genotyped. (Application no longer changes the nested-Sanger-primer distance — see below.)
+
+**Nested Sanger primers bind ≥ 250 bp from the cut** (window 250–330 bp, uniform across ICE/TIDE/amplicon-NGS). A Sanger read's first ~60 bp are low-quality and reliable ICE/TIDE decomposition needs ≥ 200 bp of clean trace *before* the cut; 250–330 bp out puts the cut ~190–270 bp into the high-quality region. The picker moves **outward only** (never closer) to escape a repeat. These distances sit inside the default 2 kb PCR amplicon, so the **same genomic PCR can be reused** — only the Sanger reaction is re-run.
 
 **Amplicon size defaults to a uniform 2 kb for every design** (single, separate, or combined), so all loci amplify under one PCR condition and pool easily. The cut is genotyped from nested Sanger primers, so a large amplicon doesn't hurt ICE/TIDE resolution. Override per run with `--amplicon-size`.
 
@@ -43,7 +45,7 @@ PCR primers that land in a **known repetitive element** (Alu, LINE, microsatelli
 - A primer's **3′ anchor (last 15 bp)** — the part that drives priming specificity — must be repeat-free. Candidates whose 3′ anchor sits in a repeat are rejected; a clean 3′ anchor is the **top selection priority**, above the Tm/clamp rules.
 - If the default-size window is all-repeat, the search **expands the amplicon up to `--max-amplicon` (default 1.5× target)** to reach repeat-free sequence, always preferring the smallest clean amplicon. The report notes any enlargement.
 - If no clean primer exists even at the cap, the best available is kept and **flagged** with the repeat name + a suggestion (raise `--max-amplicon`, move the other primer, or rely on Primer-BLAST).
-- Sanger primers are screened too but **flag-only** (they sit inside the amplicon).
+- Sanger primers are now **repeat-aware too**: the nested picker rejects a candidate whose 3′ anchor sits in a repeat and, if the standard window is all-repeat, extends the search **outward only** (farther from the cut, up to 150 bp past the window — never closer) to reach repeat-free sequence. It falls back to the best in-window candidate only if nothing clean exists. A repeat-anchored sequencing primer gives noisy traces, so this matters even though Sanger primers sit inside the amplicon.
 - `--no-repeat-check` skips this (offline / poorly-annotated species); if the Ensembl call fails the pipeline proceeds unscreened with a note. Repeat screening **complements** Primer-BLAST — it avoids annotated repeats up front; Primer-BLAST still does the genome-wide specificity check.
 
 ## Procedure
@@ -52,7 +54,7 @@ The whole pipeline runs in **one pass** through `scripts/design_primers.py`. Do 
 
 1. **Resolve the locus**:
    - If `--locus` is given: parse `chrN:start-end` (commas and missing `chr` prefix both tolerated), use as the search region.
-   - If `--gene` is given: hit Ensembl `/lookup/symbol/`. On 4xx (typical for pseudogenes like `OR2W5P`), fall through to NCBI E-utilities `esearch` + `esummary`, take the GRCh38 entry, and continue.
+   - If `--gene` is given: hit Ensembl `/lookup/symbol/`. On 4xx (typical for pseudogenes like `OR2W5P`), the script **errors out asking for explicit `--locus` coordinates** — the NCBI E-utilities fallback is temporarily disabled (commented out in `resolve_target`; re-enable later).
 2. **Locate the gRNA in the genome** by searching the ±2 kb region around the locus, both strands. If multiple perfect matches exist, use the leftmost and warn in the report.
 3. **Identify PAM and cut site** (or bypass):
    - SpCas9: PAM = `NGG` immediately 3' of the protospacer on the same strand. Cut between bp 17 and 18 (3 bp 5' of the PAM).
@@ -64,7 +66,7 @@ The whole pipeline runs in **one pass** through `scripts/design_primers.py`. Do 
    - R primer candidates: same, downstream of the (rightmost) cut.
    - Compute Wallace Tm, SantaLucia NN Tm, GC%, length, 3'-clamp status, homopolymer runs, and 3'-anchor repeat overlap — all in a single loop.
 6. **Score and select** the best (F, R) pair, lexicographically: (1) **both 3′ anchors repeat-free**; (2) **smallest |amplicon − target|** (prefer the least enlargement); (3) primer quality — Wallace Tm within **60 ± 2 °C** with a **3' G/C clamp**, then 60 ± 2 °C without a clamp, then the broad `--tm-min/--tm-max` window (default 57–63), closest-to-60 within each tier. Homopolymer runs and GC% outside 30–70 are hard rejects. (When `--no-repeat-check` is set, criterion 1 is inert and selection is size → Tm/clamp.)
-7. **Select Sanger primers**. Single cut: nested F + R flanking the cut (80–150 bp for ICE, 60–120 bp for TIDE). Combined: F at the leftmost cut, R at the rightmost (see "Multiple gRNAs on one gene").
+7. **Select Sanger primers**. Single cut: nested F + R flanking the cut (250–330 bp from the cut, uniform across applications; the picker extends outward only to clear a repeat). Combined: F at the leftmost cut, R at the rightmost (see "Multiple gRNAs on one gene").
 8. **Hard verification gate**: every primer must match the + strand at its claimed binding site. If any fails, abort with the exact mismatch.
 9. **Off-target check (PCR only)**: submit the PCR primer pair to NCBI Primer-BLAST against the organism genome database, returning a **job key + results URL** for the user to poll. Sanger primers are guaranteed inside the amplicon so they can't introduce new off-targets.
 10. **Output** the markdown report + wild-type amplicon FASTA (all cut sites marked).
@@ -87,7 +89,7 @@ Plus a separate `<output-dir>/<gene>_<grna-short>_amplicon_WT.fa` for direct upl
 ## Failure handling
 
 - **gRNA not found in genome** — try both strands, the reverse-complement, then report clearly. Common cause: wrong species/assembly, or the gRNA was pasted with U's (RNA) instead of T's.
-- **Gene symbol not in Ensembl** — fall through to NCBI E-utilities. If NCBI also returns nothing, error out with a clear "this symbol may be wrong or the locus may be on a different assembly" message.
+- **Gene symbol not in Ensembl** — the NCBI E-utilities fallback is temporarily disabled, so the script errors out and asks for explicit `--locus chrN:start-end` coordinates (e.g. from UCSC Genome Browser or NCBI Gene). Re-enable the fallback later by uncommenting the block in `resolve_target`.
 - **PAM not found** — by default, error out. The error message now suggests `--skip-pam-check` and `--nuclease` so the user has an obvious next move.
 - **Multiple perfect gRNA matches** — use the leftmost, list the rest in the report's "Multiple gRNA matches" section.
 - **No candidate primer pair meets the Tm filter** — error out with a suggestion to widen `--tm-min/--tm-max` or adjust `--amplicon-size`. (Was previously auto-widened silently — that was confusing, now we surface it.)
@@ -104,11 +106,11 @@ Plus a separate `<output-dir>/<gene>_<grna-short>_amplicon_WT.fa` for direct upl
 
 **Input:** "I have a gRNA with PAM — `TCGGCCTGGACTGGAGAAAACGG` — for `OR2W5`. Skip the PAM check, the library annotation is wrong."
 
-**Output:** script auto-detects the 23-bp input, splits it into 20-bp protospacer + 3-bp user-annotated `CGG`, runs Ensembl → falls through to NCBI because OR2W5P isn't in Ensembl → locates the protospacer in chr1:247,488,092-247,492,408 → reports the genome's actual 3' bases as the PAM (which won't match the user's `CGG`) → with `--skip-pam-check` it proceeds and produces primers anyway, with a clear note in the report that the PAM check was skipped.
+**Output:** script auto-detects the 23-bp input, splits it into 20-bp protospacer + 3-bp user-annotated `CGG`. Because `OR2W5P` is a pseudogene Ensembl doesn't index and the NCBI fallback is temporarily disabled, pass explicit coordinates: `--locus chr1:247,488,092-247,492,408`. It then locates the protospacer → reports the genome's actual 3' bases as the PAM (which won't match the user's `CGG`) → with `--skip-pam-check` it proceeds and produces primers anyway, with a clear note in the report that the PAM check was skipped.
 
 **Input:** "Design TIDE primers for two OR2W5 gRNAs: `AACCAGGAGGACGCACTCGG` and `ACCGGCAGACGGCCACATAG`."
 
-**Command:** `--grna AACCAGGAGGACGCACTCGG ACCGGCAGACGGCCACATAG --gene OR2W5 --application TIDE`
+**Command:** `--grna AACCAGGAGGACGCACTCGG ACCGGCAGACGGCCACATAG --locus chr1:247,488,092-247,492,408 --application TIDE` (OR2W5P needs explicit `--locus` while the NCBI fallback is disabled)
 
 **Output:** the two cuts are 37 bp apart, so one combined **2 kb** amplicon is designed with a single PCR pair and one Sanger F+R pair. The report notes that because the spread (37 bp) is ≤ 200 bp (TIDE), a single forward read covers both cuts *if each gRNA is run in a separate single-cut sample* — but if both are co-delivered, Sanger-F reads the left cut and Sanger-R the right. (Had the two cuts been > 1 kb apart, as with the two example TCL1A gRNAs, the script would instead emit two independent designs.)
 
