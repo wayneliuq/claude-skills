@@ -67,25 +67,39 @@ NN = {
     'TA': (-7.2, -21.3),
     'CA': (-8.5, -22.7), 'TG': (-8.5, -22.7),
     'GT': (-8.4, -22.4), 'AC': (-8.4, -22.4),
-    'CT': (-7.8, -21.0), 'AG': ('-7.8', -21.0),  # placeholder, see below
+    'CT': (-7.8, -21.0), 'AG': (-7.8, -21.0),
     'GA': (-8.2, -22.2), 'TC': (-8.2, -22.2),
     'CG': (-10.6, -27.2),
     'GC': (-9.8, -24.4),
     'GG': (-8.0, -19.9), 'CC': (-8.0, -19.9),
 }
-# Fix that placeholder (kept one dict compact for readability above; correct value below)
-NN['AG'] = (-7.8, -21.0)
 
 
 def nn_dH_dS(seq):
-    """SantaLucia 1998 nearest-neighbor dH (kcal/mol) and dS (cal/mol/K)."""
+    """SantaLucia 1998 unified nearest-neighbor dH (kcal/mol) and dS (cal/mol/K).
+
+    Sums the 10 unique NN stacking terms plus the published initiation terms:
+      - initiation with a terminal G·C pair: dH +0.1, dS −2.8
+      - initiation with a terminal A·T pair: dH +2.3, dS +4.1
+    applied once per duplex end (so a 5'-A...G-3' oligo gets one A·T-end term and
+    one G·C-end term). The symmetry correction (dS −1.4) is added ONLY for a
+    self-complementary sequence. (The previous version applied the −1.4 to every
+    sequence and dropped the A·T-end initiation entirely, which overstated Tm by
+    up to ~3 °C for A·T-ended oligos.)"""
     s = seq.upper()
     dH = 0.0
-    dS = -1.4  # initiation
-    if s[0] in 'GC':
-        dS -= 2.8
-    if s[-1] in 'GC':
-        dS -= 2.8
+    dS = 0.0
+    # Initiation, once per terminal base pair.
+    for end_base in (s[0], s[-1]):
+        if end_base in 'GC':
+            dH += 0.1
+            dS += -2.8
+        else:
+            dH += 2.3
+            dS += 4.1
+    # Symmetry correction: self-complementary duplexes only.
+    if s == s.translate(str.maketrans("ACGT", "TGCA"))[::-1]:
+        dS += -1.4
     for i in range(len(s) - 1):
         pair = s[i:i + 2]
         if pair in NN:
