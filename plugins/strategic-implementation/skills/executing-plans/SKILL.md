@@ -82,7 +82,7 @@ This keeps the deliverable's file scope traceable in the conversation and makes 
 
 ### Checkpoint schema (`<feature-folder>/checkpoint.md`)
 
-A compact, compaction-survivable projection of execution state. One line per entry, no prose. Update at every atomic commit (see Step 2d).
+A compact, durable projection of execution state — the at-a-glance record of what's done and what's in flight. One line per entry, no prose. Update at every atomic commit (see Step 2d).
 
 ```markdown
 # Checkpoint — <feature slug>
