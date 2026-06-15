@@ -107,12 +107,22 @@ _Implements: product-brief_<slug>.md · Date: <date>_
 
 ### Authoring rules
 
+0. **Does this need to exist?** Before drafting any deliverable, abstraction, module, config surface, or dependency, walk this hierarchy and stop at the first hit:
+   1. **Need it at all?** → if the brief's success signal and every acceptance step still hold without it, drop it (YAGNI).
+   2. **Stdlib / language built-in does it?** → use that.
+   3. **Native platform / framework feature does it?** → use that.
+   4. **Already-installed dependency does it?** → use that (this is rule 6's reuse check).
+   5. **One line?** → write the one line.
+   6. **Only then** → the minimum that satisfies the acceptance steps.
+
+   Never add scaffolding, plugin points, strategy patterns, or generalization for hypothetical future needs. The `simplify` reviewer scores the plan against this same hierarchy and returns deletion candidates for anything that fails it.
+
 1. **One deliverable = one user-observable outcome.** Do not create deliverables for "internal plumbing" unless the plumbing is itself a validation gate.
 2. **No LOC budgets.** Size is not a gate in v2. Fitness is a gate.
 3. **Validation method honesty.** Choose the method whose evidence actually proves the deliverable's user-acceptance steps. If the steps require visual confirmation, `preview` or `post-hoc` — not `tdd`. If the steps name observable behavior under real I/O, `integration-test` — not `tdd` with a mocked seam. If the chosen method cannot reproduce the user's verification flow, it is wrong. **For a `Macro-deliverable: true` deliverable, the method must prove the INTEGRATED cross-domain outcome end-to-end — never a single domain in isolation.**
 4. **Preview-unavailable fallback.** For `preview`-validated deliverables: in `supervised`/`auto`, pause for PM manual validation if the preview tool can't run; in `yolo`, auto-escalate to TDD and proceed.
 5. **Verify paths.** Every file path must be confirmed via Glob before the draft is presented for review.
-6. **Reuse before creating.** Grep for existing primitives; cite them in "Reused existing patterns."
+6. **Reuse before creating** (rule 0, rung 4). Grep for existing primitives before introducing a new one; cite every reused primitive in "Reused existing patterns."
 7. **Validation honesty per integration-risk class.** Class `a`/`b`/`c` deliverables MUST declare validation as `integration-test`, `preview`, or `post-hoc`. They MUST NOT declare `tdd` if the proposed test would mock the very dependency the deliverable's correctness depends on. Class `d` may use any method. A green unit-test suite that mocks the integration point is not validation — it is orthogonal-to-correctness coverage. A `Macro-deliverable` is treated as integration-risk for this rule: its method must exercise the cross-domain seam, not per-domain mocks.
 8. **Consumer audit on shape change.** Any deliverable that changes a data shape (interface / type / schema / payload / return type / function signature) MUST grep its consumers and list every one with a status (`updated-in-this-deliverable`, `updated-in-D<n>`, `unaffected-because-<reason>`, `explicit-skip-because-<reason>`). Hand-wavy enumeration is rejected by review.
 9. **Macro-deliverable (narrow exception).** Default is normal decomposition — split work into the smallest independently-validateable deliverables. A deliverable may be marked `Macro-deliverable: true` ONLY when ALL hold: (a) the outcome spans ≥2 domains (commonly backend / API-contract / frontend); (b) the domains are NOT independently end-to-end-validateable — splitting them loses the ability to validate any sub-part e2e; (c) together they form ONE user-observable outcome; (d) it is large enough that concurrent build meaningfully beats sequential. PLUS an eligibility gate: the domains must own **disjoint file sets — authored AND generated/derived outputs** (no two domains write the same lockfile / index / generated artifact). Expected domain count is small (≤ ~4). If work *can* be split into independently-validateable pieces, it MUST be — a macro-deliverable is not a license to skip honest decomposition. A macro-deliverable IS one deliverable → one atomic `D<n>:` commit (executing-plans runs its domains in one Workflow). Record it in the template's `Macro-deliverable` / `Domains & file partition` fields and name it under "Workflow decision".
