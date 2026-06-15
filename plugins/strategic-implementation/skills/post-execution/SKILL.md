@@ -1,6 +1,6 @@
 ---
 name: post-execution
-description: Consolidated post-execution skill replacing v1's bug-fix + post-mortem + end-of-implementation. Three modes — regression-check (auto after all deliverables complete), triage (PM-reported behavioral issue), learnings-synthesis (validation-log accumulation).
+description: Post-execution skill with three modes — regression-check (auto after all deliverables complete), triage (PM-reported behavioral issue), learnings-synthesis (validation-log accumulation).
 ---
 
 # post-execution

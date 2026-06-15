@@ -11,7 +11,7 @@ Code-level simplicity review of a changed working set. Produces a structured rep
 
 Adapted from two upstream sources:
 
-- **`anthropic-skills:simplify`** (top-level Anthropic skill — "Review changed code for reuse, quality, and efficiency, then fix any issues found"). This in-repo skill keeps the review portion and intentionally **drops** the auto-fix portion (HARD DECISION from the v3.2.1 brief: report-only, PM-gated dispositions).
+- **`anthropic-skills:simplify`** (top-level Anthropic skill — "Review changed code for reuse, quality, and efficiency, then fix any issues found"). This in-repo skill keeps the review portion and intentionally **drops** the auto-fix portion (report-only, PM-gated dispositions by design).
 - **`agents/plan-simplify.md`** (in-plugin plan-time simplicity reviewer used by `review`). That agent operates on execution plans before code exists; this skill operates on actual diffs after code lands. Distinct names, distinct surfaces.
 
 ## Inputs
