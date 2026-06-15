@@ -261,6 +261,18 @@ The v3.1 choice mirrors v2.2: import the high-leverage idea, leave the heavyweig
 
 ---
 
+## Acknowledgments — inspirations for v4.3.0 (Leanness Pass)
+
+v4.3.0 removed an obsolete subsystem and grafted in three small, high-leverage ideas from public agentic-skill projects. As before, we imported the idea and left the heavyweight stack behind:
+
+- **[DietrichGebert/ponytail](https://github.com/DietrichGebert/ponytail)** — the "lazy senior developer" decision hierarchy (*does this need to exist? → stdlib → native platform feature → already-installed dependency → one line → minimum*) is imported as `execution-plan` authoring rule 0 and as the scoring rubric for the `simplify` reviewer, which now returns named deletion candidates against it. **Left behind:** the `ponytail:` deferred-debt ledger and per-shortcut comment machinery.
+- **[addyosmani/agent-skills](https://github.com/addyosmani/agent-skills)** — the anti-rationalization-table device (common excuse → rebuttal) is adopted at the two highest-skip authoring gates (validation-method honesty, consumer-audit-on-shape-change), capped at two. **Left behind:** the ~100-line change-sizing review norm (conflicts with our fitness-not-size gate), autonomous `/build auto` (we have `yolo`), and doubt-driven development (covered by our review panel).
+- **[Leonxlnx/taste-skill](https://github.com/Leonxlnx/taste-skill)** — the anti-slop "AI Tells" checklist is adopted as an in-plugin `agents/frontend-quality.md`, split into a SLIM tier (em-dash ban, eyebrow restraint, no repeated section layouts, hero-fits-viewport, no fake-precise numbers — applied to throwaway `ui-mockup` output) and a RICH tier (font/color discipline, motivated motion, design-system selection — applied to shipped UI via `frontend-engineer`). **Left behind:** the motion/GSAP/dials/design-system machinery in the throwaway mockup path.
+
+The same pass also *deleted* the long-running-session drift machinery (chapter rotation, per-turn goal evaluator, turn-cap) as obsolete on modern models — so v4.3.0 ships net-less code while raising plan minimalism and frontend quality. We thank all three projects for their public, well-documented work.
+
+---
+
 ## Feature folder layout
 
 ```
