@@ -124,7 +124,17 @@ _Implements: product-brief_<slug>.md · Date: <date>_
 5. **Verify paths.** Every file path must be confirmed via Glob before the draft is presented for review.
 6. **Reuse before creating** (rule 0, rung 4). Grep for existing primitives before introducing a new one; cite every reused primitive in "Reused existing patterns."
 7. **Validation honesty per integration-risk class.** Class `a`/`b`/`c` deliverables MUST declare validation as `integration-test`, `preview`, or `post-hoc`. They MUST NOT declare `tdd` if the proposed test would mock the very dependency the deliverable's correctness depends on. Class `d` may use any method. A green unit-test suite that mocks the integration point is not validation — it is orthogonal-to-correctness coverage. A `Macro-deliverable` is treated as integration-risk for this rule: its method must exercise the cross-domain seam, not per-domain mocks.
+
+   | Rationalization | Rebuttal |
+   |---|---|
+   | "Unit tests are faster / simpler here." | If they mock the dependency the deliverable's correctness rests on, they're orthogonal-to-correctness coverage, not validation. Speed is irrelevant when the test can't fail for the real reason. |
+   | "The integration point is stable, mocking is fine." | Stability is a claim, not evidence. Class a/b/c means the risk lives at that seam — exercise it (`integration-test`/`preview`/`post-hoc`), don't assume it away. |
 8. **Consumer audit on shape change.** Any deliverable that changes a data shape (interface / type / schema / payload / return type / function signature) MUST grep its consumers and list every one with a status (`updated-in-this-deliverable`, `updated-in-D<n>`, `unaffected-because-<reason>`, `explicit-skip-because-<reason>`). Hand-wavy enumeration is rejected by review.
+
+   | Rationalization | Rebuttal |
+   |---|---|
+   | "Probably nothing else uses this shape." | "Probably" is a grep you haven't run. Run it, then list every consumer with a status. |
+   | "It's a small/internal change, consumers will adapt." | Silent shape changes break callers at runtime, not review time. Enumerate them now or review rejects the plan. |
 9. **Macro-deliverable (narrow exception).** Default is normal decomposition — split work into the smallest independently-validateable deliverables. A deliverable may be marked `Macro-deliverable: true` ONLY when ALL hold: (a) the outcome spans ≥2 domains (commonly backend / API-contract / frontend); (b) the domains are NOT independently end-to-end-validateable — splitting them loses the ability to validate any sub-part e2e; (c) together they form ONE user-observable outcome; (d) it is large enough that concurrent build meaningfully beats sequential. PLUS an eligibility gate: the domains must own **disjoint file sets — authored AND generated/derived outputs** (no two domains write the same lockfile / index / generated artifact). Expected domain count is small (≤ ~4). If work *can* be split into independently-validateable pieces, it MUST be — a macro-deliverable is not a license to skip honest decomposition. A macro-deliverable IS one deliverable → one atomic `D<n>:` commit (executing-plans runs its domains in one Workflow). Record it in the template's `Macro-deliverable` / `Domains & file partition` fields and name it under "Workflow decision".
 
 ---
