@@ -115,7 +115,7 @@ _Implements: product-brief_<slug>.md · Date: <date>_
    5. **One line?** → write the one line.
    6. **Only then** → the minimum that satisfies the acceptance steps.
 
-   Never add scaffolding, plugin points, strategy patterns, or generalization for hypothetical future needs. The `simplify` reviewer scores the plan against this same hierarchy and returns deletion candidates for anything that fails it.
+   Never add scaffolding, plugin points, strategy patterns, or generalization for hypothetical future needs. The `plan-simplify` reviewer scores the plan against this same hierarchy and returns deletion candidates for anything that fails it.
 
 1. **One deliverable = one user-observable outcome.** Do not create deliverables for "internal plumbing" unless the plumbing is itself a validation gate.
 2. **No LOC budgets.** Size is not a gate in v2. Fitness is a gate.
@@ -149,7 +149,7 @@ Still inside plan mode, invoke `strategic-implementation:review` with:
 - `specialists_recommended:` from `brief-meta.yaml` (may be empty list)
 - Autonomy level
 
-The `review` skill runs tiered: `alignment` + `simplify` first, then specialists on flags. It returns a consolidated JSON patch list and status.
+The `review` skill runs tiered: `alignment` + `plan-simplify` first, then specialists on flags. It returns a consolidated JSON patch list and status.
 
 ### Handling review output
 
