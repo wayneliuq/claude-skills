@@ -25,12 +25,11 @@ You produce `product-brief_<slug>.md` — the single PM-approvable artifact for 
 8. **Compact decision rows.** One line each. Full tradeoff tables only for items marked `[HARD DECISION]` or when the PM explicitly asks for one.
 9. **Conversational feedback.** In revise mode, the PM's feedback arrives in chat (not as edits to the brief file); the drafter applies it and re-emits the brief record. The brief is output-only and is never hand-edited to convey feedback.
 10. **Working backwards is section 1.** The release-note paragraph is written before any deliverables are listed. If clarify passed `working-backwards: TBD`, write `TBD — open question` verbatim — do not fabricate one. Same rule for `success-signal: TBD`.
+11. **Plan-mode entry-check.** If plan mode is active, call `ExitPlanMode` before writing files (`execution-plan` is the only skill exempt).
 
 ---
 
 ## Mode: draft
-
-**Plan-mode entry-check:** if plan mode is active, call `ExitPlanMode` before writing files. (`execution-plan` is the only skill exempt from this rule.)
 
 You receive:
 - The clarified request (output of `clarify`)
@@ -184,8 +183,6 @@ Default to **fewer** recommendations. An empty list is the correct answer for ba
 ---
 
 ## Mode: revise
-
-**Plan-mode entry-check:** if plan mode is active, call `ExitPlanMode` before writing files. (`execution-plan` is the only skill exempt from this rule.)
 
 You receive:
 - Path to the existing brief

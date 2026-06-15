@@ -22,12 +22,11 @@ You produce a single static `mockup.html` that serves as the visual contract for
 5. **PM feedback is conversational.** The PM describes changes in chat; the skill re-emits `mockup.html` (output-only). No inline-comment or sibling-feedback-file editing.
 6. **Conflict-back-to-brief.** A PM comment that contradicts a brief deliverable is not silently applied — the conflict is surfaced and the workflow loops back to brief revision.
 7. **Anti-slop (SLIM tier).** Apply the SLIM tier of `agents/frontend-quality.md` — zero em-dashes, eyebrow restraint, no repeated section layouts, hero fits the first viewport, no fake-precise numbers, no scroll cues/version tells, real content not lorem, off-black/off-white. These are legibility/IA rules, not pixel polish; they do not violate rule 4 (throwaway, not polished). Do NOT pull in the RICH tier (motion, fonts, design systems) — that belongs to shipped UI, not the mockup.
+8. **Plan-mode entry-check.** If plan mode is active, call `ExitPlanMode` before writing files (`execution-plan` is the only skill exempt).
 
 ---
 
 ## Mode: generate
-
-**Plan-mode entry-check:** if plan mode is active, call `ExitPlanMode` before writing files. (`execution-plan` is the only skill exempt from this rule.)
 
 You receive:
 - Brief path
@@ -91,8 +90,6 @@ Do NOT auto-advance.
 
 ## Mode: revise
 
-**Plan-mode entry-check:** if plan mode is active, call `ExitPlanMode` before writing files. (`execution-plan` is the only skill exempt from this rule.)
-
 You receive:
 - Path to existing `mockup.html`
 - Brief path (for conflict checks)
@@ -126,8 +123,6 @@ Write `mockup.html`. Announce:
 ---
 
 ## Mode: conflict-back-to-brief
-
-**Plan-mode entry-check:** if plan mode is active, call `ExitPlanMode` before writing files. (`execution-plan` is the only skill exempt from this rule.)
 
 Triggered when a PM feedback item contradicts a brief deliverable or HARD DECISION.
 

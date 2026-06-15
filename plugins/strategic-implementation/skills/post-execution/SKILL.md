@@ -13,11 +13,11 @@ You receive:
 - For `triage`: the PM's issue report
 - For `learnings-synthesis`: (no extra input — reads validation-log)
 
+**Plan-mode entry-check (all modes):** if plan mode is active, call `ExitPlanMode` before writing files. (`execution-plan` is the only skill exempt from this rule.)
+
 ---
 
 ## Mode: regression-check
-
-**Plan-mode entry-check:** if plan mode is active, call `ExitPlanMode` before writing files. (`execution-plan` is the only skill exempt from this rule.)
 
 Triggered automatically by `executing-plans` when the final deliverable is marked complete.
 
@@ -100,8 +100,6 @@ If any regression is unresolved or any goal-backward verification returns `no`: 
 
 ## Mode: triage
 
-**Plan-mode entry-check:** if plan mode is active, call `ExitPlanMode` before writing files. (`execution-plan` is the only skill exempt from this rule.)
-
 Triggered when PM reports a behavioral issue after execution completed (bug, unexpected behavior, missing edge case).
 
 ### Steps
@@ -140,8 +138,6 @@ Triggered when PM reports a behavioral issue after execution completed (bug, une
 ---
 
 ## Mode: learnings-synthesis
-
-**Plan-mode entry-check:** if plan mode is active, call `ExitPlanMode` before writing files. (`execution-plan` is the only skill exempt from this rule.)
 
 Triggered when `validation-log.md` accumulates ≥2 meaningful deviations (judgment call — a typo fix does not count; a non-obvious gotcha does).
 
