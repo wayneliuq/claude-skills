@@ -6,7 +6,7 @@
 
 You write what the user should be able to do. The plugin handles everything between that sentence and merged code: clarification, planning, adversarial review, deliverable-by-deliverable execution, and a regression check at the end. You approve **one document** (the product brief). Everything else happens behind the right gates, with the right level of autonomy you choose at the start.
 
-**Version:** 4.3.0
+**Version:** 4.4.0
 **Built for:** Claude Code on Opus 4.8
 **Audience:** non-technical PMs, solo founders, anyone who can describe what good looks like
 **Requires:** the [`code-review-graph`](https://github.com/tirth8205/code-review-graph) MCP server (see [Dependencies](#dependencies))
@@ -265,6 +265,19 @@ v4.3.0 removed an obsolete subsystem and grafted in three small, high-leverage i
 - **[Leonxlnx/taste-skill](https://github.com/Leonxlnx/taste-skill)** — the anti-slop "AI Tells" checklist is adopted as an in-plugin `agents/frontend-quality.md`, split into a SLIM tier (em-dash ban, eyebrow restraint, no repeated section layouts, hero-fits-viewport, no fake-precise numbers — applied to throwaway `ui-mockup` output) and a RICH tier (font/color discipline, motivated motion, design-system selection — applied to shipped UI via `frontend-engineer`). **Left behind:** the motion/GSAP/dials/design-system machinery in the throwaway mockup path.
 
 The same pass also *deleted* the long-running-session drift machinery (chapter rotation, per-turn goal evaluator, turn-cap) as obsolete on modern models — removing a whole hook subsystem and a per-turn model call, in exchange for lightweight rules and one shared reference file. We thank all three projects for their public, well-documented work.
+
+---
+
+## Leanness Pass II — v4.4.0
+
+A self-audit pass that removed machinery a more capable model no longer needs, plus duplication and errors:
+
+- **Pruned the BM25 memory/recall subsystem** (the whole `scripts/memory/` Python layer, its SessionStart refresh hook, and all recall call-sites) — it never showed value in practice. `project-learnings.md` (the durable tier) and the externalized store stay. Native memory is left to a future hindsight-MCP integration.
+- **Dropped mid-execution simplify** and the **edit-thrashing** hook, keeping pre-execution simplify (the `plan-simplify` review agent), the post-execution final simplify pass, and the error-loop / deviation-surface breakers.
+- **Renamed** the plan-review `simplify` *agent* to `plan-simplify`, resolving a name collision with the code-level `simplify` *skill* (and a mislinked reference in `review`).
+- **De-duplicated** the store-routing protocol (×8 → one canonical copy in `scripts/store/README.md`) and the per-mode plan-mode entry-check; stripped stale internal version archaeology; compressed the triage repro ladder.
+
+Net effect: the plugin ships substantially less code (the memory subsystem alone was ~1.6k lines) while keeping every load-bearing gate.
 
 ---
 
