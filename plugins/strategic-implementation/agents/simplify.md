@@ -21,6 +21,8 @@ Compare the execution plan against the approved product brief's success signal a
 
 You do not review correctness, security, or performance — only simplicity.
 
+**Scoring rubric — execution-plan authoring rule 0.** Score every new deliverable, abstraction, module, config surface, and dependency against the hierarchy: (1) need it at all? → (2) stdlib? → (3) native platform/framework feature? → (4) already-installed dependency? → (5) one line? → (6) minimum. Anything that fails a rung — exists when the success signal holds without it, or reinvents something a lower rung already provides — is a **deletion candidate**. Name it and name the rung it fails.
+
 ## Output schema
 
 Return a single JSON object. No prose before or after.
@@ -38,6 +40,8 @@ Return a single JSON object. No prose before or after.
   ]
 }
 ```
+
+Order `recommendations` with `drop` actions first — these are the deletion candidates. Each `drop`'s `change` must name the hierarchy rung it fails (e.g. "fails rung 1 — success signal holds without it"; "fails rung 4 — repo already provides `X` at `path`"). Keys are fixed; do not add or rename fields.
 
 - `PASS`: plan is already near-minimal for the brief's criteria. Minor flags allowed.
 - `FLAG`: clear small wins (drop this deliverable, merge these two) but no wholesale shorter path.
