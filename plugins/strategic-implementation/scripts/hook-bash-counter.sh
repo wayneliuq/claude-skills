@@ -1,12 +1,10 @@
 #!/bin/bash
 # PostToolUse(Bash) hook for strategic-implementation.
 # Detects atomic deliverable commits (subjects matching `^D[0-9]+: `) and
-# updates the per-chapter / per-feature counters in state.json:
-#   - deliverables_done_in_chapter (append)
+# updates the per-feature counters in state.json:
 #   - deliverables_since_last_simplify (increment)
 #   - loc_since_last_simplify (estimate from git diff stat of the commit)
-# Sets flag pending_chapter_rotation when the chapter is complete; sets flag
-# pending_simplify when simplify thresholds are crossed.
+# Sets flag pending_simplify when simplify thresholds are crossed.
 # No-ops silently when no feature is active.
 
 SI_HOOK_INPUT=$(cat)
@@ -46,10 +44,9 @@ LAST_COUNTED=$(si_state_read '.last_counted_sha')
 HEAD_SHA=$(cd "$CWD" && git rev-parse HEAD 2>/dev/null || echo "")
 [[ "$LAST_COUNTED" = "$HEAD_SHA" ]] && si_noop
 
-# Update counters + chapter membership + last_counted_sha.
+# Update counters + last_counted_sha.
 si_state_mutate "
-  .deliverables_done_in_chapter += [\"$DLV\"]
-  | .deliverables_since_last_simplify = (.deliverables_since_last_simplify + 1)
+  .deliverables_since_last_simplify = (.deliverables_since_last_simplify + 1)
   | .loc_since_last_simplify = (.loc_since_last_simplify + $LOC_DELTA)
   | .last_counted_sha = \"$HEAD_SHA\"
   | .current_deliverable_edit_counts = {}
@@ -57,17 +54,10 @@ si_state_mutate "
 "
 
 # Re-read updated counters and set the deterministic flags.
-DONE=$(si_state_read '.deliverables_done_in_chapter | length')
-CHAPTER_SIZE=$(si_state_read '.chapter_size')
 SIMPLIFY_DELIVERABLES=$(si_state_read '.simplify_thresholds.deliverables')
 SIMPLIFY_LOC=$(si_state_read '.simplify_thresholds.loc')
 DSINCE=$(si_state_read '.deliverables_since_last_simplify')
 LSINCE=$(si_state_read '.loc_since_last_simplify')
-
-# Chapter complete?
-if [[ -n "$DONE" && -n "$CHAPTER_SIZE" && "$DONE" -ge "$CHAPTER_SIZE" ]]; then
-  si_state_mutate '.pending_chapter_rotation = true'
-fi
 
 # Simplify trigger?
 if [[ -n "$DSINCE" && -n "$SIMPLIFY_DELIVERABLES" && "$DSINCE" -ge "$SIMPLIFY_DELIVERABLES" ]] \

@@ -56,7 +56,7 @@ Initialize deviation counter `DEV-001`.
 
 ### Initialize hook state (deterministic-trigger layer)
 
-The plugin ships harness-fired hooks (`plugins/strategic-implementation/hooks/hooks.json`) that detect deliverable commits, edit-thrashing, error-loops, simplify thresholds, validation-log additions, and chapter completion deterministically — without depending on the agent to remember to check. Hooks are no-ops unless an active state file exists.
+The plugin ships harness-fired hooks (`plugins/strategic-implementation/hooks/hooks.json`) that detect deliverable commits, edit-thrashing, error-loops, simplify thresholds, and validation-log additions deterministically — without depending on the agent to remember to check. Hooks are no-ops unless an active state file exists.
 
 Write `.claude/strategic-implementation/state.json` (relative to repo root, NOT the feature folder — hooks read from a fixed location). Use the following shape:
 
@@ -66,9 +66,6 @@ Write `.claude/strategic-implementation/state.json` (relative to repo root, NOT 
   "feature_folder": "<feature-folder>",
   "feature_slug": "<slug>",
   "autonomy": "<level>",
-  "chapter_size": 5,
-  "current_chapter": 1,
-  "deliverables_done_in_chapter": [],
   "deliverables_since_last_simplify": 0,
   "loc_since_last_simplify": 0,
   "simplify_thresholds": {"deliverables": 3, "loc": 400},
@@ -78,7 +75,6 @@ Write `.claude/strategic-implementation/state.json` (relative to repo root, NOT 
   "plan_path": "<feature-folder>/execution-plan.md",
   "brief_success_signal": "<verbatim success signal from brief>",
   "last_counted_sha": "",
-  "pending_chapter_rotation": false,
   "pending_simplify": false,
   "pending_thrash_pause": false,
   "pending_error_loop": false,
@@ -87,28 +83,11 @@ Write `.claude/strategic-implementation/state.json` (relative to repo root, NOT 
 }
 ```
 
-Then emit the chapter-1 `<active-goal>` block to chat (the goal evaluator reads it from conversation):
-
-```
-<active-goal chapter="1" range="D1..D5">
-condition: complete deliverables D1 through D5 as specified in <plan-path>. Each must commit atomically with subject `D<n>: ...`, validation per its declared method recorded in validation-log.md, and checkpoint.md advanced.
-brief success signal: <verbatim from brief>
-constraints:
-  - No edits outside file lists declared in deliverables D1..D5
-  - No amending prior deliverable commits
-  - Every Edit/Write announces `touched: <files> deliverable: D<n>` in chat
-  - Stop and surface to PM on any BLOCK or unresolved ⚠️ in validation-log.md
-turn-cap: stop after 40 turns and surface checkpoint.md to PM
-</active-goal>
-```
-
-**On chapter rollover the hook itself emits the next block** — the agent does not re-write it. When the bash-counter hook detects the 5th deliverable commit in the current chapter, the Stop orchestrator rotates and injects the next chapter's `<active-goal>` as next-turn guidance. The agent reads the injected guidance and continues with the new chapter binding. No paste, no skill-mediated check.
-
-**Touched-file announcement (constraint compliance).** After every Edit/Write batch within a deliverable, announce in chat:
+**Touched-file announcement (scope discipline).** After every Edit/Write batch within a deliverable, announce in chat:
 
 > `touched: <comma-separated files> deliverable: D<n>`
 
-This is the only signal the goal evaluator has into file-scope drift. Skipping it means the evaluator cannot verify the "no edits outside declared list" constraint — silent drift becomes possible. Treat the announcement as part of the deliverable's build phase, not optional.
+This keeps the deliverable's file scope traceable in the conversation and makes an out-of-list edit visible to the PM. Treat it as part of the deliverable's build phase, not optional.
 
 ### Checkpoint schema (`<feature-folder>/checkpoint.md`)
 
@@ -397,7 +376,7 @@ When all deliverables are marked complete:
 3. `post-execution` writes `post-execution-report.md` and reports back.
 4. If the report status is `PASS`: announce feature complete.
 5. If `FLAG` or `BLOCK`: surface to PM; do not declare complete until resolved.
-6. **Deactivate hook state.** Set `.active = false` in `.claude/strategic-implementation/state.json` so subsequent sessions on the same repo do not trigger goal-evaluator or counter hooks. Use:
+6. **Deactivate hook state.** Set `.active = false` in `.claude/strategic-implementation/state.json` so subsequent sessions on the same repo do not trigger the counter or Stop-orchestrator hooks. Use:
 
    ```bash
    jq '.active = false' .claude/strategic-implementation/state.json \
