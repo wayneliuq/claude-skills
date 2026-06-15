@@ -48,7 +48,7 @@ supersedes: none            # <feature-slug> this work replaces, or `none`
 _Feature: <slug> · Started: <date> · Autonomy: <level>_
 ```
 
-The YAML frontmatter is **optional and additive** — it is the recall index's facet source (`status` / `domains` drive filtering; `supersedes` retires prior records). Older logs without it remain valid; the indexer tolerates absence. Set `status: aborted` if execution is abandoned before completion, so the work is never surfaced as proven precedent.
+The YAML frontmatter is **optional and additive** — lightweight metadata (`status` / `domains` / `supersedes`) for scanning prior features and any future memory tooling. Older logs without it remain valid. Set `status: aborted` if execution is abandoned before completion, so the work is not mistaken for proven precedent.
 
 If `checkpoint.md` does not yet exist, initialize it at `<feature-folder>/checkpoint.md` with the four-section schema (Done / In progress / Open decisions / Unresolved deviations) — sections may start empty. See "Checkpoint schema" below.
 
@@ -137,19 +137,11 @@ Fired only when a deliverable is `Macro-deliverable: true`. Emit the operator-vi
 
 When the capability gate routes here: build the domains **sequentially in the working tree** (contract first, then each domain), run validation, then the same single `D<n>:` atomic commit. Surface: `workflow unavailable → built sequentially`. **Resume reconciliation:** if `checkpoint.md` shows this macro-deliverable in-flight AND the working tree is dirty with its declared domain paths, `git checkout -- <those paths>` (reset to HEAD) before rebuilding — or require a clean tree and surface the discarded partial work — so a mid-workflow interruption never double-applies. This backs the "no lost work" guarantee.
 
-After Step 2-macro (either path) completes its commit, continue to the next deliverable (skip 2a–2f for this one; 2e consumer-audit/2f simplify-trigger still apply via the post-commit hook).
+After Step 2-macro (either path) completes its commit, continue to the next deliverable (skip 2a–2e for this one; the 2e consumer-audit still applies).
 
 ### Step 2a — Pre-flight env check
 
-**Point-of-need recall (advisory).** Before building, for a `Macro-deliverable` OR an `Integration-risk class: a|b|c` deliverable, query memory for how similar work was done before — so you reuse a proven approach instead of re-deriving it (e.g. rediscovering that an end-to-end test should run in a container first):
-
-```bash
-bash "${CLAUDE_PLUGIN_ROOT}/scripts/memory/recall.sh" "<deliverable name + domains>" --domains "<domains>" --k 3
-```
-
-This hot path is **BM25-only** (no embedding model is loaded per deliverable). It reads the index only — it never builds or re-embeds inline. Treat any output as advisory pre-flight context: it **informs, never dictates** the build or validation-method choice. Empty output → proceed silently (no index yet, or no good match). The command degrades to silence on any error and never blocks execution.
-
-Then verify the prerequisites for the deliverable's validation method:
+Verify the prerequisites for the deliverable's validation method:
 
 - **`preview`:** Claude Code preview tool available; dev server startable. If not available: apply preview-unavailable fallback (below).
 - **`cli`:** the CLI command runnable; required binaries in PATH.
@@ -204,7 +196,7 @@ Run the declared validation:
 
 Execution continues; `post-execution` regression-check reads these flags.
 
-**Validation-approach capture (cross-domain / integration-risk deliverables).** When a deliverable is `Macro-deliverable: true` OR `Integration-risk class: a|b|c`, after validation passes append a small block to `validation-log.md` recording the validation **approach actually used** — the pipeline / infrastructure, not just the one-word method (e.g. "docker compose up → integration-test in CI → manual staging smoke"). This is what `execution-plan`'s validation-approach recall later greps so similar future work reuses it instead of re-guessing.
+**Validation-approach capture (cross-domain / integration-risk deliverables).** When a deliverable is `Macro-deliverable: true` OR `Integration-risk class: a|b|c`, after validation passes append a small block to `validation-log.md` recording the validation **approach actually used** — the pipeline / infrastructure, not just the one-word method (e.g. "docker compose up → integration-test in CI → manual staging smoke"). This is a durable record of how the integrated outcome was validated, for future similar work to reuse.
 
 ```markdown
 ## APPROACH — D<n>
@@ -215,7 +207,7 @@ Execution continues; `post-execution` regression-check reads these flags.
 
 This block is **additive** — it does not change the header or the `DEV-NNN` deviation schema, and absence in older logs is expected (recall tolerates it).
 
-**Gotcha capture (any deliverable that cost avoidable rework).** When a deliverable burned time on a wrong path that a prior lesson would have prevented — or that a future similar deliverable should avoid — append a `## GOTCHA` block. This is the "we lost time on X; do Y first" note, and it is the highest-signal record for point-of-need recall (it directly prevents re-derivation, e.g. rediscovering that an end-to-end test must run in a container first).
+**Gotcha capture (any deliverable that cost avoidable rework).** When a deliverable burned time on a wrong path that a prior lesson would have prevented — or that a future similar deliverable should avoid — append a `## GOTCHA` block. This is the "we lost time on X; do Y first" note, and it is the highest-signal record for avoiding repeated rework (it directly prevents re-derivation, e.g. rediscovering that an end-to-end test must run in a container first).
 
 ```markdown
 ## GOTCHA — D<n>

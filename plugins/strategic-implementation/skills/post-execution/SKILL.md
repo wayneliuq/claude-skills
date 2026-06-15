@@ -59,7 +59,7 @@ The mode is intentionally lean. Across 24 historical regression-check reports, o
    ---
    status: complete           # complete (PASS) | flagged (FLAG) | aborted | superseded — derived from the Status verdict below
    domains: [<domain>, ...]   # areas / integration-risk dependencies this feature touched
-   outcome: <one phrase>      # what shipped, in a phrase — the recall index surfaces this
+   outcome: <one phrase>      # what shipped, in a phrase
    supersedes: none           # <feature-slug> this work replaces, or `none`
    ---
    # Post-execution report

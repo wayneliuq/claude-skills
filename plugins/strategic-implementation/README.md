@@ -17,14 +17,13 @@ You write what the user should be able to do. The plugin handles everything betw
 
 ### Quick setup (new machine)
 
-Run the bootstrap script — it verifies and (with `--install`) sets up everything below:
+Run the bootstrap script — it verifies your environment:
 
 ```bash
-bash plugins/strategic-implementation/scripts/setup.sh            # --check: report only, no changes
-bash plugins/strategic-implementation/scripts/setup.sh --install  # create venv, install deps
+bash plugins/strategic-implementation/scripts/setup.sh   # --check: report only, no changes
 ```
 
-It checks core tools (git, python3+FTS5, jq), installs `code-review-graph`, and sets up the memory recall layer (BM25 needs nothing; the optional vector leg gets a persistent venv at `~/.claude/strategic-implementation/.memory-venv` with `sqlite-vec`+`model2vec`). Recall **auto-discovers that venv at the default path** — no shell export needed; `$SI_MEMORY_PYTHON` is only an optional override for a custom interpreter. `--build-index` also builds the graph + BM25 index for the current repo. Everything degrades gracefully if a dependency is absent.
+It checks core tools (git, jq) and that `code-review-graph` is installed. Everything degrades gracefully if a dependency is absent.
 
 ### `code-review-graph` (MCP server) — required for full token efficiency
 
@@ -41,10 +40,6 @@ Three skills use the [`code-review-graph`](https://github.com/tirth8205/code-rev
 **Graceful degradation.** Every skill that uses the graph has a stale/empty-graph fallback: it emits `FLAG: graph stale … file-read mode` and proceeds by reading files directly. So the plugin **works without** `code-review-graph` — it just loses the token-efficient path. The dependency is a performance dependency, not a hard one.
 
 **Keeping the graph fresh.** The graph silently degrades to file-read mode if it goes stale. To keep it current automatically, this repo ships graph-freshness automation (session-start rebuild, all-editing-tools rebuild trigger, and a `post-merge` hook installer) — see [`docs/strategic-implementation/2026-05-26-graph-freshness/`](../../docs/strategic-implementation/2026-05-26-graph-freshness/setup-and-findings.md). Markdown/prose is **not** indexed by `code-review-graph` (it is AST/code-only); that determination and alternatives are recorded there too.
-
-### Memory/recall index (Python) — optional, local, graceful
-
-The plugin's **first Python surface** lives under [`scripts/memory/`](scripts/memory/): a derived, rebuildable recall index over the repo's own strategic-implementation markdown (typed/status-aware ingest + SQLite FTS5 BM25). The markdown stays canonical; the index (`docs/strategic-implementation/.memory/index.db`) is git-ignored and rebuilt from files. **The index auto-refreshes on session start** — a `SessionStart` hook runs `scripts/memory/refresh.sh --background`, which rebuilds in a detached, locked worker (instant return, no session-start delay; a no-op in repos without `docs/strategic-implementation/`). So it stays fresh on its own, the same way `code-review-graph` does; `refresh.sh` is also runnable manually. Phase 1a needs **no third-party dependencies** (stdlib `sqlite3` + FTS5). The optional vector leg (Phase 1b) adds local static embeddings (`model2vec`) + `sqlite-vec` for semantic / wording-mismatch recall at plan-drafting time, and requires an **extension-capable interpreter** — a python.org build has `enable_load_extension` compiled out, so use Homebrew python via `setup.sh --install`, which builds the venv at the default path that recall **auto-discovers** (no export needed; `$SI_MEMORY_PYTHON` is an optional override — see [`scripts/memory/requirements.txt`](scripts/memory/requirements.txt)). The per-deliverable hot path stays BM25-only. Recall is always advisory and degrades to silence — it never blocks execution. Include/exclude policy: [`scripts/memory/MEMORY-DOCTYPES.md`](scripts/memory/MEMORY-DOCTYPES.md).
 
 ---
 
