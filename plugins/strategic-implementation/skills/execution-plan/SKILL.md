@@ -29,19 +29,12 @@ If the environment does not support `EnterPlanMode` in this context, fall back: 
 Inside plan mode:
 
 0. **Graph health pre-flight.** Call `mcp__code-review-graph__list_graph_stats_tool`. If the graph is empty (`total_nodes: 0`) or `last_updated` lags the working tree by more than a day, emit `FLAG: graph stale (last-built: <ts>; nodes: <n>)` and continue with file-read mode for this run. If healthy, prefer graph queries throughout Step 2.
-1. Read the brief end-to-end. Extract: deliverables (D1…Dn), each deliverable's **user-facing acceptance steps** (the outcome contract — what a human does to confirm it works), the success signal, scope boundary (in / out / anti-goals), hard decisions, document references. The brief deliberately does NOT specify an implementation method (`preview` / `cli` / `tdd` / `integration-test` / `post-hoc`); execution-plan chooses the method, driven by the user-acceptance steps and the integration-risk class. _(Note from v3.2.1: brief no longer carries a separate Acceptance Criteria section — each deliverable's declared validation method is its acceptance test, and the Success signal section names the outcome-level check.)_
+1. Read the brief end-to-end. Extract: deliverables (D1…Dn), each deliverable's **user-facing acceptance steps** (the outcome contract — what a human does to confirm it works), the success signal, scope boundary (in / out / anti-goals), hard decisions, document references. The brief deliberately does NOT specify an implementation method (`preview` / `cli` / `tdd` / `integration-test` / `post-hoc`); execution-plan chooses the method, driven by the user-acceptance steps and the integration-risk class.
 2. For each deliverable, identify the concrete files likely to change. **Prefer code-review-graph queries** (`semantic_search_nodes` to find the symbol, `query_graph` for callers/callees/imports/tests, `get_architecture_overview` for module shape, `get_impact_radius` for blast radius); fall back to **Glob** / **Grep** / **Read** only when the graph cannot answer. Verify file paths via Glob before citing them. Unverified paths get `[PATH NOT FOUND]` annotations. Cite graph results as concrete symbols (`function foo at path/file.py:42`, "callers: `bar`, `baz`") rather than paraphrased file content.
 3. **Library-lifecycle doc pass.** For each integration-risk dependency from clarify, locate the canonical persistence / lifecycle doc (project README, vendor docs, RFC, or in-repo notes). Read the relevant section. Capture: what state persists across what boundaries (per-connection / per-session / per-process / per-deployment), known gotchas, and the doc URL/path. Time-box: aim for 15–30 minutes total across all libraries; if a library has no good docs, note that explicitly. Empty audit is acceptable only if clarify declared `none`.
 4. **Load the documentation registry.** Read `docs/strategic-implementation/documentation-registry.md` if present. For each registry entry, judge whether the deliverables in this brief might invalidate it (touches the path, the area, or the update-trigger condition). Tag each deliverable with `may-invalidate: [doc-paths]` or `may-invalidate: none`. Surface the union of impacted entries in the plan summary at Step 5 so the PM sees what docs this work will require updating.
 5. Load `docs/strategic-implementation/project-learnings.md` if it exists. Filter entries for relevance to this brief's deliverables. Inject matching entries when invoking `review`.
-6. **Validation-approach recall.** For deliverables that will be cross-domain (`Macro-deliverable`) or `Integration-risk class: a|b|c`, query memory for how similar work was validated before, replacing the former N-most-recent `grep` with a ranked, status-filtered recall over the whole indexed history:
-
-   ```bash
-   bash "${CLAUDE_PLUGIN_ROOT}/scripts/memory/recall.sh" "<brief domains + integration-risk class + validation intent>" --domains "<domains>" --k 3 --fuse
-   ```
-
-   This runs once per plan (not per deliverable), so it uses the richer `--fuse` path (BM25 + vector fusion when the vector leg is available; auto-falls back to BM25-only otherwise). It returns ranked distilled approaches with source pointers, drawn from the full corpus and matched by meaning, not just recency or exact wording — and never surfaces aborted/superseded work as precedent. Surface any hits as **advisory** input to the Step 3 validation-method choice (reuse a proven pipeline instead of re-guessing). This is advisory only — it informs, never dictates, the method. Empty output (no index yet, or no good match) → proceed silently (no error, no block). The command degrades to silence on any error.
-7. **Load brief sidecar.** Read `<feature-folder>/brief-meta.yaml` if present. Capture `specialists_recommended:` — this list is forwarded to `review` to narrow specialist selection. Absent sidecar or empty list → forward an empty list; `review`'s pre-filter still applies mandatory triggers.
+6. **Load brief sidecar.** Read `<feature-folder>/brief-meta.yaml` if present. Capture `specialists_recommended:` — this list is forwarded to `review` to narrow specialist selection. Absent sidecar or empty list → forward an empty list; `review`'s pre-filter still applies mandatory triggers.
 
 ---
 
@@ -107,14 +100,34 @@ _Implements: product-brief_<slug>.md · Date: <date>_
 
 ### Authoring rules
 
+0. **Does this need to exist?** Before drafting any deliverable, abstraction, module, config surface, or dependency, walk this hierarchy and stop at the first hit:
+   1. **Need it at all?** → if the brief's success signal and every acceptance step still hold without it, drop it (YAGNI).
+   2. **Stdlib / language built-in does it?** → use that.
+   3. **Native platform / framework feature does it?** → use that.
+   4. **Already-installed dependency does it?** → use that (this is rule 6's reuse check).
+   5. **One line?** → write the one line.
+   6. **Only then** → the minimum that satisfies the acceptance steps.
+
+   Never add scaffolding, plugin points, strategy patterns, or generalization for hypothetical future needs. The `plan-simplify` reviewer scores the plan against this same hierarchy and returns deletion candidates for anything that fails it.
+
 1. **One deliverable = one user-observable outcome.** Do not create deliverables for "internal plumbing" unless the plumbing is itself a validation gate.
-2. **No LOC budgets.** Size is not a gate in v2. Fitness is a gate.
+2. **No LOC budgets.** Size is not a gate. Fitness is a gate.
 3. **Validation method honesty.** Choose the method whose evidence actually proves the deliverable's user-acceptance steps. If the steps require visual confirmation, `preview` or `post-hoc` — not `tdd`. If the steps name observable behavior under real I/O, `integration-test` — not `tdd` with a mocked seam. If the chosen method cannot reproduce the user's verification flow, it is wrong. **For a `Macro-deliverable: true` deliverable, the method must prove the INTEGRATED cross-domain outcome end-to-end — never a single domain in isolation.**
 4. **Preview-unavailable fallback.** For `preview`-validated deliverables: in `supervised`/`auto`, pause for PM manual validation if the preview tool can't run; in `yolo`, auto-escalate to TDD and proceed.
 5. **Verify paths.** Every file path must be confirmed via Glob before the draft is presented for review.
-6. **Reuse before creating.** Grep for existing primitives; cite them in "Reused existing patterns."
+6. **Reuse before creating** (rule 0, rung 4). Grep for existing primitives before introducing a new one; cite every reused primitive in "Reused existing patterns."
 7. **Validation honesty per integration-risk class.** Class `a`/`b`/`c` deliverables MUST declare validation as `integration-test`, `preview`, or `post-hoc`. They MUST NOT declare `tdd` if the proposed test would mock the very dependency the deliverable's correctness depends on. Class `d` may use any method. A green unit-test suite that mocks the integration point is not validation — it is orthogonal-to-correctness coverage. A `Macro-deliverable` is treated as integration-risk for this rule: its method must exercise the cross-domain seam, not per-domain mocks.
+
+   | Rationalization | Rebuttal |
+   |---|---|
+   | "Unit tests are faster / simpler here." | If they mock the dependency the deliverable's correctness rests on, they're orthogonal-to-correctness coverage, not validation. Speed is irrelevant when the test can't fail for the real reason. |
+   | "The integration point is stable, mocking is fine." | Stability is a claim, not evidence. Class a/b/c means the risk lives at that seam — exercise it (`integration-test`/`preview`/`post-hoc`), don't assume it away. |
 8. **Consumer audit on shape change.** Any deliverable that changes a data shape (interface / type / schema / payload / return type / function signature) MUST grep its consumers and list every one with a status (`updated-in-this-deliverable`, `updated-in-D<n>`, `unaffected-because-<reason>`, `explicit-skip-because-<reason>`). Hand-wavy enumeration is rejected by review.
+
+   | Rationalization | Rebuttal |
+   |---|---|
+   | "Probably nothing else uses this shape." | "Probably" is a grep you haven't run. Run it, then list every consumer with a status. |
+   | "It's a small/internal change, consumers will adapt." | Silent shape changes break callers at runtime, not review time. Enumerate them now or review rejects the plan. |
 9. **Macro-deliverable (narrow exception).** Default is normal decomposition — split work into the smallest independently-validateable deliverables. A deliverable may be marked `Macro-deliverable: true` ONLY when ALL hold: (a) the outcome spans ≥2 domains (commonly backend / API-contract / frontend); (b) the domains are NOT independently end-to-end-validateable — splitting them loses the ability to validate any sub-part e2e; (c) together they form ONE user-observable outcome; (d) it is large enough that concurrent build meaningfully beats sequential. PLUS an eligibility gate: the domains must own **disjoint file sets — authored AND generated/derived outputs** (no two domains write the same lockfile / index / generated artifact). Expected domain count is small (≤ ~4). If work *can* be split into independently-validateable pieces, it MUST be — a macro-deliverable is not a license to skip honest decomposition. A macro-deliverable IS one deliverable → one atomic `D<n>:` commit (executing-plans runs its domains in one Workflow). Record it in the template's `Macro-deliverable` / `Domains & file partition` fields and name it under "Workflow decision".
 
 ---
@@ -129,7 +142,7 @@ Still inside plan mode, invoke `strategic-implementation:review` with:
 - `specialists_recommended:` from `brief-meta.yaml` (may be empty list)
 - Autonomy level
 
-The `review` skill runs tiered: `alignment` + `simplify` first, then specialists on flags. It returns a consolidated JSON patch list and status.
+The `review` skill runs tiered: `alignment` + `plan-simplify` first, then specialists on flags. It returns a consolidated JSON patch list and status.
 
 ### Handling review output
 
@@ -187,10 +200,4 @@ Terse. Substance exact. Drop articles, filler ("just", "really", "basically"), p
 
 ## Record routing — externalized artifact store
 
-Per-feature **records** (this stage's brief / plan / validation-log / checkpoint / reports / mockup / brief-meta — NOT the durable tier) are read and written through the store adapter, not the feature folder directly. Wherever this skill's steps say to write or read `<feature-folder>/<file>`, route it as below; treat `<file>` as the `<artifact-name>` of the record address `<repo-id>/<date-slug>/<artifact-name>`.
-
-- **Write (fallback-safe):** `bash "${CLAUDE_PLUGIN_ROOT}/scripts/store/store.sh" put "<repo-id>/<date-slug>/<file>" "<feature-folder>/<file>" <local-tmp> --handle-out <h>` — stores the record, OR writes the in-repo `<feature-folder>/<file>` fallback if gh/locator is unavailable or the store write fails (a surfaced conflict is NOT fallen back). Then best-effort `cache.sh refresh "<address>" <local-tmp>`.
-- **Read (this feature):** the human-browsable copy is the cache (`cache.sh path <date-slug>`); the authoritative read is `store.sh read "<address>"`.
-- **Read (a PRIOR feature) — live:** `store.sh list "<repo-id>/<prior-date-slug>"` then `store.sh read` per address. Never the active-feature cache (it holds only the active feature).
-- **Per-operation fallback (transition safety):** evaluate immediately before EACH record read/write — if the locator (`docs/strategic-implementation/store-locator.yaml`) is absent (bootstrap not run) or `gh` is unavailable/offline, fall back to the in-repo `<feature-folder>/<file>` path for that operation and note the fallback. If a store write fails mid-operation, fall back to the in-repo path within the same operation so no record is ever dropped.
-- **Durable tier stays in-repo:** `project-learnings.md` and `documentation-registry.md` are read/written in place — never routed to the store.
+Per-feature **records** (brief / plan / validation-log / checkpoint / reports / mockup / brief-meta) route through the store adapter, not the feature folder directly: wherever a step says write/read `<feature-folder>/<file>`, use the store address `<repo-id>/<date-slug>/<file>` with in-repo fallback. Full read/write/fallback protocol: [`scripts/store/README.md`](../../scripts/store/README.md#record-routing-protocol-agent-facing). **Durable tier — `project-learnings.md`, `documentation-registry.md` — stays in-repo, never routed to the store.**

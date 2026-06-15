@@ -1,6 +1,6 @@
 ---
 name: post-execution
-description: Consolidated post-execution skill replacing v1's bug-fix + post-mortem + end-of-implementation. Three modes — regression-check (auto after all deliverables complete), triage (PM-reported behavioral issue), learnings-synthesis (validation-log accumulation).
+description: Post-execution skill with three modes — regression-check (auto after all deliverables complete), triage (PM-reported behavioral issue), learnings-synthesis (validation-log accumulation).
 ---
 
 # post-execution
@@ -13,11 +13,11 @@ You receive:
 - For `triage`: the PM's issue report
 - For `learnings-synthesis`: (no extra input — reads validation-log)
 
+**Plan-mode entry-check (all modes):** if plan mode is active, call `ExitPlanMode` before writing files. (`execution-plan` is the only skill exempt from this rule.)
+
 ---
 
 ## Mode: regression-check
-
-**Plan-mode entry-check:** if plan mode is active, call `ExitPlanMode` before writing files. (`execution-plan` is the only skill exempt from this rule.)
 
 Triggered automatically by `executing-plans` when the final deliverable is marked complete.
 
@@ -51,7 +51,7 @@ The mode is intentionally lean. Across 24 historical regression-check reports, o
 
    The auto-apply scope is intentionally narrow: it never extends to simplify-report findings, test failures, or source-code changes — those require PM disposition.
 
-5. **Final simplify pass (mandatory).** Invoke `strategic-implementation:simplify` against the full feature diff (`git diff <merge-base>...HEAD`). The skill writes `<feature-folder>/simplify-report-NN.md` (next monotonic number, even if mid-execution reports already exist). Capture the report path and the high/med/low counts. PM-disposition is captured the same way as mid-execution reports — conversationally (apply / defer / dismiss per finding; the report file is output-only, not hand-edited). In `auto`/`yolo`, undispositioned findings become a FLAG in this report's status, not a BLOCK.
+5. **Final simplify pass (mandatory).** Invoke `strategic-implementation:simplify` against the full feature diff (`git diff <merge-base>...HEAD`). The skill writes `<feature-folder>/simplify-report-NN.md` (next monotonic number). Capture the report path and the high/med/low counts. PM-disposition is captured conversationally (apply / defer / dismiss per finding; the report file is output-only, not hand-edited). In `auto`/`yolo`, undispositioned findings become a FLAG in this report's status, not a BLOCK.
 
 6. **Write report + token-report telemetry.** Write `<feature-folder>/post-execution-report.md` using the template below — exactly five top-level sections, in this reader-facing order: Cross-contamination → Goal-backward → Plugin-config → Simplify → Status. The previous report's `## Modified files`, `## Test suite run` (as a section), `## Acceptance tests authored`, `## Registry-update verification` (as a section), and `## Visual diff` are removed; the test-suite and registry signals appear as one-liners inside Status.
 
@@ -59,7 +59,7 @@ The mode is intentionally lean. Across 24 historical regression-check reports, o
    ---
    status: complete           # complete (PASS) | flagged (FLAG) | aborted | superseded — derived from the Status verdict below
    domains: [<domain>, ...]   # areas / integration-risk dependencies this feature touched
-   outcome: <one phrase>      # what shipped, in a phrase — the recall index surfaces this
+   outcome: <one phrase>      # what shipped, in a phrase
    supersedes: none           # <feature-slug> this work replaces, or `none`
    ---
    # Post-execution report
@@ -100,8 +100,6 @@ If any regression is unresolved or any goal-backward verification returns `no`: 
 
 ## Mode: triage
 
-**Plan-mode entry-check:** if plan mode is active, call `ExitPlanMode` before writing files. (`execution-plan` is the only skill exempt from this rule.)
-
 Triggered when PM reports a behavioral issue after execution completed (bug, unexpected behavior, missing edge case).
 
 ### Steps
@@ -114,11 +112,7 @@ Triggered when PM reports a behavioral issue after execution completed (bug, une
 
    Default N. On N: route to brief revision via the orchestrator. Log a `spec-ambiguity-redirect` deviation and stop. On y: proceed to Step 2; log `spec-ambiguity-override`.
 
-2. **Build deterministic repro before hypothesizing.** Prohibit proposing fixes until a fast, deterministic, agent-runnable signal exists that distinguishes "broken" from "fixed." If one cannot be built, log a `repro-blocked` deviation and surface to PM rather than dive into code. Repro-construction ladder, in order of preference: failing test → curl/CLI snapshot diff → headless browser script → trace replay → throwaway harness → bisect harness → differential vs. last-known-good. Stop at the first rung that yields a deterministic pass/fail.
-
-   **Step 2a — Generate ranked hypotheses.** Produce 3–5 falsifiable hypotheses, ranked by expected explanatory power, each with a one-line falsification cost. Forbid fix attempts on hypotheses below rank 3 until the top-3 are ruled out.
-
-   **Step 2b — Tag debug logs for cleanup.** Any debug print/log added during diagnosis carries a unique prefix declared up front (e.g. `[DBG-D<n>-<short-uuid>]`). Step 5's Triage block records the prefix so cleanup is a single grep/remove.
+2. **Build a deterministic repro before hypothesizing.** Don't propose fixes until a fast, agent-runnable signal distinguishes "broken" from "fixed" (failing test / CLI snapshot / headless script / bisect — whichever is cheapest). If none can be built, log a `repro-blocked` deviation and surface to PM rather than dive into code. Rank the plausible causes and rule out the top ones first. Tag any debug logs with a unique prefix (e.g. `[DBG-<short-uuid>]`) so Step 5 records it and cleanup is a single grep.
 
 3. **TDD the fix.** Write an acceptance test that captures the bug (fails currently). Then write the minimum code to make it pass.
 4. Run the full test suite to confirm no new regressions.
@@ -140,8 +134,6 @@ Triggered when PM reports a behavioral issue after execution completed (bug, une
 ---
 
 ## Mode: learnings-synthesis
-
-**Plan-mode entry-check:** if plan mode is active, call `ExitPlanMode` before writing files. (`execution-plan` is the only skill exempt from this rule.)
 
 Triggered when `validation-log.md` accumulates ≥2 meaningful deviations (judgment call — a typo fix does not count; a non-obvious gotcha does).
 
@@ -179,10 +171,4 @@ Terse. Substance exact. Drop articles, filler ("just", "really", "basically"), p
 
 ## Record routing — externalized artifact store
 
-Per-feature **records** (this stage's brief / plan / validation-log / checkpoint / reports / mockup / brief-meta — NOT the durable tier) are read and written through the store adapter, not the feature folder directly. Wherever this skill's steps say to write or read `<feature-folder>/<file>`, route it as below; treat `<file>` as the `<artifact-name>` of the record address `<repo-id>/<date-slug>/<artifact-name>`.
-
-- **Write (fallback-safe):** `bash "${CLAUDE_PLUGIN_ROOT}/scripts/store/store.sh" put "<repo-id>/<date-slug>/<file>" "<feature-folder>/<file>" <local-tmp> --handle-out <h>` — stores the record, OR writes the in-repo `<feature-folder>/<file>` fallback if gh/locator is unavailable or the store write fails (a surfaced conflict is NOT fallen back). Then best-effort `cache.sh refresh "<address>" <local-tmp>`.
-- **Read (this feature):** the human-browsable copy is the cache (`cache.sh path <date-slug>`); the authoritative read is `store.sh read "<address>"`.
-- **Read (a PRIOR feature) — live:** `store.sh list "<repo-id>/<prior-date-slug>"` then `store.sh read` per address. Never the active-feature cache (it holds only the active feature).
-- **Per-operation fallback (transition safety):** evaluate immediately before EACH record read/write — if the locator (`docs/strategic-implementation/store-locator.yaml`) is absent (bootstrap not run) or `gh` is unavailable/offline, fall back to the in-repo `<feature-folder>/<file>` path for that operation and note the fallback. If a store write fails mid-operation, fall back to the in-repo path within the same operation so no record is ever dropped.
-- **Durable tier stays in-repo:** `project-learnings.md` and `documentation-registry.md` are read/written in place — never routed to the store.
+Per-feature **records** (brief / plan / validation-log / checkpoint / reports / mockup / brief-meta) route through the store adapter, not the feature folder directly: wherever a step says write/read `<feature-folder>/<file>`, use the store address `<repo-id>/<date-slug>/<file>` with in-repo fallback. Full read/write/fallback protocol: [`scripts/store/README.md`](../../scripts/store/README.md#record-routing-protocol-agent-facing). **Durable tier — `project-learnings.md`, `documentation-registry.md` — stays in-repo, never routed to the store.**

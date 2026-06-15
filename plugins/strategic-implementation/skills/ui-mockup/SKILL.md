@@ -21,12 +21,12 @@ You produce a single static `mockup.html` that serves as the visual contract for
 4. **Throwaway, not polished.** The mockup proves layout and IA — not pixel fidelity.
 5. **PM feedback is conversational.** The PM describes changes in chat; the skill re-emits `mockup.html` (output-only). No inline-comment or sibling-feedback-file editing.
 6. **Conflict-back-to-brief.** A PM comment that contradicts a brief deliverable is not silently applied — the conflict is surfaced and the workflow loops back to brief revision.
+7. **Anti-slop (SLIM tier).** Apply the SLIM tier of `agents/frontend-quality.md` — zero em-dashes, eyebrow restraint, no repeated section layouts, hero fits the first viewport, no fake-precise numbers, no scroll cues/version tells, real content not lorem, off-black/off-white. These are legibility/IA rules, not pixel polish; they do not violate rule 4 (throwaway, not polished). Do NOT pull in the RICH tier (motion, fonts, design systems) — that belongs to shipped UI, not the mockup.
+8. **Plan-mode entry-check.** If plan mode is active, call `ExitPlanMode` before writing files (`execution-plan` is the only skill exempt).
 
 ---
 
 ## Mode: generate
-
-**Plan-mode entry-check:** if plan mode is active, call `ExitPlanMode` before writing files. (`execution-plan` is the only skill exempt from this rule.)
 
 You receive:
 - Brief path
@@ -90,8 +90,6 @@ Do NOT auto-advance.
 
 ## Mode: revise
 
-**Plan-mode entry-check:** if plan mode is active, call `ExitPlanMode` before writing files. (`execution-plan` is the only skill exempt from this rule.)
-
 You receive:
 - Path to existing `mockup.html`
 - Brief path (for conflict checks)
@@ -126,8 +124,6 @@ Write `mockup.html`. Announce:
 
 ## Mode: conflict-back-to-brief
 
-**Plan-mode entry-check:** if plan mode is active, call `ExitPlanMode` before writing files. (`execution-plan` is the only skill exempt from this rule.)
-
 Triggered when a PM feedback item contradicts a brief deliverable or HARD DECISION.
 
 ### Task — surface the contradiction
@@ -154,10 +150,4 @@ The orchestrator waits for PM approval. On approval, the orchestrator passes the
 
 ## Record routing — externalized artifact store
 
-Per-feature **records** (this stage's brief / plan / validation-log / checkpoint / reports / mockup / brief-meta — NOT the durable tier) are read and written through the store adapter, not the feature folder directly. Wherever this skill's steps say to write or read `<feature-folder>/<file>`, route it as below; treat `<file>` as the `<artifact-name>` of the record address `<repo-id>/<date-slug>/<artifact-name>`.
-
-- **Write (fallback-safe):** `bash "${CLAUDE_PLUGIN_ROOT}/scripts/store/store.sh" put "<repo-id>/<date-slug>/<file>" "<feature-folder>/<file>" <local-tmp> --handle-out <h>` — stores the record, OR writes the in-repo `<feature-folder>/<file>` fallback if gh/locator is unavailable or the store write fails (a surfaced conflict is NOT fallen back). Then best-effort `cache.sh refresh "<address>" <local-tmp>`.
-- **Read (this feature):** the human-browsable copy is the cache (`cache.sh path <date-slug>`); the authoritative read is `store.sh read "<address>"`.
-- **Read (a PRIOR feature) — live:** `store.sh list "<repo-id>/<prior-date-slug>"` then `store.sh read` per address. Never the active-feature cache (it holds only the active feature).
-- **Per-operation fallback (transition safety):** evaluate immediately before EACH record read/write — if the locator (`docs/strategic-implementation/store-locator.yaml`) is absent (bootstrap not run) or `gh` is unavailable/offline, fall back to the in-repo `<feature-folder>/<file>` path for that operation and note the fallback. If a store write fails mid-operation, fall back to the in-repo path within the same operation so no record is ever dropped.
-- **Durable tier stays in-repo:** `project-learnings.md` and `documentation-registry.md` are read/written in place — never routed to the store.
+Per-feature **records** (brief / plan / validation-log / checkpoint / reports / mockup / brief-meta) route through the store adapter, not the feature folder directly: wherever a step says write/read `<feature-folder>/<file>`, use the store address `<repo-id>/<date-slug>/<file>` with in-repo fallback. Full read/write/fallback protocol: [`scripts/store/README.md`](../../scripts/store/README.md#record-routing-protocol-agent-facing). **Durable tier — `project-learnings.md`, `documentation-registry.md` — stays in-repo, never routed to the store.**

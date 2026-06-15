@@ -25,12 +25,11 @@ You produce `product-brief_<slug>.md` — the single PM-approvable artifact for 
 8. **Compact decision rows.** One line each. Full tradeoff tables only for items marked `[HARD DECISION]` or when the PM explicitly asks for one.
 9. **Conversational feedback.** In revise mode, the PM's feedback arrives in chat (not as edits to the brief file); the drafter applies it and re-emits the brief record. The brief is output-only and is never hand-edited to convey feedback.
 10. **Working backwards is section 1.** The release-note paragraph is written before any deliverables are listed. If clarify passed `working-backwards: TBD`, write `TBD — open question` verbatim — do not fabricate one. Same rule for `success-signal: TBD`.
+11. **Plan-mode entry-check.** If plan mode is active, call `ExitPlanMode` before writing files (`execution-plan` is the only skill exempt).
 
 ---
 
 ## Mode: draft
-
-**Plan-mode entry-check:** if plan mode is active, call `ExitPlanMode` before writing files. (`execution-plan` is the only skill exempt from this rule.)
 
 You receive:
 - The clarified request (output of `clarify`)
@@ -185,8 +184,6 @@ Default to **fewer** recommendations. An empty list is the correct answer for ba
 
 ## Mode: revise
 
-**Plan-mode entry-check:** if plan mode is active, call `ExitPlanMode` before writing files. (`execution-plan` is the only skill exempt from this rule.)
-
 You receive:
 - Path to the existing brief
 - PM feedback, given conversationally in chat
@@ -227,10 +224,4 @@ The orchestrator waits for PM approval. On approval, the orchestrator invokes `e
 
 ## Record routing — externalized artifact store
 
-Per-feature **records** (this stage's brief / plan / validation-log / checkpoint / reports / mockup / brief-meta — NOT the durable tier) are read and written through the store adapter, not the feature folder directly. Wherever this skill's steps say to write or read `<feature-folder>/<file>`, route it as below; treat `<file>` as the `<artifact-name>` of the record address `<repo-id>/<date-slug>/<artifact-name>`.
-
-- **Write (fallback-safe):** `bash "${CLAUDE_PLUGIN_ROOT}/scripts/store/store.sh" put "<repo-id>/<date-slug>/<file>" "<feature-folder>/<file>" <local-tmp> --handle-out <h>` — stores the record, OR writes the in-repo `<feature-folder>/<file>` fallback if gh/locator is unavailable or the store write fails (a surfaced conflict is NOT fallen back). Then best-effort `cache.sh refresh "<address>" <local-tmp>`.
-- **Read (this feature):** the human-browsable copy is the cache (`cache.sh path <date-slug>`); the authoritative read is `store.sh read "<address>"`.
-- **Read (a PRIOR feature) — live:** `store.sh list "<repo-id>/<prior-date-slug>"` then `store.sh read` per address. Never the active-feature cache (it holds only the active feature).
-- **Per-operation fallback (transition safety):** evaluate immediately before EACH record read/write — if the locator (`docs/strategic-implementation/store-locator.yaml`) is absent (bootstrap not run) or `gh` is unavailable/offline, fall back to the in-repo `<feature-folder>/<file>` path for that operation and note the fallback. If a store write fails mid-operation, fall back to the in-repo path within the same operation so no record is ever dropped.
-- **Durable tier stays in-repo:** `project-learnings.md` and `documentation-registry.md` are read/written in place — never routed to the store.
+Per-feature **records** (brief / plan / validation-log / checkpoint / reports / mockup / brief-meta) route through the store adapter, not the feature folder directly: wherever a step says write/read `<feature-folder>/<file>`, use the store address `<repo-id>/<date-slug>/<file>` with in-repo fallback. Full read/write/fallback protocol: [`scripts/store/README.md`](../../scripts/store/README.md#record-routing-protocol-agent-facing). **Durable tier — `project-learnings.md`, `documentation-registry.md` — stays in-repo, never routed to the store.**

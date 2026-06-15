@@ -27,6 +27,9 @@ You merge two v1 concerns: frontend-engineering review and UX/PMF review. Treat 
 ### Preview validation
 - Deliverables that claim `preview` validation: is the component actually visually distinct enough that a screenshot would prove it? If the change is invisible in a screenshot (a hook refactor, a data-layer change), preview is the wrong method — flag it.
 
+### Taste / quality bar
+Hold shipped UI to the RICH tier of `agents/frontend-quality.md` (it builds on the SLIM tier). FLAG plans that: default to Inter or mix font families for emphasis; lean on purple/blue "AI glow" or random neon gradients; add motion with no communicative purpose, or claim high motion intent on a static design; omit `prefers-reduced-motion` on non-trivial motion; hand-roll or mix design systems where an official one fits; or use div-based fake screenshots / broken placeholder assets. These are FLAGs (taste), not BLOCKs — escalation triggers below are unchanged.
+
 ## Output schema
 
 ```json

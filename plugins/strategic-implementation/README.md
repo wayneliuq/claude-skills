@@ -6,8 +6,8 @@
 
 You write what the user should be able to do. The plugin handles everything between that sentence and merged code: clarification, planning, adversarial review, deliverable-by-deliverable execution, and a regression check at the end. You approve **one document** (the product brief). Everything else happens behind the right gates, with the right level of autonomy you choose at the start.
 
-**Version:** 3.7.1
-**Built for:** Claude Code on Opus 4.7
+**Version:** 4.4.0
+**Built for:** Claude Code on Opus 4.8
 **Audience:** non-technical PMs, solo founders, anyone who can describe what good looks like
 **Requires:** the [`code-review-graph`](https://github.com/tirth8205/code-review-graph) MCP server (see [Dependencies](#dependencies))
 
@@ -17,14 +17,13 @@ You write what the user should be able to do. The plugin handles everything betw
 
 ### Quick setup (new machine)
 
-Run the bootstrap script — it verifies and (with `--install`) sets up everything below:
+Run the bootstrap script — it verifies your environment:
 
 ```bash
-bash plugins/strategic-implementation/scripts/setup.sh            # --check: report only, no changes
-bash plugins/strategic-implementation/scripts/setup.sh --install  # create venv, install deps
+bash plugins/strategic-implementation/scripts/setup.sh   # --check: report only, no changes
 ```
 
-It checks core tools (git, python3+FTS5, jq), installs `code-review-graph`, and sets up the memory recall layer (BM25 needs nothing; the optional vector leg gets a persistent venv at `~/.claude/strategic-implementation/.memory-venv` with `sqlite-vec`+`model2vec`). Recall **auto-discovers that venv at the default path** — no shell export needed; `$SI_MEMORY_PYTHON` is only an optional override for a custom interpreter. `--build-index` also builds the graph + BM25 index for the current repo. Everything degrades gracefully if a dependency is absent.
+It checks core tools (git, jq) and that `code-review-graph` is installed. Everything degrades gracefully if a dependency is absent.
 
 ### `code-review-graph` (MCP server) — required for full token efficiency
 
@@ -41,10 +40,6 @@ Three skills use the [`code-review-graph`](https://github.com/tirth8205/code-rev
 **Graceful degradation.** Every skill that uses the graph has a stale/empty-graph fallback: it emits `FLAG: graph stale … file-read mode` and proceeds by reading files directly. So the plugin **works without** `code-review-graph` — it just loses the token-efficient path. The dependency is a performance dependency, not a hard one.
 
 **Keeping the graph fresh.** The graph silently degrades to file-read mode if it goes stale. To keep it current automatically, this repo ships graph-freshness automation (session-start rebuild, all-editing-tools rebuild trigger, and a `post-merge` hook installer) — see [`docs/strategic-implementation/2026-05-26-graph-freshness/`](../../docs/strategic-implementation/2026-05-26-graph-freshness/setup-and-findings.md). Markdown/prose is **not** indexed by `code-review-graph` (it is AST/code-only); that determination and alternatives are recorded there too.
-
-### Memory/recall index (Python) — optional, local, graceful
-
-The plugin's **first Python surface** lives under [`scripts/memory/`](scripts/memory/): a derived, rebuildable recall index over the repo's own strategic-implementation markdown (typed/status-aware ingest + SQLite FTS5 BM25). The markdown stays canonical; the index (`docs/strategic-implementation/.memory/index.db`) is git-ignored and rebuilt from files. **The index auto-refreshes on session start** — a `SessionStart` hook runs `scripts/memory/refresh.sh --background`, which rebuilds in a detached, locked worker (instant return, no session-start delay; a no-op in repos without `docs/strategic-implementation/`). So it stays fresh on its own, the same way `code-review-graph` does; `refresh.sh` is also runnable manually. Phase 1a needs **no third-party dependencies** (stdlib `sqlite3` + FTS5). The optional vector leg (Phase 1b) adds local static embeddings (`model2vec`) + `sqlite-vec` for semantic / wording-mismatch recall at plan-drafting time, and requires an **extension-capable interpreter** — a python.org build has `enable_load_extension` compiled out, so use Homebrew python via `setup.sh --install`, which builds the venv at the default path that recall **auto-discovers** (no export needed; `$SI_MEMORY_PYTHON` is an optional override — see [`scripts/memory/requirements.txt`](scripts/memory/requirements.txt)). The per-deliverable hot path stays BM25-only. Recall is always advisory and degrades to silence — it never blocks execution. Include/exclude policy: [`scripts/memory/MEMORY-DOCTYPES.md`](scripts/memory/MEMORY-DOCTYPES.md).
 
 ---
 
@@ -258,6 +253,31 @@ The v3.1 hardening pass adds five rules across `post-execution`, `executing-plan
 **De-facto policy note.** The inlined AgentShield rule patterns in D1 are the plugin's de-facto plugin-config security policy as of v3.1 — the brief declared no security policy doc upstream of this work, and the rule wording shipped here is authoritative-by-default. Future PMs editing security-sensitive plugin config should treat these patterns as the contract until a project-level security policy supersedes them.
 
 The v3.1 choice mirrors v2.2: import the high-leverage idea, leave the heavyweight stack behind. AgentShield's `npx` runtime, claude-doctor's cross-session signals, and mattpocock's persistent domain-language convention are all explicitly out of scope. We thank all three projects for their public, well-documented work.
+
+---
+
+## Acknowledgments — inspirations for v4.3.0 (Leanness Pass)
+
+v4.3.0 removed an obsolete subsystem and grafted in three small, high-leverage ideas from public agentic-skill projects. As before, we imported the idea and left the heavyweight stack behind:
+
+- **[DietrichGebert/ponytail](https://github.com/DietrichGebert/ponytail)** — the "lazy senior developer" decision hierarchy (*does this need to exist? → stdlib → native platform feature → already-installed dependency → one line → minimum*) is imported as `execution-plan` authoring rule 0 and as the scoring rubric for the `simplify` reviewer, which now returns named deletion candidates against it. **Left behind:** the `ponytail:` deferred-debt ledger and per-shortcut comment machinery.
+- **[addyosmani/agent-skills](https://github.com/addyosmani/agent-skills)** — the anti-rationalization-table device (common excuse → rebuttal) is adopted at the two highest-skip authoring gates (validation-method honesty, consumer-audit-on-shape-change), capped at two. **Left behind:** the ~100-line change-sizing review norm (conflicts with our fitness-not-size gate), autonomous `/build auto` (we have `yolo`), and doubt-driven development (covered by our review panel).
+- **[Leonxlnx/taste-skill](https://github.com/Leonxlnx/taste-skill)** — the anti-slop "AI Tells" checklist is adopted as an in-plugin `agents/frontend-quality.md`, split into a SLIM tier (em-dash ban, eyebrow restraint, no repeated section layouts, hero-fits-viewport, no fake-precise numbers — applied to throwaway `ui-mockup` output) and a RICH tier (font/color discipline, motivated motion, design-system selection — applied to shipped UI via `frontend-engineer`). **Left behind:** the motion/GSAP/dials/design-system machinery in the throwaway mockup path.
+
+The same pass also *deleted* the long-running-session drift machinery (chapter rotation, per-turn goal evaluator, turn-cap) as obsolete on modern models — removing a whole hook subsystem and a per-turn model call, in exchange for lightweight rules and one shared reference file. We thank all three projects for their public, well-documented work.
+
+---
+
+## Leanness Pass II — v4.4.0
+
+A self-audit pass that removed machinery a more capable model no longer needs, plus duplication and errors:
+
+- **Pruned the BM25 memory/recall subsystem** (the whole `scripts/memory/` Python layer, its SessionStart refresh hook, and all recall call-sites) — it never showed value in practice. `project-learnings.md` (the durable tier) and the externalized store stay. Native memory is left to a future hindsight-MCP integration.
+- **Dropped mid-execution simplify** and the **edit-thrashing** hook, keeping pre-execution simplify (the `plan-simplify` review agent), the post-execution final simplify pass, and the error-loop / deviation-surface breakers.
+- **Renamed** the plan-review `simplify` *agent* to `plan-simplify`, resolving a name collision with the code-level `simplify` *skill* (and a mislinked reference in `review`).
+- **De-duplicated** the store-routing protocol (×8 → one canonical copy in `scripts/store/README.md`) and the per-mode plan-mode entry-check; stripped stale internal version archaeology; compressed the triage repro ladder.
+
+Net effect: the plugin ships substantially less code (the memory subsystem alone was ~1.6k lines) while keeping every load-bearing gate.
 
 ---
 

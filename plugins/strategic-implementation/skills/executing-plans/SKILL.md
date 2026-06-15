@@ -48,7 +48,7 @@ supersedes: none            # <feature-slug> this work replaces, or `none`
 _Feature: <slug> · Started: <date> · Autonomy: <level>_
 ```
 
-The YAML frontmatter is **optional and additive** — it is the recall index's facet source (`status` / `domains` drive filtering; `supersedes` retires prior records). Older logs without it remain valid; the indexer tolerates absence. Set `status: aborted` if execution is abandoned before completion, so the work is never surfaced as proven precedent.
+The YAML frontmatter is **optional and additive** — lightweight metadata (`status` / `domains` / `supersedes`) for scanning prior features and any future memory tooling. Older logs without it remain valid. Set `status: aborted` if execution is abandoned before completion, so the work is not mistaken for proven precedent.
 
 If `checkpoint.md` does not yet exist, initialize it at `<feature-folder>/checkpoint.md` with the four-section schema (Done / In progress / Open decisions / Unresolved deviations) — sections may start empty. See "Checkpoint schema" below.
 
@@ -56,7 +56,7 @@ Initialize deviation counter `DEV-001`.
 
 ### Initialize hook state (deterministic-trigger layer)
 
-The plugin ships harness-fired hooks (`plugins/strategic-implementation/hooks/hooks.json`) that detect deliverable commits, edit-thrashing, error-loops, simplify thresholds, validation-log additions, and chapter completion deterministically — without depending on the agent to remember to check. Hooks are no-ops unless an active state file exists.
+The plugin ships harness-fired hooks (`plugins/strategic-implementation/hooks/hooks.json`) that detect deliverable commits, error-loops, and validation-log additions deterministically — without depending on the agent to remember to check. Hooks are no-ops unless an active state file exists.
 
 Write `.claude/strategic-implementation/state.json` (relative to repo root, NOT the feature folder — hooks read from a fixed location). Use the following shape:
 
@@ -66,53 +66,23 @@ Write `.claude/strategic-implementation/state.json` (relative to repo root, NOT 
   "feature_folder": "<feature-folder>",
   "feature_slug": "<slug>",
   "autonomy": "<level>",
-  "chapter_size": 5,
-  "current_chapter": 1,
-  "deliverables_done_in_chapter": [],
-  "deliverables_since_last_simplify": 0,
-  "loc_since_last_simplify": 0,
-  "simplify_thresholds": {"deliverables": 3, "loc": 400},
-  "current_deliverable_edit_counts": {},
   "consecutive_failures": 0,
-  "total_deliverables": <N>,
-  "plan_path": "<feature-folder>/execution-plan.md",
-  "brief_success_signal": "<verbatim success signal from brief>",
   "last_counted_sha": "",
-  "pending_chapter_rotation": false,
-  "pending_simplify": false,
-  "pending_thrash_pause": false,
   "pending_error_loop": false,
   "pending_deviation_surface": false,
   "validation_log_last_mtime": ""
 }
 ```
 
-Then emit the chapter-1 `<active-goal>` block to chat (the goal evaluator reads it from conversation):
-
-```
-<active-goal chapter="1" range="D1..D5">
-condition: complete deliverables D1 through D5 as specified in <plan-path>. Each must commit atomically with subject `D<n>: ...`, validation per its declared method recorded in validation-log.md, and checkpoint.md advanced.
-brief success signal: <verbatim from brief>
-constraints:
-  - No edits outside file lists declared in deliverables D1..D5
-  - No amending prior deliverable commits
-  - Every Edit/Write announces `touched: <files> deliverable: D<n>` in chat
-  - Stop and surface to PM on any BLOCK or unresolved ⚠️ in validation-log.md
-turn-cap: stop after 40 turns and surface checkpoint.md to PM
-</active-goal>
-```
-
-**On chapter rollover the hook itself emits the next block** — the agent does not re-write it. When the bash-counter hook detects the 5th deliverable commit in the current chapter, the Stop orchestrator rotates and injects the next chapter's `<active-goal>` as next-turn guidance. The agent reads the injected guidance and continues with the new chapter binding. No paste, no skill-mediated check.
-
-**Touched-file announcement (constraint compliance).** After every Edit/Write batch within a deliverable, announce in chat:
+**Touched-file announcement (scope discipline).** After every Edit/Write batch within a deliverable, announce in chat:
 
 > `touched: <comma-separated files> deliverable: D<n>`
 
-This is the only signal the goal evaluator has into file-scope drift. Skipping it means the evaluator cannot verify the "no edits outside declared list" constraint — silent drift becomes possible. Treat the announcement as part of the deliverable's build phase, not optional.
+This keeps the deliverable's file scope traceable in the conversation and makes an out-of-list edit visible to the PM. Treat it as part of the deliverable's build phase, not optional.
 
 ### Checkpoint schema (`<feature-folder>/checkpoint.md`)
 
-A compact, compaction-survivable projection of execution state. One line per entry, no prose. Update at every atomic commit (see Step 2d).
+A compact, durable projection of execution state — the at-a-glance record of what's done and what's in flight. One line per entry, no prose. Update at every atomic commit (see Step 2d).
 
 ```markdown
 # Checkpoint — <feature slug>
@@ -159,7 +129,7 @@ Fired only when a deliverable is `Macro-deliverable: true`. Emit the operator-vi
    ```
    Do NOT use `pipeline()` for the seam→fan-out boundary (it has no barrier). Thread the contract artifact (`seam`) into each domain agent so the barrier is also a data handoff.
 2. **Edit mechanism — shared-tree-disjoint (primary).** Per the D5/ED4a spike, workflow `agent()` edits land in the main working tree. Domain agents write their **disjoint file sets** directly in that shared tree. **Build agents run ZERO git commands** (the main thread owns all git) — this makes index.lock contention a non-issue. `agent(isolation:'worktree')` is forbidden. *Fallback only if disjointness can't be guaranteed:* detached worktree per domain + `git -C <wt> diff | git apply` (with `--3way` or sequential-rebuild on apply conflict) — never `cp`-of-output, never `isolation:'worktree'`.
-3. **No nested sub-agents.** Workflow agents build only. Validation (2c), any `simplify`, and the single commit (2d) run on the **main thread after** the workflow returns. For a manual-`preview` macro-deliverable: the workflow builds + runs automatable checks, then hands back "built + checks green" for the human preview after return (workflows cannot pause mid-run).
+3. **No nested sub-agents.** Workflow agents build only. Validation (2c) and the single commit (2d) run on the **main thread after** the workflow returns. For a manual-`preview` macro-deliverable: the workflow builds + runs automatable checks, then hands back "built + checks green" for the human preview after return (workflows cannot pause mid-run).
 4. **One atomic commit.** After validation passes, the main thread makes exactly ONE `D<n>:` commit touching all domain files + `checkpoint.md` + `validation-log.md`. **Invariant: no intermediate per-domain commits land on the branch** — this is what keeps the git-log hook counters correct (a macro-deliverable counts as one deliverable).
 5. **Deferred concurrency proof.** Because an in-session live trial may validate cached behavior, log a `validation-honesty` deviation and surface a one-line follow-up: "Operator: in a fresh session (cache reloaded), re-run this macro-deliverable and confirm concurrent domains in `/workflows`; record the result in `validation-log.md`."
 
@@ -167,19 +137,11 @@ Fired only when a deliverable is `Macro-deliverable: true`. Emit the operator-vi
 
 When the capability gate routes here: build the domains **sequentially in the working tree** (contract first, then each domain), run validation, then the same single `D<n>:` atomic commit. Surface: `workflow unavailable → built sequentially`. **Resume reconciliation:** if `checkpoint.md` shows this macro-deliverable in-flight AND the working tree is dirty with its declared domain paths, `git checkout -- <those paths>` (reset to HEAD) before rebuilding — or require a clean tree and surface the discarded partial work — so a mid-workflow interruption never double-applies. This backs the "no lost work" guarantee.
 
-After Step 2-macro (either path) completes its commit, continue to the next deliverable (skip 2a–2f for this one; 2e consumer-audit/2f simplify-trigger still apply via the post-commit hook).
+After Step 2-macro (either path) completes its commit, continue to the next deliverable (skip 2a–2e for this one; the 2e consumer-audit still applies).
 
 ### Step 2a — Pre-flight env check
 
-**Point-of-need recall (advisory).** Before building, for a `Macro-deliverable` OR an `Integration-risk class: a|b|c` deliverable, query memory for how similar work was done before — so you reuse a proven approach instead of re-deriving it (e.g. rediscovering that an end-to-end test should run in a container first):
-
-```bash
-bash "${CLAUDE_PLUGIN_ROOT}/scripts/memory/recall.sh" "<deliverable name + domains>" --domains "<domains>" --k 3
-```
-
-This hot path is **BM25-only** (no embedding model is loaded per deliverable). It reads the index only — it never builds or re-embeds inline. Treat any output as advisory pre-flight context: it **informs, never dictates** the build or validation-method choice. Empty output → proceed silently (no index yet, or no good match). The command degrades to silence on any error and never blocks execution.
-
-Then verify the prerequisites for the deliverable's validation method:
+Verify the prerequisites for the deliverable's validation method:
 
 - **`preview`:** Claude Code preview tool available; dev server startable. If not available: apply preview-unavailable fallback (below).
 - **`cli`:** the CLI command runnable; required binaries in PATH.
@@ -206,7 +168,6 @@ Implement the deliverable per its steps. Rules:
   - Clean up only code YOUR changes made unused — leave pre-existing dead code alone.
   - Do not "improve" adjacent code.
 - **Rework guardrails (per-deliverable counters):**
-  - **Edit-thrashing:** the `hook-edit-tracker.sh` hook tracks Edit/Write tool calls per file and sets `pending_thrash_pause` on the 4th edit to the same file (>3 edits). The Stop orchestrator surfaces this as injected guidance — pause, re-read the brief and the deliverable's plan block before any further Edit/Write to that file. Log a `thrash-pause` deviation. In `auto`, decide and proceed; in `supervised`, surface and pause. The agent's own in-text counter remains a fallback if hooks are disabled.
   - **Error-loop:** the `hook-error-tracker.sh` hook tracks consecutive tool failures and sets `pending_error_loop` at 3 consecutive failures. The Stop orchestrator surfaces "do not retry; escalate to triage" as injected guidance. Escalate to `post-execution:triage` with the error trace as the reported issue. Log an `error-loop-escalation` deviation. Hook is primary; in-text counter is fallback.
 
 **Registry-tracked doc bundle.** If the deliverable's `may-invalidate` field is non-empty, after building primary changes, prompt the PM:
@@ -235,7 +196,7 @@ Run the declared validation:
 
 Execution continues; `post-execution` regression-check reads these flags.
 
-**Validation-approach capture (cross-domain / integration-risk deliverables).** When a deliverable is `Macro-deliverable: true` OR `Integration-risk class: a|b|c`, after validation passes append a small block to `validation-log.md` recording the validation **approach actually used** — the pipeline / infrastructure, not just the one-word method (e.g. "docker compose up → integration-test in CI → manual staging smoke"). This is what `execution-plan`'s validation-approach recall later greps so similar future work reuses it instead of re-guessing.
+**Validation-approach capture (cross-domain / integration-risk deliverables).** When a deliverable is `Macro-deliverable: true` OR `Integration-risk class: a|b|c`, after validation passes append a small block to `validation-log.md` recording the validation **approach actually used** — the pipeline / infrastructure, not just the one-word method (e.g. "docker compose up → integration-test in CI → manual staging smoke"). This is a durable record of how the integrated outcome was validated, for future similar work to reuse.
 
 ```markdown
 ## APPROACH — D<n>
@@ -246,7 +207,7 @@ Execution continues; `post-execution` regression-check reads these flags.
 
 This block is **additive** — it does not change the header or the `DEV-NNN` deviation schema, and absence in older logs is expected (recall tolerates it).
 
-**Gotcha capture (any deliverable that cost avoidable rework).** When a deliverable burned time on a wrong path that a prior lesson would have prevented — or that a future similar deliverable should avoid — append a `## GOTCHA` block. This is the "we lost time on X; do Y first" note, and it is the highest-signal record for point-of-need recall (it directly prevents re-derivation, e.g. rediscovering that an end-to-end test must run in a container first).
+**Gotcha capture (any deliverable that cost avoidable rework).** When a deliverable burned time on a wrong path that a prior lesson would have prevented — or that a future similar deliverable should avoid — append a `## GOTCHA` block. This is the "we lost time on X; do Y first" note, and it is the highest-signal record for avoiding repeated rework (it directly prevents re-derivation, e.g. rediscovering that an end-to-end test must run in a container first).
 
 ```markdown
 ## GOTCHA — D<n>
@@ -276,40 +237,6 @@ Stage only the files named in this deliverable — plus any registry-tracked doc
 Before flipping status: if the deliverable has a `Consumer audit` subsection, walk the list. Every entry must be `updated-in-this-deliverable`, `updated-in-D<n>` (where D<n> is already complete or scheduled), `unaffected-because-...`, or `explicit-skip-because-...`. Any entry left as TBD, missing, or contradicted by what was actually changed → log a `consumer-audit-mismatch` deviation and surface to PM before proceeding.
 
 In `execution-plan.md`, update deliverable status: `pending` → `complete`.
-
-### Step 2f — Maybe-invoke simplify (mid-execution trigger)
-
-**Primary trigger:** the `hook-bash-counter.sh` hook detects the deliverable commit and sets `pending_simplify` when thresholds cross. The Stop orchestrator surfaces "invoke simplify now" as injected guidance on the next turn. The agent acts on that injected guidance — no need to compute counters in-skill.
-
-**Fallback (hooks disabled or skipped):** compute counters via `git log` directly. Defaults: `every_n_deliverables = 3`, `loc_threshold = 400` (declared in `simplify/SKILL.md`).
-
-**Skip rule:** if total plan deliverables ≤ 3, do NOT invoke mid-execution. The final pass in `post-execution` regression-check is sufficient.
-
-Otherwise, derive counters from `git log` (no new state file):
-
-```bash
-# Reference point: last simplify-report-NN.md commit, or feature-folder creation if none.
-LAST_REF=$(git log -1 --format=%H -- "<feature-folder>/simplify-report-*.md" 2>/dev/null \
-  || git log --diff-filter=A --format=%H -- "<feature-folder>" | tail -1)
-
-DELIVERABLES_SINCE=$(git log --oneline "$LAST_REF"..HEAD -- "<feature-folder>/checkpoint.md" | wc -l)
-LOC_SINCE=$(git log -p "$LAST_REF"..HEAD -- ':(exclude)<feature-folder>/' | grep -E '^[+-]' | grep -vE '^[+-]{3}' | wc -l)
-```
-
-If `DELIVERABLES_SINCE >= every_n_deliverables` OR `LOC_SINCE >= loc_threshold`: invoke `strategic-implementation:simplify` with the feature folder. The skill writes `<feature-folder>/simplify-report-NN.md` and returns the path.
-
-**Surface the report.** Append to chat:
-
-> Simplify report: `<path>` — <total> findings (high: <h>, med: <m>, low: <l>). Disposition each finding conversationally (apply / defer / dismiss) before the next deliverable, or proceed and let undispositioned findings surface in the deviation log.
-
-**Disposition rules:**
-- `supervised`: pause for PM to fill every finding's disposition before next deliverable.
-- `auto`: proceed; log a `simplify-disposition-pending` deviation only if the next atomic commit lands with unfilled dispositions in the latest report.
-- `yolo`: proceed; log nothing.
-
-The `simplify` skill never auto-edits source. PM-applied changes (when disposition is `apply`) become a follow-up deliverable or land as part of a future deliverable's same-file edits — never as a side-effect of `simplify` itself.
-
----
 
 ## Failure Protocol
 
@@ -369,13 +296,13 @@ Do not mark complete. Do not proceed to next deliverable. Await PM direction.
 
 ## Deviation logging
 
-A deviation exists on any of: blocker, retry, user-correction, reversal, ambiguity-decision, auto-escalation, yolo-skip, branch-risk, consumer-audit-mismatch, thrash-pause, error-loop-escalation, repro-blocked, spec-ambiguity-redirect, spec-ambiguity-override, simplify-disposition-pending.
+A deviation exists on any of: blocker, retry, user-correction, reversal, ambiguity-decision, auto-escalation, yolo-skip, branch-risk, consumer-audit-mismatch, error-loop-escalation, repro-blocked, spec-ambiguity-redirect, spec-ambiguity-override.
 
 Append to `validation-log.md`:
 
 ```markdown
 ## DEV-NNN
-**Type:** blocker | retry | user-correction | reversal | ambiguity-decision | auto-escalation | yolo-skip | branch-risk | consumer-audit-mismatch | thrash-pause | error-loop-escalation | repro-blocked | spec-ambiguity-redirect | spec-ambiguity-override | simplify-disposition-pending
+**Type:** blocker | retry | user-correction | reversal | ambiguity-decision | auto-escalation | yolo-skip | branch-risk | consumer-audit-mismatch | error-loop-escalation | repro-blocked | spec-ambiguity-redirect | spec-ambiguity-override
 **Deliverable:** D<n>
 **Plan said:** <verbatim>
 **Actually:** <what happened>
@@ -397,7 +324,7 @@ When all deliverables are marked complete:
 3. `post-execution` writes `post-execution-report.md` and reports back.
 4. If the report status is `PASS`: announce feature complete.
 5. If `FLAG` or `BLOCK`: surface to PM; do not declare complete until resolved.
-6. **Deactivate hook state.** Set `.active = false` in `.claude/strategic-implementation/state.json` so subsequent sessions on the same repo do not trigger goal-evaluator or counter hooks. Use:
+6. **Deactivate hook state.** Set `.active = false` in `.claude/strategic-implementation/state.json` so subsequent sessions on the same repo do not trigger the counter or Stop-orchestrator hooks. Use:
 
    ```bash
    jq '.active = false' .claude/strategic-implementation/state.json \
@@ -437,10 +364,4 @@ Terse. Substance exact. Drop articles, filler ("just", "really", "basically"), p
 
 ## Record routing — externalized artifact store
 
-Per-feature **records** (this stage's brief / plan / validation-log / checkpoint / reports / mockup / brief-meta — NOT the durable tier) are read and written through the store adapter, not the feature folder directly. Wherever this skill's steps say to write or read `<feature-folder>/<file>`, route it as below; treat `<file>` as the `<artifact-name>` of the record address `<repo-id>/<date-slug>/<artifact-name>`.
-
-- **Write (fallback-safe):** `bash "${CLAUDE_PLUGIN_ROOT}/scripts/store/store.sh" put "<repo-id>/<date-slug>/<file>" "<feature-folder>/<file>" <local-tmp> --handle-out <h>` — stores the record, OR writes the in-repo `<feature-folder>/<file>` fallback if gh/locator is unavailable or the store write fails (a surfaced conflict is NOT fallen back). Then best-effort `cache.sh refresh "<address>" <local-tmp>`.
-- **Read (this feature):** the human-browsable copy is the cache (`cache.sh path <date-slug>`); the authoritative read is `store.sh read "<address>"`.
-- **Read (a PRIOR feature) — live:** `store.sh list "<repo-id>/<prior-date-slug>"` then `store.sh read` per address. Never the active-feature cache (it holds only the active feature).
-- **Per-operation fallback (transition safety):** evaluate immediately before EACH record read/write — if the locator (`docs/strategic-implementation/store-locator.yaml`) is absent (bootstrap not run) or `gh` is unavailable/offline, fall back to the in-repo `<feature-folder>/<file>` path for that operation and note the fallback. If a store write fails mid-operation, fall back to the in-repo path within the same operation so no record is ever dropped.
-- **Durable tier stays in-repo:** `project-learnings.md` and `documentation-registry.md` are read/written in place — never routed to the store.
+Per-feature **records** (brief / plan / validation-log / checkpoint / reports / mockup / brief-meta) route through the store adapter, not the feature folder directly: wherever a step says write/read `<feature-folder>/<file>`, use the store address `<repo-id>/<date-slug>/<file>` with in-repo fallback. Full read/write/fallback protocol: [`scripts/store/README.md`](../../scripts/store/README.md#record-routing-protocol-agent-facing). **Durable tier — `project-learnings.md`, `documentation-registry.md` — stays in-repo, never routed to the store.**

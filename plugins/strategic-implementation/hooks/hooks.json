@@ -6,11 +6,6 @@
         "hooks": [
           {
             "type": "command",
-            "command": "${CLAUDE_PLUGIN_ROOT}/scripts/memory/refresh.sh --background",
-            "timeout": 10
-          },
-          {
-            "type": "command",
             "command": "${CLAUDE_PLUGIN_ROOT}/scripts/store/cache.sh session --background",
             "timeout": 10
           }
@@ -25,16 +20,6 @@
             "type": "command",
             "command": "${CLAUDE_PLUGIN_ROOT}/scripts/hook-bash-counter.sh",
             "timeout": 10
-          }
-        ]
-      },
-      {
-        "matcher": "Edit|Write",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "${CLAUDE_PLUGIN_ROOT}/scripts/hook-edit-tracker.sh",
-            "timeout": 5
           }
         ]
       }
@@ -71,11 +56,6 @@
             "type": "command",
             "command": "${CLAUDE_PLUGIN_ROOT}/scripts/hook-stop-orchestrator.sh",
             "timeout": 10
-          },
-          {
-            "type": "prompt",
-            "model": "haiku",
-            "prompt": "You are the goal evaluator for the strategic-implementation plugin. Look at the conversation for the most recent <active-goal>...</active-goal> block. If none exists, respond exactly: {\"ok\": true}. If one exists, evaluate whether its `condition` clauses have been demonstrated in the conversation since the block was emitted (commit subjects, validation results, file-touched announcements, etc.). Treat the `turn-cap` clause as a hard ceiling: if reached, respond {\"ok\": true, \"reason\": \"turn-cap reached; surface checkpoint\"}. If a `constraints` clause has been violated by evidence in the conversation (a file edited outside the declared list, an out-of-range deliverable touched, an unresolved BLOCK in validation-log), respond {\"ok\": false, \"reason\": \"<one sentence on the violation>\"}. Otherwise: if every condition clause is demonstrated, respond {\"ok\": true}; if not, respond {\"ok\": false, \"reason\": \"<one sentence on what is still missing>\"}. Only judge from evidence visible in the conversation; do not assume file or repo state. Return strict JSON on a single line. No markdown, no code fences, no prose before or after. Your entire response must start with `{` and end with `}`."
           }
         ]
       }

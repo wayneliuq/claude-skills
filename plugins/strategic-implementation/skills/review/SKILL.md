@@ -1,11 +1,11 @@
 ---
 name: review
-description: Tiered review orchestrator. Runs pre-filter + generalist + simplify in parallel on the execution plan, then invokes specialists only on dimensions flagged by the generalist or matched by the pre-filter. Returns a consolidated patch list, block status, and alternative-path candidate.
+description: Tiered review orchestrator. Runs pre-filter + three generalists (alignment, plan-simplify, user-validation) in parallel on the execution plan, then invokes specialists only on dimensions flagged by a generalist or matched by the pre-filter. Returns a consolidated patch list, block status, and alternative-path candidate.
 ---
 
 # review
 
-You orchestrate the tiered review of an execution plan. The goal is ≥70% token reduction vs. v1's always-parallel 10-agent panel, while preserving coverage on the dimensions that actually need it.
+You orchestrate the tiered review of an execution plan. Review only the dimensions that actually need it: a fixed generalist tier on every plan, plus specialists gated by a pre-filter and the generalists' flags.
 
 You are invoked by `execution-plan` (and may be invoked directly by `post-execution` or other callers in the future).
 
@@ -25,9 +25,9 @@ Three generalist reviewers run in parallel on every plan. Their scopes are delib
 
 | Agent | Owns | Does NOT review |
 |---|---|---|
-| [`alignment`](../../agents/alignment.md) | Brief alignment (every deliverable in brief → in plan), consumer audit on shape change, architecture-doc conformance, future-proofing/naming/repo-coherence, specialist routing. | PMF, user walkthroughs, user-reachability — ceded to `user-validation`. Simplicity → `simplify`. Test correctness → `tests`. Specialist domains → specialists. |
-| [`simplify`](../simplify/SKILL.md) | Whether a shorter path exists from the brief's success signal to the plan; returns PASS or ALTERNATIVE. | Per-file code style. Reviewer dimensions owned by other agents. |
-| [`user-validation`](../../agents/user-validation.md) | Named target user, declared interaction surface, per-acceptance-step walkthrough, end-to-end reachability of the user path (including the "client-built, pipeline-missing" loophole), PMF / deliverable-recognizability. | Missing deliverables (alignment owns; flag the unreachable step as the consequence instead). Architecture, consumer audits → alignment. Validation-method honesty → `tests`. Simplicity → `simplify`. |
+| [`alignment`](../../agents/alignment.md) | Brief alignment (every deliverable in brief → in plan), consumer audit on shape change, architecture-doc conformance, future-proofing/naming/repo-coherence, specialist routing. | PMF, user walkthroughs, user-reachability — ceded to `user-validation`. Simplicity → `plan-simplify`. Test correctness → `tests`. Specialist domains → specialists. |
+| [`plan-simplify`](../../agents/plan-simplify.md) | Whether a shorter path exists from the brief's success signal to the plan; returns PASS or ALTERNATIVE. | Per-file code style. Reviewer dimensions owned by other agents. |
+| [`user-validation`](../../agents/user-validation.md) | Named target user, declared interaction surface, per-acceptance-step walkthrough, end-to-end reachability of the user path (including the "client-built, pipeline-missing" loophole), PMF / deliverable-recognizability. | Missing deliverables (alignment owns; flag the unreachable step as the consequence instead). Architecture, consumer audits → alignment. Validation-method honesty → `tests`. Simplicity → `plan-simplify`. |
 
 When two agents corroborate the same root cause (e.g. `alignment` flags "D5 absent" while `user-validation` flags "step 3 of D5 unreachable because D5 missing"), Step 5's dedup logic merges them into one entry and raises severity rather than duplicating the flag.
 
@@ -59,7 +59,7 @@ Record the candidate set. Specialists not in the candidate set will not run unle
 
 Launch in parallel:
 - `strategic-implementation:alignment`
-- `strategic-implementation:simplify`
+- `strategic-implementation:plan-simplify`
 - `strategic-implementation:user-validation`
 
 Pass each:
@@ -104,7 +104,7 @@ Specialist agents tend to surface edge cases, fallbacks, and defensive deliverab
 
 ### Build the candidate set
 
-Collect every patch returned by **specialists in Step 4 only** (not generalists). Tag each patch with its `source_agent`. Generalist patches (`alignment`, `simplify`, `user-validation`) are exempt — those agents already operate against the brief.
+Collect every patch returned by **specialists in Step 4 only** (not generalists). Tag each patch with its `source_agent`. Generalist patches (`alignment`, `plan-simplify`, `user-validation`) are exempt — those agents already operate against the brief.
 
 If the candidate set is empty, skip to Step 5.
 
@@ -152,7 +152,7 @@ Merge all agent outputs. Apply:
 2. **Deduplicate.** Two agents flagging the same underlying issue → keep one, note the corroboration.
 3. **Reconcile conflicts.** Prefer the more conservative position. Note the conflict inline.
 4. **Block propagation.** Any specialist `BLOCK` propagates to the overall status. `alignment` BLOCK propagates. `user-validation` BLOCK propagates — typically caused by an unreachable user-acceptance step (the "client-built, pipeline-missing" loophole). When `alignment` flags "D<n> absent" AND `user-validation` flags "step k of D<n> unreachable because D<n> missing", these are the same root cause — dedup into one entry with corroboration noted; severity is the max of the two.
-5. **Alternative path (simplify).** If `simplify` returned `ALTERNATIVE`, carry it through as a top-level field — it requires a PM decision, not a patch.
+5. **Alternative path (simplify).** If `plan-simplify` returned `ALTERNATIVE`, carry it through as a top-level field — it requires a PM decision, not a patch.
 6. **Prioritize.** Sort recommendations: high-severity first, then by deliverable id.
 
 ---
@@ -189,10 +189,4 @@ If the caller applies patches and asks for re-review: only re-run specialists wh
 
 ## Record routing — externalized artifact store
 
-Per-feature **records** (this stage's brief / plan / validation-log / checkpoint / reports / mockup / brief-meta — NOT the durable tier) are read and written through the store adapter, not the feature folder directly. Wherever this skill's steps say to write or read `<feature-folder>/<file>`, route it as below; treat `<file>` as the `<artifact-name>` of the record address `<repo-id>/<date-slug>/<artifact-name>`.
-
-- **Write (fallback-safe):** `bash "${CLAUDE_PLUGIN_ROOT}/scripts/store/store.sh" put "<repo-id>/<date-slug>/<file>" "<feature-folder>/<file>" <local-tmp> --handle-out <h>` — stores the record, OR writes the in-repo `<feature-folder>/<file>` fallback if gh/locator is unavailable or the store write fails (a surfaced conflict is NOT fallen back). Then best-effort `cache.sh refresh "<address>" <local-tmp>`.
-- **Read (this feature):** the human-browsable copy is the cache (`cache.sh path <date-slug>`); the authoritative read is `store.sh read "<address>"`.
-- **Read (a PRIOR feature) — live:** `store.sh list "<repo-id>/<prior-date-slug>"` then `store.sh read` per address. Never the active-feature cache (it holds only the active feature).
-- **Per-operation fallback (transition safety):** evaluate immediately before EACH record read/write — if the locator (`docs/strategic-implementation/store-locator.yaml`) is absent (bootstrap not run) or `gh` is unavailable/offline, fall back to the in-repo `<feature-folder>/<file>` path for that operation and note the fallback. If a store write fails mid-operation, fall back to the in-repo path within the same operation so no record is ever dropped.
-- **Durable tier stays in-repo:** `project-learnings.md` and `documentation-registry.md` are read/written in place — never routed to the store.
+Per-feature **records** (brief / plan / validation-log / checkpoint / reports / mockup / brief-meta) route through the store adapter, not the feature folder directly: wherever a step says write/read `<feature-folder>/<file>`, use the store address `<repo-id>/<date-slug>/<file>` with in-repo fallback. Full read/write/fallback protocol: [`scripts/store/README.md`](../../scripts/store/README.md#record-routing-protocol-agent-facing). **Durable tier — `project-learnings.md`, `documentation-registry.md` — stays in-repo, never routed to the store.**

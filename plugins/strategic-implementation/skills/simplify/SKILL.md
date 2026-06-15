@@ -1,6 +1,6 @@
 ---
 name: simplify
-description: Code-level simplicity reviewer. Scans changed files (default `git diff <merge-base>...HEAD`) for reuse misses, dead code candidates, comment hygiene problems, and shape/naming inconsistencies. Reports only — never auto-edits source. Graph-first scan via code-review-graph MCP; file reads only as fallback. Auto-invoked mid-execution by `executing-plans` (every 3 deliverables OR ≥400 LOC since last pass) and as a final pass by `post-execution` regression-check. Standalone-runnable on any branch.
+description: Code-level simplicity reviewer. Scans changed files (default `git diff <merge-base>...HEAD`) for reuse misses, dead code candidates, comment hygiene problems, and shape/naming inconsistencies. Reports only — never auto-edits source. Graph-first scan via code-review-graph MCP; file reads only as fallback. Invoked as a final pass by `post-execution` regression-check, and standalone-runnable on any branch.
 ---
 
 # simplify
@@ -11,13 +11,8 @@ Code-level simplicity review of a changed working set. Produces a structured rep
 
 Adapted from two upstream sources:
 
-- **`anthropic-skills:simplify`** (top-level Anthropic skill — "Review changed code for reuse, quality, and efficiency, then fix any issues found"). This in-repo skill keeps the review portion and intentionally **drops** the auto-fix portion (HARD DECISION from the v3.2.1 brief: report-only, PM-gated dispositions).
-- **`agents/simplify.md`** (in-plugin plan-time simplicity reviewer used by `review`). That agent operates on execution plans before code exists; this skill operates on actual diffs after code lands. Same naming root, different surface.
-
-## Defaults
-<!-- defaults: every_n_deliverables=3, loc_threshold=400, max_loc_per_finding=50 -->
-
-These defaults govern auto-invocation by `executing-plans` (mid-execution trigger). To tune, edit the comment values above. Plan front-matter override is a v3 follow-up (deferred per execution-plan v2 review).
+- **`anthropic-skills:simplify`** (top-level Anthropic skill — "Review changed code for reuse, quality, and efficiency, then fix any issues found"). This in-repo skill keeps the review portion and intentionally **drops** the auto-fix portion (report-only, PM-gated dispositions by design).
+- **`agents/plan-simplify.md`** (in-plugin plan-time simplicity reviewer used by `review`). That agent operates on execution plans before code exists; this skill operates on actual diffs after code lands. Distinct names, distinct surfaces.
 
 ## Inputs
 
@@ -130,10 +125,4 @@ Terse. Substance exact. Drop articles, filler ("just", "really", "basically"), p
 
 ## Record routing — externalized artifact store
 
-Per-feature **records** (this stage's brief / plan / validation-log / checkpoint / reports / mockup / brief-meta — NOT the durable tier) are read and written through the store adapter, not the feature folder directly. Wherever this skill's steps say to write or read `<feature-folder>/<file>`, route it as below; treat `<file>` as the `<artifact-name>` of the record address `<repo-id>/<date-slug>/<artifact-name>`.
-
-- **Write (fallback-safe):** `bash "${CLAUDE_PLUGIN_ROOT}/scripts/store/store.sh" put "<repo-id>/<date-slug>/<file>" "<feature-folder>/<file>" <local-tmp> --handle-out <h>` — stores the record, OR writes the in-repo `<feature-folder>/<file>` fallback if gh/locator is unavailable or the store write fails (a surfaced conflict is NOT fallen back). Then best-effort `cache.sh refresh "<address>" <local-tmp>`.
-- **Read (this feature):** the human-browsable copy is the cache (`cache.sh path <date-slug>`); the authoritative read is `store.sh read "<address>"`.
-- **Read (a PRIOR feature) — live:** `store.sh list "<repo-id>/<prior-date-slug>"` then `store.sh read` per address. Never the active-feature cache (it holds only the active feature).
-- **Per-operation fallback (transition safety):** evaluate immediately before EACH record read/write — if the locator (`docs/strategic-implementation/store-locator.yaml`) is absent (bootstrap not run) or `gh` is unavailable/offline, fall back to the in-repo `<feature-folder>/<file>` path for that operation and note the fallback. If a store write fails mid-operation, fall back to the in-repo path within the same operation so no record is ever dropped.
-- **Durable tier stays in-repo:** `project-learnings.md` and `documentation-registry.md` are read/written in place — never routed to the store.
+Per-feature **records** (brief / plan / validation-log / checkpoint / reports / mockup / brief-meta) route through the store adapter, not the feature folder directly: wherever a step says write/read `<feature-folder>/<file>`, use the store address `<repo-id>/<date-slug>/<file>` with in-repo fallback. Full read/write/fallback protocol: [`scripts/store/README.md`](../../scripts/store/README.md#record-routing-protocol-agent-facing). **Durable tier — `project-learnings.md`, `documentation-registry.md` — stays in-repo, never routed to the store.**

@@ -5,7 +5,7 @@ description: Explicit user-invoked skill. Removes line-level unit tests that wer
 
 # prune-tests
 
-This skill is **only invoked by explicit PM request** (e.g., "prune the pre-GA tests"). It is never auto-invoked. Its purpose is to clean up line-level unit tests that accumulated during pre-GA development, where v2's validation model intentionally favored goal-level acceptance tests over line-level coverage.
+This skill is **only invoked by explicit PM request** (e.g., "prune the pre-GA tests"). It is never auto-invoked. Its purpose is to clean up line-level unit tests that accumulated during pre-GA development, where the validation model intentionally favored goal-level acceptance tests over line-level coverage.
 
 ---
 

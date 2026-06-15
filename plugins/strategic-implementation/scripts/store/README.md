@@ -69,3 +69,17 @@ allow rule once — via `/permissions` (choose *Add allow rule*, user scope) or 
 
 If you'd rather not pre-authorize the agent, just run `migrate.sh` yourself (above) — zero permission
 needed.
+
+## Record routing protocol (agent-facing)
+
+This is the canonical protocol every skill follows. Per-feature **records** (brief / plan /
+validation-log / checkpoint / reports / mockup / brief-meta — NOT the durable tier) are read and
+written through the store adapter, not the feature folder directly. Wherever a skill step says to
+write or read `<feature-folder>/<file>`, route it as below; treat `<file>` as the `<artifact-name>`
+of the record address `<repo-id>/<date-slug>/<artifact-name>`.
+
+- **Write (fallback-safe):** `bash "${CLAUDE_PLUGIN_ROOT}/scripts/store/store.sh" put "<repo-id>/<date-slug>/<file>" "<feature-folder>/<file>" <local-tmp> --handle-out <h>` — stores the record, OR writes the in-repo `<feature-folder>/<file>` fallback if gh/locator is unavailable or the store write fails (a surfaced conflict is NOT fallen back). Then best-effort `cache.sh refresh "<address>" <local-tmp>`.
+- **Read (this feature):** the human-browsable copy is the cache (`cache.sh path <date-slug>`); the authoritative read is `store.sh read "<address>"`.
+- **Read (a PRIOR feature) — live:** `store.sh list "<repo-id>/<prior-date-slug>"` then `store.sh read` per address. Never the active-feature cache (it holds only the active feature).
+- **Per-operation fallback (transition safety):** evaluate immediately before EACH record read/write — if the locator (`docs/strategic-implementation/store-locator.yaml`) is absent (bootstrap not run) or `gh` is unavailable/offline, fall back to the in-repo `<feature-folder>/<file>` path for that operation and note the fallback. If a store write fails mid-operation, fall back to the in-repo path within the same operation so no record is ever dropped.
+- **Durable tier stays in-repo:** `project-learnings.md` and `documentation-registry.md` are read/written in place — never routed to the store.

@@ -2,12 +2,10 @@
 # setup.sh — bootstrap strategic-implementation plugin dependencies on a machine.
 #
 # Verifies (and, with --install, sets up) everything the plugin relies on:
-#   - core tools: git, python3 (+ sqlite FTS5), jq
+#   - core tools: git, python3, jq
+#   - gh CLI (authenticated) — required by the externalized artifact store
 #   - code-review-graph (structural-graph MCP; performance dependency)
 #   - rtk (optional token-savings telemetry)
-#   - memory recall Phase 1a (BM25/FTS5 — stdlib only)
-#   - memory recall Phase 1b (vector leg — extension-capable interpreter + a
-#     persistent venv with sqlite-vec + model2vec)
 #
 # Default mode is --check (report only; NO changes). Re-run with --install to
 # apply. Idempotent: safe to run repeatedly. Portable to macOS bash 3.2.
@@ -17,19 +15,12 @@
 set -uo pipefail
 
 HERE="$(cd "$(dirname "$0")" && pwd)"
-MEMORY_DIR="$HERE/memory"
-VENV_DIR="${SI_MEMORY_VENV:-$HOME/.claude/strategic-implementation/.memory-venv}"
 REPO_ROOT="$(pwd)"
 MODE="check"
 DO_BUILD=0
 
-# Pinned versions — source of truth: scripts/memory/requirements.txt
-SQLITE_VEC_PIN="sqlite-vec==0.1.9"
-MODEL2VEC_PIN="model2vec==0.8.2"
-EMBED_MODEL="minishlab/potion-base-8M"
-
 usage() {
-  sed -n '2,20p' "$0" | sed 's/^# \{0,1\}//'
+  sed -n '2,14p' "$0" | sed 's/^# \{0,1\}//'
 }
 
 while [ $# -gt 0 ]; do
@@ -70,14 +61,10 @@ else bad "git missing"; note "install Xcode CLT (xcode-select --install) or 'bre
 
 if have python3; then
   PV="$(python3 -c 'import sys;print(sys.version.split()[0])' 2>/dev/null)"
-  if python3 -c "import sqlite3;sqlite3.connect(':memory:').execute('CREATE VIRTUAL TABLE t USING fts5(x)')" 2>/dev/null; then
-    ok "python3 $PV (sqlite FTS5 available — BM25 recall works)"
-  else
-    bad "python3 $PV present but sqlite FTS5 unavailable"
-    note "BM25 recall needs FTS5; install a python build that bundles it"
-  fi
+  ok "python3 $PV"
 else
-  bad "python3 missing"; note "install python (brew install python, or python.org)"
+  warn "python3 not found (code-review-graph install needs it; skills still degrade gracefully)"
+  note "install python (brew install python, or python.org)"
 fi
 
 if have jq; then ok "jq $(jq --version)"
@@ -134,77 +121,10 @@ if have code-review-graph; then
 fi
 
 # --------------------------------------------------------------------------
-section "Memory recall — Phase 1a (BM25 / FTS5)"
-ok "no third-party deps (stdlib sqlite3 + FTS5, verified above)"
-if [ "$DO_BUILD" = "1" ]; then
-  if [ -d "$REPO_ROOT/docs/strategic-implementation" ]; then
-    if python3 "$MEMORY_DIR/build_index.py" --root "$REPO_ROOT/docs/strategic-implementation" --vectors off --quiet; then
-      ok "BM25 index built for this repo"
-    else warn "index build returned non-zero (check FTS5 / corpus)"; fi
-  else
-    note "no docs/strategic-implementation/ in this repo yet — index builds on first feature"
-  fi
-fi
-
-# --------------------------------------------------------------------------
-section "Memory recall — Phase 1b (vector leg — optional)"
-CAP=""
-for cand in "${SI_MEMORY_PYTHON:-}" /usr/local/opt/python@3/bin/python3 /opt/homebrew/opt/python@3/bin/python3 /usr/local/bin/python3 /opt/homebrew/bin/python3; do
-  [ -z "$cand" ] && continue
-  if [ -x "$cand" ] || command -v "$cand" >/dev/null 2>&1; then
-    if "$cand" -c "import sqlite3,sys;sys.exit(0 if hasattr(sqlite3.connect(':memory:'),'enable_load_extension') else 1)" 2>/dev/null; then
-      CAP="$cand"; break
-    fi
-  fi
-done
-
-if [ -z "$CAP" ]; then
-  warn "no extension-capable interpreter found (the python.org build has enable_load_extension compiled out)"
-  note "install Homebrew python: brew install python   (then re-run --install)"
-  note "without it, recall runs BM25-only everywhere — graceful, no breakage"
-else
-  ok "extension-capable interpreter: $CAP ($("$CAP" -c 'import sys;print(sys.version.split()[0])' 2>/dev/null))"
-  if [ "$MODE" = "install" ]; then
-    if [ ! -x "$VENV_DIR/bin/python" ]; then
-      mkdir -p "$(dirname "$VENV_DIR")"
-      if "$CAP" -m venv "$VENV_DIR"; then ok "venv created: $VENV_DIR"; else bad "venv creation failed"; fi
-    else
-      ok "venv exists: $VENV_DIR"
-    fi
-    if [ -x "$VENV_DIR/bin/pip" ]; then
-      if "$VENV_DIR/bin/pip" install -q --disable-pip-version-check "$SQLITE_VEC_PIN" "$MODEL2VEC_PIN"; then
-        ok "vector deps installed ($SQLITE_VEC_PIN, $MODEL2VEC_PIN)"
-      else
-        bad "vector dep install failed (network? py-version wheels?)"
-      fi
-      if "$VENV_DIR/bin/python" - <<PY 2>/dev/null
-import sqlite3, sqlite_vec
-c = sqlite3.connect(":memory:"); c.enable_load_extension(True); sqlite_vec.load(c); c.execute("select vec_version()")
-from model2vec import StaticModel
-StaticModel.from_pretrained("$EMBED_MODEL").encode(["warm the model cache"])
-PY
-      then ok "sqlite-vec loads + embedding model cached (offline-ready)"
-      else warn "vector verify/pre-warm failed (a one-time model fetch needs network)"; fi
-    fi
-    echo ""
-    if [ "$VENV_DIR" = "$HOME/.claude/strategic-implementation/.memory-venv" ]; then
-      echo "         Vector leg ready — recall auto-discovers this venv at the default path."
-      echo "         No shell export needed. (Optional override: SI_MEMORY_PYTHON=<python>.)"
-    else
-      echo "         Non-default venv dir — export so recall finds it:"
-      echo "           export SI_MEMORY_PYTHON=\"$VENV_DIR/bin/python\""
-    fi
-  else
-    note "run with --install to create the venv + install vector deps (sqlite-vec, model2vec)"
-    note "at the default path it is then auto-discovered — no shell export needed"
-  fi
-fi
-
-# --------------------------------------------------------------------------
 section "Summary"
 echo "  pass=$PASS  warn=$WARN  fail=$FAIL  (mode: $MODE)"
 if [ "$MODE" = "check" ]; then
-  echo "  check mode — no changes made. Re-run with --install to apply, --build-index to also build indexes."
+  echo "  check mode — no changes made. Re-run with --install to apply, --build-index to also build the graph."
 fi
 [ "$FAIL" -gt 0 ] && exit 1
 exit 0
