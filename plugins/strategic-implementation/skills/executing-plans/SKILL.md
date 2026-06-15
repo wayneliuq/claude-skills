@@ -56,7 +56,7 @@ Initialize deviation counter `DEV-001`.
 
 ### Initialize hook state (deterministic-trigger layer)
 
-The plugin ships harness-fired hooks (`plugins/strategic-implementation/hooks/hooks.json`) that detect deliverable commits, edit-thrashing, error-loops, simplify thresholds, and validation-log additions deterministically — without depending on the agent to remember to check. Hooks are no-ops unless an active state file exists.
+The plugin ships harness-fired hooks (`plugins/strategic-implementation/hooks/hooks.json`) that detect deliverable commits, error-loops, and validation-log additions deterministically — without depending on the agent to remember to check. Hooks are no-ops unless an active state file exists.
 
 Write `.claude/strategic-implementation/state.json` (relative to repo root, NOT the feature folder — hooks read from a fixed location). Use the following shape:
 
@@ -66,17 +66,8 @@ Write `.claude/strategic-implementation/state.json` (relative to repo root, NOT 
   "feature_folder": "<feature-folder>",
   "feature_slug": "<slug>",
   "autonomy": "<level>",
-  "deliverables_since_last_simplify": 0,
-  "loc_since_last_simplify": 0,
-  "simplify_thresholds": {"deliverables": 3, "loc": 400},
-  "current_deliverable_edit_counts": {},
   "consecutive_failures": 0,
-  "total_deliverables": <N>,
-  "plan_path": "<feature-folder>/execution-plan.md",
-  "brief_success_signal": "<verbatim success signal from brief>",
   "last_counted_sha": "",
-  "pending_simplify": false,
-  "pending_thrash_pause": false,
   "pending_error_loop": false,
   "pending_deviation_surface": false,
   "validation_log_last_mtime": ""
@@ -138,7 +129,7 @@ Fired only when a deliverable is `Macro-deliverable: true`. Emit the operator-vi
    ```
    Do NOT use `pipeline()` for the seam→fan-out boundary (it has no barrier). Thread the contract artifact (`seam`) into each domain agent so the barrier is also a data handoff.
 2. **Edit mechanism — shared-tree-disjoint (primary).** Per the D5/ED4a spike, workflow `agent()` edits land in the main working tree. Domain agents write their **disjoint file sets** directly in that shared tree. **Build agents run ZERO git commands** (the main thread owns all git) — this makes index.lock contention a non-issue. `agent(isolation:'worktree')` is forbidden. *Fallback only if disjointness can't be guaranteed:* detached worktree per domain + `git -C <wt> diff | git apply` (with `--3way` or sequential-rebuild on apply conflict) — never `cp`-of-output, never `isolation:'worktree'`.
-3. **No nested sub-agents.** Workflow agents build only. Validation (2c), any `simplify`, and the single commit (2d) run on the **main thread after** the workflow returns. For a manual-`preview` macro-deliverable: the workflow builds + runs automatable checks, then hands back "built + checks green" for the human preview after return (workflows cannot pause mid-run).
+3. **No nested sub-agents.** Workflow agents build only. Validation (2c) and the single commit (2d) run on the **main thread after** the workflow returns. For a manual-`preview` macro-deliverable: the workflow builds + runs automatable checks, then hands back "built + checks green" for the human preview after return (workflows cannot pause mid-run).
 4. **One atomic commit.** After validation passes, the main thread makes exactly ONE `D<n>:` commit touching all domain files + `checkpoint.md` + `validation-log.md`. **Invariant: no intermediate per-domain commits land on the branch** — this is what keeps the git-log hook counters correct (a macro-deliverable counts as one deliverable).
 5. **Deferred concurrency proof.** Because an in-session live trial may validate cached behavior, log a `validation-honesty` deviation and surface a one-line follow-up: "Operator: in a fresh session (cache reloaded), re-run this macro-deliverable and confirm concurrent domains in `/workflows`; record the result in `validation-log.md`."
 
@@ -185,7 +176,6 @@ Implement the deliverable per its steps. Rules:
   - Clean up only code YOUR changes made unused — leave pre-existing dead code alone.
   - Do not "improve" adjacent code.
 - **Rework guardrails (per-deliverable counters):**
-  - **Edit-thrashing:** the `hook-edit-tracker.sh` hook tracks Edit/Write tool calls per file and sets `pending_thrash_pause` on the 4th edit to the same file (>3 edits). The Stop orchestrator surfaces this as injected guidance — pause, re-read the brief and the deliverable's plan block before any further Edit/Write to that file. Log a `thrash-pause` deviation. In `auto`, decide and proceed; in `supervised`, surface and pause. The agent's own in-text counter remains a fallback if hooks are disabled.
   - **Error-loop:** the `hook-error-tracker.sh` hook tracks consecutive tool failures and sets `pending_error_loop` at 3 consecutive failures. The Stop orchestrator surfaces "do not retry; escalate to triage" as injected guidance. Escalate to `post-execution:triage` with the error trace as the reported issue. Log an `error-loop-escalation` deviation. Hook is primary; in-text counter is fallback.
 
 **Registry-tracked doc bundle.** If the deliverable's `may-invalidate` field is non-empty, after building primary changes, prompt the PM:
@@ -256,40 +246,6 @@ Before flipping status: if the deliverable has a `Consumer audit` subsection, wa
 
 In `execution-plan.md`, update deliverable status: `pending` → `complete`.
 
-### Step 2f — Maybe-invoke simplify (mid-execution trigger)
-
-**Primary trigger:** the `hook-bash-counter.sh` hook detects the deliverable commit and sets `pending_simplify` when thresholds cross. The Stop orchestrator surfaces "invoke simplify now" as injected guidance on the next turn. The agent acts on that injected guidance — no need to compute counters in-skill.
-
-**Fallback (hooks disabled or skipped):** compute counters via `git log` directly. Defaults: `every_n_deliverables = 3`, `loc_threshold = 400` (declared in `simplify/SKILL.md`).
-
-**Skip rule:** if total plan deliverables ≤ 3, do NOT invoke mid-execution. The final pass in `post-execution` regression-check is sufficient.
-
-Otherwise, derive counters from `git log` (no new state file):
-
-```bash
-# Reference point: last simplify-report-NN.md commit, or feature-folder creation if none.
-LAST_REF=$(git log -1 --format=%H -- "<feature-folder>/simplify-report-*.md" 2>/dev/null \
-  || git log --diff-filter=A --format=%H -- "<feature-folder>" | tail -1)
-
-DELIVERABLES_SINCE=$(git log --oneline "$LAST_REF"..HEAD -- "<feature-folder>/checkpoint.md" | wc -l)
-LOC_SINCE=$(git log -p "$LAST_REF"..HEAD -- ':(exclude)<feature-folder>/' | grep -E '^[+-]' | grep -vE '^[+-]{3}' | wc -l)
-```
-
-If `DELIVERABLES_SINCE >= every_n_deliverables` OR `LOC_SINCE >= loc_threshold`: invoke `strategic-implementation:simplify` with the feature folder. The skill writes `<feature-folder>/simplify-report-NN.md` and returns the path.
-
-**Surface the report.** Append to chat:
-
-> Simplify report: `<path>` — <total> findings (high: <h>, med: <m>, low: <l>). Disposition each finding conversationally (apply / defer / dismiss) before the next deliverable, or proceed and let undispositioned findings surface in the deviation log.
-
-**Disposition rules:**
-- `supervised`: pause for PM to fill every finding's disposition before next deliverable.
-- `auto`: proceed; log a `simplify-disposition-pending` deviation only if the next atomic commit lands with unfilled dispositions in the latest report.
-- `yolo`: proceed; log nothing.
-
-The `simplify` skill never auto-edits source. PM-applied changes (when disposition is `apply`) become a follow-up deliverable or land as part of a future deliverable's same-file edits — never as a side-effect of `simplify` itself.
-
----
-
 ## Failure Protocol
 
 On validation failure:
@@ -348,13 +304,13 @@ Do not mark complete. Do not proceed to next deliverable. Await PM direction.
 
 ## Deviation logging
 
-A deviation exists on any of: blocker, retry, user-correction, reversal, ambiguity-decision, auto-escalation, yolo-skip, branch-risk, consumer-audit-mismatch, thrash-pause, error-loop-escalation, repro-blocked, spec-ambiguity-redirect, spec-ambiguity-override, simplify-disposition-pending.
+A deviation exists on any of: blocker, retry, user-correction, reversal, ambiguity-decision, auto-escalation, yolo-skip, branch-risk, consumer-audit-mismatch, error-loop-escalation, repro-blocked, spec-ambiguity-redirect, spec-ambiguity-override.
 
 Append to `validation-log.md`:
 
 ```markdown
 ## DEV-NNN
-**Type:** blocker | retry | user-correction | reversal | ambiguity-decision | auto-escalation | yolo-skip | branch-risk | consumer-audit-mismatch | thrash-pause | error-loop-escalation | repro-blocked | spec-ambiguity-redirect | spec-ambiguity-override | simplify-disposition-pending
+**Type:** blocker | retry | user-correction | reversal | ambiguity-decision | auto-escalation | yolo-skip | branch-risk | consumer-audit-mismatch | error-loop-escalation | repro-blocked | spec-ambiguity-redirect | spec-ambiguity-override
 **Deliverable:** D<n>
 **Plan said:** <verbatim>
 **Actually:** <what happened>

@@ -1,6 +1,6 @@
 ---
 name: simplify
-description: Code-level simplicity reviewer. Scans changed files (default `git diff <merge-base>...HEAD`) for reuse misses, dead code candidates, comment hygiene problems, and shape/naming inconsistencies. Reports only — never auto-edits source. Graph-first scan via code-review-graph MCP; file reads only as fallback. Auto-invoked mid-execution by `executing-plans` (every 3 deliverables OR ≥400 LOC since last pass) and as a final pass by `post-execution` regression-check. Standalone-runnable on any branch.
+description: Code-level simplicity reviewer. Scans changed files (default `git diff <merge-base>...HEAD`) for reuse misses, dead code candidates, comment hygiene problems, and shape/naming inconsistencies. Reports only — never auto-edits source. Graph-first scan via code-review-graph MCP; file reads only as fallback. Invoked as a final pass by `post-execution` regression-check, and standalone-runnable on any branch.
 ---
 
 # simplify
@@ -13,11 +13,6 @@ Adapted from two upstream sources:
 
 - **`anthropic-skills:simplify`** (top-level Anthropic skill — "Review changed code for reuse, quality, and efficiency, then fix any issues found"). This in-repo skill keeps the review portion and intentionally **drops** the auto-fix portion (HARD DECISION from the v3.2.1 brief: report-only, PM-gated dispositions).
 - **`agents/plan-simplify.md`** (in-plugin plan-time simplicity reviewer used by `review`). That agent operates on execution plans before code exists; this skill operates on actual diffs after code lands. Distinct names, distinct surfaces.
-
-## Defaults
-<!-- defaults: every_n_deliverables=3, loc_threshold=400, max_loc_per_finding=50 -->
-
-These defaults govern auto-invocation by `executing-plans` (mid-execution trigger). To tune, edit the comment values above. Plan front-matter override is a v3 follow-up (deferred per execution-plan v2 review).
 
 ## Inputs
 
