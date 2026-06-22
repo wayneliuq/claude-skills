@@ -19,7 +19,7 @@ For each deliverable, check:
    > "D<n> declares `tdd` validation but mocks `<dependency>` — the very dependency whose lifecycle this deliverable changes. Escalate to `integration-test` or document why the mock is acceptable."
    A green unit-test suite that mocks the integration point is orthogonal-to-correctness coverage, not correctness coverage.
 
-   **Validation-honesty soft-failures to resist** (in the spirit of `alignment`'s adversarial stance): accepting `tdd` at integration seams because tests are green; treating green mocked tests as proof the dependency is exercised; letting `preview` substitute for `cli` when the proof is in machine-readable output, not pixels; calling a missing fallback "edge-case" when the seam is the deliverable.
+   **Validation-honesty soft-failures to resist** (in the spirit of `alignment`'s adversarial stance): accepting `tdd` at integration seams because tests are green; treating green mocked tests as proof the dependency is exercised; letting `preview` substitute for `cli` when the proof is in machine-readable output, not pixels; calling a missing fallback "edge-case" when the seam is the deliverable; **treating a green test on the canonical path as proof the capability holds on sibling paths into the same state; accepting a fixture set that never exercises the renamed/variant input; accepting a type that structurally permits the bad value as "typechecks, therefore correct."**
 3. **Mock placement (HIGH).** Mocks are allowed only at system boundaries (third-party SDKs, network, file system, OS). Mocks of internal collaborators (helpers, factories, services within the same module/package) are a HIGH-severity FLAG. Required wording shape:
    > "D<n> mocks internal collaborator `<name>` — internal collaborators must be exercised, not stubbed. Move the mock to the system boundary or remove it."
    A test suite that mocks its own callees proves nothing about integration.
@@ -32,8 +32,12 @@ For each deliverable, check:
 10. **Macro-deliverable end-to-end honesty (HIGH).** If a deliverable is `Macro-deliverable: true`, its validation method MUST demonstrate the **integrated cross-domain outcome** end-to-end — exercising the seam between the domains (e.g. backend ↔ API-contract ↔ frontend together), not each domain in isolation. Per-domain-only validation of a macro-deliverable is a **HIGH-severity FLAG**; name the concrete stronger cross-domain method. Required wording shape:
    > "D<n> is a macro-deliverable but its `<method>` only exercises `<domain>` — a macro-deliverable's validation must prove the integrated cross-domain outcome end-to-end. Use `integration-test`/`preview`/`post-hoc` over the seam."
    Escalate to **BLOCK** if no method could possibly prove the integrated outcome (the deliverable should not have been marked macro). A macro-deliverable exists precisely because its parts are not independently e2e-validateable — so validating one part proves nothing about the whole.
+11. **Source-of-truth multiplicity (HIGH).** Read the deliverable's `Source-of-truth touchpoints` field. If a source of truth has **>1 writer or >1 reader**, the validation must test the **invariant across all paths**, not one happy-path unit. A green test on the *canonical* path is explicitly NOT evidence the invariant holds on the others — the bug lives on the sibling path the test never exercises (the second create path that never updated optimistic/error state; the renamed column no fixture used). FLAG if the plan validates only one path into a multi-path source of truth. Required wording shape:
+    > "D<n> writes `<source-of-truth>` from <N> paths but validates only `<path>`. Test the invariant `<invariant>` across all writers/readers, or collapse them to one (see item 13)."
+12. **Multi-step journey tests (HIGH for stateful / navigation / lifecycle).** For deliverables involving stateful sequences, navigation, or lifecycle (mount/hydration, create→companion, terminal run-state→store, URL↔view-state), require a multi-step journey test — *do A, then B, assert the invariant*. Single-step unit tests structurally miss these (the bug reproduces only as a sequence). FLAG a stateful/navigation/lifecycle deliverable validated only by single-step units.
+13. **Design-the-bad-state-out preference.** Before requiring N-path invariant tests, check whether the plan could collapse the multiplicity instead: one mutation function (one write path), one derived enum (only one status representable), one tight type (the bad value unrepresentable). Where it can, recommend that over testing all N — it is cheaper and removes the bug class rather than asserting against it. This is the hand-off back to the `Convergence audit` / execution-plan rule 11: prefer N→1 over proving N paths agree.
 
-Do not review code style, assertion style, or test framework choice. Do not flag missing unit tests — they are intentionally deferred pre-GA.
+Do not review code style, assertion style, or test framework choice. Do not flag missing unit tests — they are intentionally deferred pre-GA. The multi-path invariant and journey requirements (items 11–12) fire ONLY on a genuine >1-reader/writer source of truth or stateful/navigation/lifecycle behavior — a single-path, single-writer, stateless deliverable keeps its plain happy-path validation, and the requirement is one journey/invariant test, not a unit matrix.
 
 ## Output schema
 
@@ -41,7 +45,7 @@ Do not review code style, assertion style, or test framework choice. Do not flag
 {
   "status": "PASS | FLAG | BLOCK",
   "flags": [
-    { "dimension": "method|honesty|coverage|fragility|regression|mock-placement", "severity": "low|med|high", "message": "...", "location": "deliverable id" }
+    { "dimension": "method|honesty|coverage|fragility|regression|mock-placement|invariant|journey", "severity": "low|med|high", "message": "...", "location": "deliverable id" }
   ],
   "recommendations": [
     { "action": "patch|discuss|defer", "target": "deliverable id", "change": "..." }
