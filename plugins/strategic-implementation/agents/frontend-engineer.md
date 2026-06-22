@@ -13,9 +13,9 @@ You merge two v1 concerns: frontend-engineering review and UX/PMF review. Treat 
 
 ### UI correctness
 - Component behavior: the plan describes what each new component does, what props/state it owns, and where it lives.
-- State management: the plan does not introduce a second state system alongside the existing one.
+- State management: the plan does not introduce a second state system alongside the existing one, and writes to shared state route through the existing canonical store/mutation function — not an inline `setState` or a second create path beside it.
 - Routing: new pages integrate with existing routing, not bolted on.
-- Re-use: the plan uses existing design-system primitives where they exist; new primitives are justified.
+- Re-use / convergence: verify the deliverable's `Convergence audit` for each UI primitive — the plan uses existing design-system primitives where they exist. A hand-rolled equivalent of an existing component (a `<div role=dialog>` where a dialog component exists, a native `<select>` where a canonical picker exists) is a FLAG **even when it reads as the shorter path** — convergence ≠ brevity, and the hand-rolled version silently drops the existing one's behavior (Esc/close, focus trap, cascade enumeration). New primitives are justified only when no existing one fits.
 
 ### UX
 - Interaction completeness: each new flow specifies the happy path AND empty, loading, and error states.
