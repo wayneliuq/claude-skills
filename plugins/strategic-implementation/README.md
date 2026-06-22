@@ -6,7 +6,7 @@
 
 You write what the user should be able to do. The plugin handles everything between that sentence and merged code: clarification, planning, adversarial review, deliverable-by-deliverable execution, and a regression check at the end. You approve **one document** (the product brief). Everything else happens behind the right gates, with the right level of autonomy you choose at the start.
 
-**Version:** 4.4.0
+**Version:** 4.5.0
 **Built for:** Claude Code on Opus 4.8
 **Audience:** non-technical PMs, solo founders, anyone who can describe what good looks like
 **Requires:** the [`code-review-graph`](https://github.com/tirth8205/code-review-graph) MCP server (see [Dependencies](#dependencies))
@@ -182,7 +182,7 @@ Set once at clarify time. Carried through the whole workflow.
 **Agents:**
 
 - **Generalist (always run):** `alignment`, `simplify`
-- **Specialists (run on flag):** `boundaries` (security + data + API), `runtime-risk` (performance + dependencies), `tests` (validation honesty), `frontend-engineer` (UI/UX/a11y), `technical-expert` (stack pitfalls + step ordering)
+- **Specialists (run on flag):** `boundaries` (security + data + API), `runtime-risk` (performance + dependencies), `tests` (validation honesty + multi-path invariants & journey tests), `frontend-engineer` (UI/UX/a11y + convergence on UI primitives), `technical-expert` (stack pitfalls + step ordering)
 
 All agents return JSON, cap at ~1500 tokens, and stay under ~120 lines of prompt.
 
@@ -278,6 +278,25 @@ A self-audit pass that removed machinery a more capable model no longer needs, p
 - **De-duplicated** the store-routing protocol (×8 → one canonical copy in `scripts/store/README.md`) and the per-mode plan-mode entry-check; stripped stale internal version archaeology; compressed the triage repro ladder.
 
 Net effect: the plugin ships substantially less code (the memory subsystem alone was ~1.6k lines) while keeping every load-bearing gate.
+
+---
+
+## Convergence & Invariant Pass — v4.5.0
+
+A real audit of a production app surfaced 16 user-facing bugs that all escaped a green CI suite and collapsed to **two root causes** — both gaps this pass closes. The two are the *same shape*: **N paths into one source of truth.**
+
+- **Gap 1 — build-new instead of find-and-converge.** Most bugs were a *second* implementation of a capability the codebase already had (a hand-rolled `<div role=dialog>` beside the existing dialog component; a native `<select>` beside the canonical picker; a second create/write path that mutated *around* the canonical store function). The bug always lived at the divergence seam.
+- **Gap 2 — a green test on the canonical path is false confidence.** The bugs lived in invariants spanning multiple paths into one state; the suite tested only the canonical path. The companion-creation test was green because it covered the *hydrate* path — the untested *second create* path was the broken one.
+
+The divergence is an **implementation-time** decision the plan never used to surface. This pass makes it a **plan-time artifact** the already-running reviewers can check — no new agent:
+
+- **Two new plan-time fields** in `execution-plan`: a **Convergence audit** (for each new behavioral UI element, rendering pipeline, or shared-state write: the existing implementation found + the routing decision — `reuse` / `extract-shared-primitive` / `routed-through` / `re-implement (justified)`) and **Source-of-truth touchpoints** (writers/readers of each state, the invariant, and how validation exercises every path). Backed by execution-plan authoring rules 10 (convergence before re-implementation) and 11 (single chokepoint for writes to a source of truth).
+- **`alignment` owns an always-on convergence check** — it is the always-on generalist for repo coherence, so it (not the conditional `frontend-engineer`) carries the verbatim find-and-converge question and FLAGs an unrouted second write path HIGH.
+- **`tests` distrusts the green single-path test** — when a source of truth has >1 reader/writer it requires an **invariant test across all paths** and a **multi-step journey test** for stateful/navigation/lifecycle behavior, and prefers *designing the multiplicity out* (one mutation fn / one derived enum / one tight type) over testing all N. Scoped so single-path, stateless deliverables keep plain happy-path validation.
+- **Pre-filter mandatory triggers** wire both: multi-path source-of-truth → `tests`; re-implement / second-path → `alignment` (+`frontend-engineer` for UI).
+- **`plan-simplify`** now detects reinvention at the *capability* level (semantic, not name-grep) so inline re-implementations are caught; **`product-brief-drafter`** states the invariant as a user-observable success-signal criterion when a state has multiple producing flows.
+
+The highest-leverage move is the convergence gate: collapsing N paths to one canonical chokepoint removes the divergence seam (Gap 1) *and* the untested-sibling-path surface (Gap 2) at once. The `tests` changes are the backstop for the cases where N>1 is irreducible (e.g. URL ↔ in-memory view-state).
 
 ---
 
