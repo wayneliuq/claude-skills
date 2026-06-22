@@ -78,6 +78,13 @@ _Implements: product-brief_<slug>.md · Date: <date>_
 - **Consumer audit:** <required iff this deliverable changes a data shape — interface / type / schema / payload / return type / function signature. Otherwise: "n/a — no shape change.">
   - <consumer file:symbol> — `updated-in-this-deliverable` | `updated-in-D<n>` | `unaffected-because-<reason>` | `explicit-skip-because-<reason>`
   - ...
+- **Convergence audit:** <required iff this deliverable introduces a behavioral UI element (dialog / picker / menu / modal), a rendering/parsing pipeline, or a write to shared state / a source of truth. Otherwise: "n/a — no new capability." One entry per capability:>
+  - <capability> — existing impl: `<symbol at path:line>` (found via graph semantic search by *purpose*, not name — inline re-implementations have no symbol to grep) | `none found — greenfield (searched: <query>)`
+  - decision: `reuse` | `extract-shared-primitive-and-converge-both-callsites` | `second-path-routed-through <canonical fn/component>` | `re-implement (justified: <why the existing one genuinely doesn't fit>)`
+  - <A second create / write / render path to an existing capability is a design smell — it must be `routed-through` the canonical chokepoint or carry a `re-implement (justified)`. `greenfield` is valid only after a recorded search.>
+- **Source-of-truth touchpoints:** <for each shared state / store slice / derived state / persisted record / URL↔view-state this deliverable reads or writes — name it and list the OTHER repo paths that also read/write it (graph: writers/readers). If >1 writer OR >1 reader, declare the invariant and how validation exercises all paths. Otherwise: "n/a — single reader/writer.">
+  - <source-of-truth name> — writers: `<paths>`; readers: `<paths>`
+  - invariant: <e.g. "exactly one status representable"; "every create path yields its companion"; "URL and in-memory view-state agree"> — validation exercises all paths via: <how>
 
 ### D2 — <name>
 ...
@@ -129,6 +136,19 @@ _Implements: product-brief_<slug>.md · Date: <date>_
    | "Probably nothing else uses this shape." | "Probably" is a grep you haven't run. Run it, then list every consumer with a status. |
    | "It's a small/internal change, consumers will adapt." | Silent shape changes break callers at runtime, not review time. Enumerate them now or review rejects the plan. |
 9. **Macro-deliverable (narrow exception).** Default is normal decomposition — split work into the smallest independently-validateable deliverables. A deliverable may be marked `Macro-deliverable: true` ONLY when ALL hold: (a) the outcome spans ≥2 domains (commonly backend / API-contract / frontend); (b) the domains are NOT independently end-to-end-validateable — splitting them loses the ability to validate any sub-part e2e; (c) together they form ONE user-observable outcome; (d) it is large enough that concurrent build meaningfully beats sequential. PLUS an eligibility gate: the domains must own **disjoint file sets — authored AND generated/derived outputs** (no two domains write the same lockfile / index / generated artifact). Expected domain count is small (≤ ~4). If work *can* be split into independently-validateable pieces, it MUST be — a macro-deliverable is not a license to skip honest decomposition. A macro-deliverable IS one deliverable → one atomic `D<n>:` commit (executing-plans runs its domains in one Workflow). Record it in the template's `Macro-deliverable` / `Domains & file partition` fields and name it under "Workflow decision".
+
+10. **Convergence before re-implementation** (rule 0, rung 4, applied to capabilities — not just named symbols). Before a deliverable builds a behavioral UI element, a rendering/parsing pipeline, or a write to shared state, search the repo for an existing implementation of that *capability/purpose* (semantic search, not name-grep — the worst re-implementations are inline and have no symbol to grep). The plan-time and review-time question is the same: **"Does an implementation of this capability already exist, and does this deliverable route through it rather than re-implement the step?"** If one exists, the deliverable must `reuse` it, `extract-shared-primitive-and-converge` both call sites, or `second-path-routed-through` the canonical component — never re-implement the step inline. Record the search and the decision in the `Convergence audit` field. A second create / write / render path to an existing capability is a design smell, not a shortcut — the bug lives at the divergence seam.
+
+    | Rationalization | Rebuttal |
+    |---|---|
+    | "Hand-rolling it here is simpler than wiring up the existing component." | The existing component carries behavior you'll silently drop (Esc/close, cascade enumeration, frontmatter strip). Convergence ≠ brevity — route through it or justify the re-implement. |
+    | "It's a slightly different case, so a second path is cleaner." | A second path diverges the moment either side changes. Extract a shared primitive and converge both call sites, or route the variant through the canonical one. |
+
+11. **Single chokepoint for writes to a source of truth.** Any deliverable that writes to shared state / a store / a persisted source of truth MUST route the write through the existing canonical mutation/lifecycle function, named in the `Convergence audit`. A write that mutates *around* it — an inline optimistic update, a second create path, an error path that sets state directly — is rejected: it bypasses whatever the canonical lifecycle does (optimistic state, error rollback, companion creation). When a source of truth has >1 writer or >1 reader, the `Source-of-truth touchpoints` field must declare the invariant and how validation exercises every path — **and prefer designing the multiplicity out** (one mutation fn, one derived enum so only one status is representable, one tight type so the bad value is unrepresentable) over testing all N paths. Collapsing N→1 is cheaper than proving N paths agree.
+
+    | Rationalization | Rebuttal |
+    |---|---|
+    | "It's just one extra `setState` next to the store call." | Then it's one path the canonical lifecycle won't run — optimistic/error/companion logic silently skipped. Route it through the canonical fn. |
 
 ---
 
