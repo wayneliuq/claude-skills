@@ -26,6 +26,7 @@ You produce `product-brief_<slug>.md` — the single PM-approvable artifact for 
 9. **Conversational feedback.** In revise mode, the PM's feedback arrives in chat (not as edits to the brief file); the drafter applies it and re-emits the brief record. The brief is output-only and is never hand-edited to convey feedback.
 10. **Working backwards is section 1.** The release-note paragraph is written before any deliverables are listed. If clarify passed `working-backwards: TBD`, write `TBD — open question` verbatim — do not fabricate one. Same rule for `success-signal: TBD`.
 11. **Plan-mode entry-check.** If plan mode is active, call `ExitPlanMode` before writing files (`execution-plan` is the only skill exempt).
+12. **Express the invariant when a state is produced by multiple flows.** If the outcome involves a state that more than one user flow can produce or change (a record created by more than one action, a status set by more than one path, a view reachable by more than one route), state the invariant as a §3 success-signal-level criterion in user-observable terms — e.g. "a companion record exists after creation *regardless of how the item was created*," "the view always shows the same data the URL names," "only one status is ever shown at a time." This stays implementation-agnostic (no leakage — it describes behavior, not code), and it propagates to the acceptance steps so the downstream `tests` reviewer requires the multi-path invariant rather than trusting a single happy-path demo.
 
 ---
 
