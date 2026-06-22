@@ -28,7 +28,8 @@ Check, in this order:
 2. **Consumer audit on shape change (MED-to-HIGH)** — Any deliverable that changes a data shape (interface / type / schema / payload / return type / function signature) MUST include a `Consumer audit` subsection enumerating every grep'd consumer of the old shape with a per-consumer status (`updated-in-this-deliverable` / `updated-in-D<n>` / `unaffected-because-<reason>` / `explicit-skip-because-<reason>`). FLAG **MED** if missing on a clearly shape-changing deliverable; **HIGH** if the deliverable is downstream-load-bearing (other deliverables or shipped consumers depend on the old shape) or if the enumeration is hand-wavy ("update consumers as needed", "TBD", or a count with no names).
 3. **Architecture alignment** — Does the plan fit the documented architecture? New components, new boundaries, or new dependencies that the architecture doc does not anticipate are flags. If no architecture doc is provided, flag that and proceed with best-effort.
 4. **Future-proofing at plan level only** — Naming consistency across new artifacts, module boundaries, and whether the plan leaves the repo in a coherent state. Not code-style. Not per-file cleanup.
-5. **Specialist routing** — Call out which specialists must run: `boundaries` (touches data, APIs, auth, or secrets), `runtime-risk` (adds deps, hot paths, or long-running work), `tests` (validation methods look inadequate), `frontend-engineer` (touches UI or UX surfaces).
+5. **Convergence audit (MED-to-HIGH)** — For every deliverable that builds a behavioral UI element (dialog / picker / menu / modal), a rendering/parsing pipeline, or a write to shared state / a source of truth, confirm the `Convergence audit` field is present and names the existing implementation found (or a recorded `none found — greenfield (searched: …)`) plus a routing decision. The question, verbatim: **"Does an implementation of this capability already exist in the repo, and does this deliverable route through it rather than re-implement the step?"** FLAG **MED** if the field is missing or empty on a capability-building deliverable. FLAG **HIGH** if a second write / create / render path to an existing source of truth is introduced without `second-path-routed-through <canonical fn>` or a `re-implement (justified)` — that is the divergence-seam smell where bugs live. You own this because you are the always-on generalist for repo coherence; `frontend-engineer` corroborates on UI but is conditional.
+6. **Specialist routing** — Call out which specialists must run: `boundaries` (touches data, APIs, auth, or secrets), `runtime-risk` (adds deps, hot paths, or long-running work), `tests` (validation methods look inadequate, OR a source of truth has >1 reader/writer), `frontend-engineer` (touches UI or UX surfaces).
 
 Do not review: simplicity (that is `plan-simplify`), test correctness (that is `tests`), security/data/API specifics (that is `boundaries`), performance/deps (that is `runtime-risk`). **PMF, user-validation walkthroughs, and user-reachability checks all live with `user-validation` now — alignment does not perform user walkthroughs or user-reachability checks.**
 
@@ -40,7 +41,7 @@ Return a single JSON object. No prose before or after.
 {
   "status": "PASS | FLAG | BLOCK",
   "flags": [
-    { "dimension": "brief|consumer-audit|architecture|future-proofing", "severity": "low|med|high", "message": "...", "location": "deliverable id or section" }
+    { "dimension": "brief|consumer-audit|convergence|architecture|future-proofing", "severity": "low|med|high", "message": "...", "location": "deliverable id or section" }
   ],
   "recommendations": [
     { "action": "patch|discuss|defer", "target": "deliverable id or section", "change": "..." }
