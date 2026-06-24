@@ -127,10 +127,10 @@ Fired only when a deliverable is `Macro-deliverable: true`. Emit the operator-vi
    const seam = await agent(buildContractPrompt)              // barrier: fully resolves before fan-out
    await parallel(domains.map(d => () => agent(buildDomainPrompt(d, { contract: seam }))))
    ```
-   Do NOT use `pipeline()` for the seam→fan-out boundary (it has no barrier). Thread the contract artifact (`seam`) into each domain agent so the barrier is also a data handoff.
+   Do NOT use `pipeline()` for the seam→fan-out boundary (it has no barrier). Thread the contract artifact (`seam`) into each domain agent so the barrier is also a data handoff. **If the plan scoped a rule-12 shared surface to this outcome (execution-plan rule 9), the seam is where it is built** — the contract agent authors the shared surface, the fan-out domains consume it read-only. The shared surface is never one of the parallel domains.
 2. **Edit mechanism — shared-tree-disjoint (primary).** Per the D5/ED4a spike, workflow `agent()` edits land in the main working tree. Domain agents write their **disjoint file sets** directly in that shared tree. **Build agents run ZERO git commands** (the main thread owns all git) — this makes index.lock contention a non-issue. `agent(isolation:'worktree')` is forbidden. *Fallback only if disjointness can't be guaranteed:* detached worktree per domain + `git -C <wt> diff | git apply` (with `--3way` or sequential-rebuild on apply conflict) — never `cp`-of-output, never `isolation:'worktree'`.
 3. **No nested sub-agents.** Workflow agents build only. Validation (2c) and the single commit (2d) run on the **main thread after** the workflow returns. For a manual-`preview` macro-deliverable: the workflow builds + runs automatable checks, then hands back "built + checks green" for the human preview after return (workflows cannot pause mid-run).
-4. **One atomic commit.** After validation passes, the main thread makes exactly ONE `D<n>:` commit touching all domain files + `checkpoint.md` + `validation-log.md`. **Invariant: no intermediate per-domain commits land on the branch** — this is what keeps the git-log hook counters correct (a macro-deliverable counts as one deliverable).
+4. **One atomic commit.** After validation passes, the main thread makes exactly ONE `D<n>:` commit touching all domain files + any docs created/updated under this deliverable's `Docs to update/create` (`may-invalidate` + `to-create`, including the doc for a seam-built shared surface) + the registry file (new/bumped rows) + `checkpoint.md` + `validation-log.md`. **Invariant: no intermediate per-domain commits land on the branch** — this is what keeps the git-log hook counters correct (a macro-deliverable counts as one deliverable).
 5. **Deferred concurrency proof.** Because an in-session live trial may validate cached behavior, log a `validation-honesty` deviation and surface a one-line follow-up: "Operator: in a fresh session (cache reloaded), re-run this macro-deliverable and confirm concurrent domains in `/workflows`; record the result in `validation-log.md`."
 
 ### Step 2-macro-fallback — Sequential macro build
@@ -170,11 +170,11 @@ Implement the deliverable per its steps. Rules:
 - **Rework guardrails (per-deliverable counters):**
   - **Error-loop:** the `hook-error-tracker.sh` hook tracks consecutive tool failures and sets `pending_error_loop` at 3 consecutive failures. The Stop orchestrator surfaces "do not retry; escalate to triage" as injected guidance. Escalate to `post-execution:triage` with the error trace as the reported issue. Log an `error-loop-escalation` deviation. Hook is primary; in-text counter is fallback.
 
-**Registry-tracked doc bundle.** If the deliverable's `may-invalidate` field is non-empty, after building primary changes, prompt the PM:
+**Registry-tracked doc bundle.** Read the deliverable's `Docs to update/create` field. Two cases, both bundled into this deliverable's atomic commit:
+- **`may-invalidate:` non-empty** — after building primary changes, prompt the PM: "Deliverable D<n> may invalidate `<doc-paths>`. Update them now in the same commit?"
+- **`to-create:` non-empty** — the deliverable introduced a new maintainer-facing surface, so author the named doc **in the repo's existing documentation style** (mirror the sibling doc / convention the plan named — do not impose a new format), and upsert its row into `documentation-registry.md`. Prompt: "Deliverable D<n> introduces `<surface>`; documenting it at `<doc-path>` per repo conventions in the same commit?"
 
-> "Deliverable D<n> may invalidate `<doc-paths>`. Update them now in the same commit?"
-
-In `auto`, surface and proceed; in `supervised`, pause for explicit reply; in `yolo`, surface and proceed without waiting. Apply doc edits in the same working tree so they land in this deliverable's atomic commit. Never amend a prior deliverable's commit to add docs.
+In `auto`, surface and proceed; in `supervised`, pause for explicit reply; in `yolo`, surface and proceed without waiting. Apply all doc edits in the same working tree so they land in this deliverable's atomic commit. Never amend a prior deliverable's commit to add docs.
 
 ### Step 2c — Validate
 
@@ -230,7 +230,7 @@ D<n>: <one-sentence outcome>
 
 Example: `D3: add product-brief revision loop`.
 
-Stage only the files named in this deliverable — plus any registry-tracked docs updated in Step 2b under `may-invalidate`, plus the registry file itself with **`Last Updated` bumped to today** for each updated doc's row, plus the updated `<feature-folder>/checkpoint.md` (move the deliverable from `## In progress` to `## Done` with its short SHA), plus the updated `validation-log.md`. All in one atomic commit. Post-execution verifies these advances.
+Stage only the files named in this deliverable — plus any registry-tracked docs updated or created in Step 2b under `Docs to update/create` (`may-invalidate` + `to-create`), plus the registry file itself with **`Last Updated` bumped to today** for each updated row and a new row for each created doc, plus the updated `<feature-folder>/checkpoint.md` (move the deliverable from `## In progress` to `## Done` with its short SHA), plus the updated `validation-log.md`. All in one atomic commit. Post-execution verifies these advances.
 
 ### Step 2e — Mark complete
 

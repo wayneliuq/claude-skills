@@ -22,7 +22,10 @@ You produce a single static `mockup.html` that serves as the visual contract for
 5. **PM feedback is conversational.** The PM describes changes in chat; the skill re-emits `mockup.html` (output-only). No inline-comment or sibling-feedback-file editing.
 6. **Conflict-back-to-brief.** A PM comment that contradicts a brief deliverable is not silently applied — the conflict is surfaced and the workflow loops back to brief revision.
 7. **Anti-slop (SLIM tier).** Apply the SLIM tier of `agents/frontend-quality.md` — zero em-dashes, eyebrow restraint, no repeated section layouts, hero fits the first viewport, no fake-precise numbers, no scroll cues/version tells, real content not lorem, off-black/off-white. These are legibility/IA rules, not pixel polish; they do not violate rule 4 (throwaway, not polished). Do NOT pull in the RICH tier (motion, fonts, design systems) — that belongs to shipped UI, not the mockup.
-8. **Plan-mode entry-check.** If plan mode is active, call `ExitPlanMode` before writing files (`execution-plan` is the only skill exempt).
+8. **Show the edit in place, not in isolation.** The mockup is a contextual diff, not a floating component. Render the surrounding *existing* surface the edit lands in — the nav, the page chrome, the adjacent sections that will NOT change — using a muted "unchanged" treatment (reduced opacity or a neutral wash), and mark the new/changed regions clearly (a labeled outline or a `NEW` / `CHANGED` tag). The PM should see exactly where the work touches the product and what it leaves alone. If the surrounding surface is unknown, survey it (Task B) before mocking — don't invent the context.
+9. **Survey conventions, not just tokens.** Run Task B (convention survey) before writing the mockup. The mockup must match the de-facto conventions of similar existing surfaces; conflicts between the brief and existing conventions are surfaced to the PM, never silently resolved in the mockup.
+10. **Codify resolved conventions.** When PM iteration resolves a convention that should bind future work (a layout/interaction/naming decision not previously documented), codify it — see the `codify` step. This is the mockup phase's contribution to the brief's maintainer goal.
+11. **Plan-mode entry-check.** If plan mode is active, call `ExitPlanMode` before writing files (`execution-plan` is the only skill exempt).
 
 ---
 
@@ -33,9 +36,9 @@ You receive:
 - Feature folder path
 - Trigger reason from orchestrator (`new screen` / `≥2-step flow` / `IA change`)
 
-### Task — discover repo styles
+### Task A — discover repo styles (tokens)
 
-Discovery order (stop at first hit, but record what was found):
+Token discovery order (stop at first hit, but record what was found):
 
 1. **CSS variables.** Glob `**/*.css` for `:root { --` blocks. Extract color, spacing, typography variables.
 2. **Tailwind config.** Glob `tailwind.config.{ts,js,cjs,mjs}`. Extract `theme.extend` palette, fontSizes, spacing.
@@ -48,6 +51,16 @@ Documented neutral fallback:
 - Accent `#0066cc`
 - Font stack `system-ui, -apple-system, "Segoe UI", sans-serif`
 - Spacing scale 4 / 8 / 12 / 16 / 24 / 32 / 48 px
+
+### Task B — survey conventions (beyond tokens)
+
+Tokens are not conventions. Tokens tell you *what colors exist*; conventions tell you *how this kind of surface is built here* — where the primary action sits, how empty/error/loading states look, how forms validate, what a list row looks like. Survey all that apply; record each source and what it yielded. This pass also serves the maintainer (the brief's second user): the mockup should look like it belongs in this repo, not like a foreign surface someone has to reconcile later.
+
+1. **Convention docs.** Read `docs/strategic-implementation/documentation-registry.md`; pull any entry tagged as UI conventions / design system. Read the `ui_conventions` doc reference from the brief's §7 (clarify collects it). Read whatever those point to.
+2. **Figma.** If the brief names a Figma file or the registry points to one and the Figma MCP is connected (`mcp__plugin_design_figma`), survey the referenced frames for the surface being built. If not connected, note that and continue — do not block.
+3. **Similar-surface survey (always, even when docs exist — especially when they don't).** Use `mcp__code-review-graph__semantic_search_nodes` to find ≥1 existing surface that does something *similar* to this feature (a sibling page, an analogous form, a comparable list/detail view). Read it. Extract the de-facto conventions it embodies (layout skeleton, control placement, state handling, naming) and note any **conflict** between what the brief asks for and what the repo already does. A conflict is a flag for the PM, not something to silently resolve in the mockup.
+
+Record findings in the mockup's head comment (`Convention survey:` line) and carry conflicts into the handoff announcement.
 
 ### Task — write mockup.html
 
@@ -63,16 +76,24 @@ Structure:
     Mockup for: <brief slug>
     Generated: <date>
     Style discovery: <Tailwind config @ <path> | CSS vars @ <path> | theme @ <path> | neutral fallback>
+    Convention survey: <convention doc @ <path> | Figma @ <ref> | similar surface: <symbol at path> | none found>
+    Conventions codified this round: <doc path(s) | none>
+    Conflicts surfaced: <one line each | none>
     Trigger reason: <new screen | ≥2-step flow | IA change>
   -->
   <style>
     /* Inline tokens, derived from discovery */
     :root { --bg: ...; --text: ...; ... }
     /* layout + components */
+    /* unchanged-context treatment — applied to existing surfaces the edit does NOT touch */
+    .unchanged { opacity: .5; }
+    .change-marker { outline: 2px dashed var(--accent); }  /* mark new/changed regions */
   </style>
 </head>
 <body>
   <!-- Mockup body. Use brief deliverables as the structural outline. -->
+  <!-- Render surrounding EXISTING surfaces (nav, chrome, adjacent sections) with class="unchanged". -->
+  <!-- Mark NEW/CHANGED regions with class="change-marker" and a visible NEW/CHANGED tag. -->
   <!-- For multi-step flows, render each step in a separate section. -->
 </body>
 </html>
@@ -82,9 +103,9 @@ Structure:
 
 Write `<feature-folder>/mockup.html`. Return path and announce:
 
-> "Mockup drafted at `<path>`. Discovery: `<what was found>`. Review by opening the file in a browser. Describe any changes in chat and reply 'revise', or reply 'approve' to proceed to execution planning."
+> "Mockup drafted at `<path>`. Tokens: `<what was found>`. Convention survey: `<doc / Figma / similar surface, or none found>`. Conflicts with existing conventions: `<one line each, or none>`. Conventions codified: `<doc path(s), or none>`. The mockup shows the edit in place — surrounding surfaces are dimmed as unchanged; new/changed regions are marked. Review by opening the file in a browser. Describe any changes in chat and reply 'revise', or reply 'approve' to proceed to execution planning."
 
-Do NOT auto-advance.
+Do NOT auto-advance. If conflicts were surfaced, the PM resolves them before approving (a conflict may route to `conflict-back-to-brief`).
 
 ---
 
@@ -110,6 +131,10 @@ For each feedback item, scan brief deliverables and HARD DECISIONs for textual c
 For each non-conflicting item:
 1. Apply the change and re-emit `mockup.html` with it.
 
+### Task — codify resolved conventions
+
+If this round resolved a reusable convention, run the **Codify resolved conventions** step (see below). Skip if nothing reusable was resolved.
+
 ### Task — append revision-log block
 
 Prepend a comment block at the top of the `<body>` recording: revision number, date, one-line summary of what changed.
@@ -118,7 +143,7 @@ Prepend a comment block at the top of the `<body>` recording: revision number, d
 
 Write `mockup.html`. Announce:
 
-> "Mockup revised. Reload the file. Review or reply 'approve' to proceed."
+> "Mockup revised. `<Conventions codified: doc path(s), or omit if none.>` Reload the file. Review or reply 'approve' to proceed."
 
 ---
 
@@ -139,6 +164,22 @@ Show the PM:
 - **abandon mockup change** → drop the feedback item. Continue with remaining items.
 
 A mockup never silently overrides the brief. The brief is the contract; the mockup is its visualization.
+
+---
+
+## Codify resolved conventions (generate + revise)
+
+The mockup phase is where UI conventions get *decided* — control placement, state handling, naming, layout skeleton. When a decision is made that should bind future work on this surface (and is not already written down), codify it so the next maintainer inherits it instead of re-deciding. This is the mockup's half of the brief's maintainer goal (`product-brief-drafter` rule 13).
+
+**When to codify** — a convention resolved during this round that is (a) not already in a convention doc the survey found, and (b) reusable beyond this one feature (it describes how *this kind of surface* behaves, not a one-off choice). One-off layout calls specific to this feature do NOT get codified.
+
+**How:**
+1. If a UI-convention doc already exists (from Task B's survey), append the resolved convention to it in that doc's existing style.
+2. If none exists and ≥1 reusable convention was resolved, create `docs/strategic-implementation/ui-conventions.md` (or the repo's documented location, if conventions live elsewhere — mirror the repo, don't impose a new home) with a one-line purpose preamble, and add the convention.
+3. **Register it.** Upsert a row in `docs/strategic-implementation/documentation-registry.md` (`Path | Covers | Last Updated | Update Trigger | Owning Area`) so `execution-plan`'s `may-invalidate` pass and future `clarify` runs know it exists. Set `Last Updated` to today.
+4. Record the codified doc path(s) in the mockup head comment (`Conventions codified this round:`).
+
+Codifying is additive and low-stakes — but do not over-codify. If nothing reusable was resolved, write `none` and move on.
 
 ---
 

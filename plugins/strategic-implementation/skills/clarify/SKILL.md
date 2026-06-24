@@ -42,6 +42,7 @@ Only questions that:
 
 - **Architecture document:** "Where is the architecture document? (path, URL, or 'none')"
 - **UX/PMF document:** only ask if the change has any user-facing impact. (path, URL, `n/a — backend only`, or `none`)
+- **UI conventions / design system / Figma:** only ask if the change has any user-facing impact. "Where are the UI conventions, design-system docs, or Figma files for this surface? (path, URL, or 'none')" These ground `ui-mockup`'s convention survey — surfacing them now means the mockup can match existing conventions instead of inventing.
 - **Security policy:** only ask if the change touches auth, secrets, user data, or external inputs. (path, URL, or `none`)
 - **Schema/ERD:** only ask if the change touches data storage. (path, URL, `n/a — no data storage`, or `none`)
 
@@ -107,7 +108,7 @@ Return:
 - Clarified request (request + assumptions + Q&A answers)
 - `working-backwards`: one-sentence outcome in PM's words, or the literal string `TBD — open question`
 - `success-signal`: one-sentence outside-observable signal, or the literal string `TBD — open question`
-- Document references (dict with `architecture`, `ux_pmf`, `security`, `schema`, each `path|url|none|n/a`)
+- Document references (dict with `architecture`, `ux_pmf`, `ui_conventions`, `security`, `schema`, each `path|url|none|n/a`)
 - Integration-risk dependencies (list of `{name, why_it_matters}`, or empty list)
 - Autonomy level (`supervised` | `auto` | `yolo`)
 

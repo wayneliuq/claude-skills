@@ -27,6 +27,7 @@ You produce `product-brief_<slug>.md` — the single PM-approvable artifact for 
 10. **Working backwards is section 1.** The release-note paragraph is written before any deliverables are listed. If clarify passed `working-backwards: TBD`, write `TBD — open question` verbatim — do not fabricate one. Same rule for `success-signal: TBD`.
 11. **Plan-mode entry-check.** If plan mode is active, call `ExitPlanMode` before writing files (`execution-plan` is the only skill exempt).
 12. **Express the invariant when a state is produced by multiple flows.** If the outcome involves a state that more than one user flow can produce or change (a record created by more than one action, a status set by more than one path, a view reachable by more than one route), state the invariant as a §3 success-signal-level criterion in user-observable terms — e.g. "a companion record exists after creation *regardless of how the item was created*," "the view always shows the same data the URL names," "only one status is ever shown at a time." This stays implementation-agnostic (no leakage — it describes behavior, not code), and it propagates to the acceptance steps so the downstream `tests` reviewer requires the multi-path invariant rather than trusting a single happy-path demo.
+13. **The feature has a second user: the maintainer.** Every brief serves the app's user (§2 above) *and* the future developer/maintainer who must extend it. Capture the maintainer's stake in §2's **Maintainer view** block, at strategic altitude only (no leakage — this is the rule-6 coupling altitude). Two obligations, both leak-clean: (a) **reuse over parallel surfaces** — when the outcome touches a surface that already exists, say "reuses the existing X surface rather than a parallel one" (component identity allowed; technique forbidden); (b) **documented per repo conventions** — say the feature will be documented "in keeping with the repo's documentation conventions," not which file or format. These obligations propagate to execution-plan, where they become operational requirements (shared-component reuse/extraction, doc generation in the repo's documented style). Keep the block to ≤3 lines; if the feature genuinely introduces no maintainer-facing surface (a one-off backend tweak with no reusable shape and no doc the registry tracks), write `n/a — no maintainer-facing surface` and the downstream plan skips the obligation.
 
 ---
 
@@ -64,6 +65,8 @@ For each deliverable, write the user-observable description and the acceptance s
 **How a user verifies:**
 1. ...
 
+**Maintainer view (the feature's second user):** <≤3 lines at strategic altitude. (a) Reuse couplings — "reuses the existing X surface rather than a parallel one" (component identity only, no technique). (b) Documentation obligation — "documented in keeping with the repo's documentation conventions." Write `n/a — no maintainer-facing surface` if the feature introduces no reusable shape and no registry-tracked doc.>
+
 ## 3. Success signal
 <Names a thing observable from outside the system — a query, a behavior, a metric. NOT "the deliverable shipped"; deliverable-shipped is covered by §2's per-deliverable user-acceptance steps. The success signal is outcome-level: a single thing that, observed from outside, says the feature is working in aggregate. If clarify passed `success-signal: TBD`, write "TBD — open question" verbatim.>
 
@@ -86,6 +89,7 @@ For each deliverable, write the user-observable description and the acceptance s
 **Document references:**
 - Architecture: <path or "none">
 - UX/PMF: <path or "n/a — backend only">
+- UI conventions / design system / Figma: <path, URL, or "n/a — no UI surface">
 - Security policy: <path or "none">
 - Schema/ERD: <path or "n/a — no data storage">
 
@@ -115,7 +119,7 @@ Invoke the fast leakage reviewer after writing the brief, before the PM announce
 >
 > Read the brief at `<brief-path>` in full.
 >
-> **What counts as leakage (FLAG)** — a phrase in §1 (Working backwards), §2 (What the user does / sees, including the target-user line, deliverables, and acceptance steps), §3 (Success signal), §4 (Boundaries), or §5 (Decisions / HARD DECISIONs) that names any of:
+> **What counts as leakage (FLAG)** — a phrase in §1 (Working backwards), §2 (What the user does / sees, including the target-user line, deliverables, acceptance steps, and the Maintainer view block), §3 (Success signal), §4 (Boundaries), or §5 (Decisions / HARD DECISIONs) that names any of:
 > - a specific library, package, framework, or runtime;
 > - a specific file path, module path, function name, class name, or symbol;
 > - a specific algorithm or data structure;
@@ -126,6 +130,7 @@ Invoke the fast leakage reviewer after writing the brief, before the PM announce
 >
 > **Allowed (do NOT flag):**
 > - the named target user and their declared interaction surface (required content);
+> - the **Maintainer view** block's intended content — reuse couplings ("reuses the existing X surface rather than a parallel one") and the "documented per repo conventions" obligation are required, leak-clean content, NOT leakage;
 > - couplings of the form "shared with component X" or "reuses the existing X model";
 > - a phrase that IS the user-observable thing being decided (e.g., the brief is literally about adopting a specific tool as the user-facing thing);
 > - §6 (Risks & unknowns) and §7 (References & revision log) — these sections may name files/paths/agents;

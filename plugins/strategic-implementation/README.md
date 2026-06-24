@@ -6,7 +6,7 @@
 
 You write what the user should be able to do. The plugin handles everything between that sentence and merged code: clarification, planning, adversarial review, deliverable-by-deliverable execution, and a regression check at the end. You approve **one document** (the product brief). Everything else happens behind the right gates, with the right level of autonomy you choose at the start.
 
-**Version:** 4.5.0
+**Version:** 4.6.0
 **Built for:** Claude Code on Opus 4.8
 **Audience:** non-technical PMs, solo founders, anyone who can describe what good looks like
 **Requires:** the [`code-review-graph`](https://github.com/tirth8205/code-review-graph) MCP server (see [Dependencies](#dependencies))
@@ -297,6 +297,20 @@ The divergence is an **implementation-time** decision the plan never used to sur
 - **`plan-simplify`** now detects reinvention at the *capability* level (semantic, not name-grep) so inline re-implementations are caught; **`product-brief-drafter`** states the invariant as a user-observable success-signal criterion when a state has multiple producing flows.
 
 The highest-leverage move is the convergence gate: collapsing N paths to one canonical chokepoint removes the divergence seam (Gap 1) *and* the untested-sibling-path surface (Gap 2) at once. The `tests` changes are the backstop for the cases where N>1 is irreducible (e.g. URL ↔ in-memory view-state).
+
+---
+
+## Maintainer & Convention Pass — v4.6.0
+
+Every spec served exactly one user — the person using the app. But every feature has a **second user**: the developer who maintains and extends it. This pass makes that second user first-class, and closes three gaps that left maintainability to chance.
+
+- **Gap 1 — the maintainer was invisible to the spec.** The brief now carries a **Maintainer view** block (`product-brief-drafter` rule 13) at strategic, leak-clean altitude: reuse-over-parallel-surface couplings and a "documented per repo conventions" obligation. `execution-plan` turns it operational — a **shared-component creation bar** (rule 12: a leaf primitive needs ≥2 current call sites or a named near-term consumer; only a higher-scope *abstraction layer* may be scaffolded on anticipated reuse, and only when **grounded in the architecture doc**) and a **doc-generation obligation** (the `Docs to update/create` field's new `to-create:` part, bundled into the deliverable's atomic commit in the repo's existing doc style). `alignment` checks both; `plan-simplify` still rejects speculative leaf extraction.
+- **Gap 2 — plans sequenced by deliverable number, not by build logic.** `execution-plan` rule 13 adds a **sequencing rubric** on top of the dependency DAG: unblocking fixes/refactors first → audit + reuse shared components → create shared / scaffold abstraction → per-domain in logical surface order → end on the deliverable whose validation proves the brief's success signal **e2e**. Recorded as a `Sequencing rationale` in "Parallel groups & order"; `alignment` flags order that violates the rubric.
+- **Gap 3 — mockups discovered tokens but not conventions.** `ui-mockup` now runs a **convention survey** beyond tokens (convention/design-system docs, Figma via the connected MCP, and an always-on similar-surface survey via the graph that surfaces de-facto conventions *and* conflicts), renders the edit **in place** (surrounding untouched surfaces dimmed as `unchanged`, new/changed regions marked) instead of as a floating component, and **codifies** any reusable convention it resolves into a convention doc + the documentation registry — the mockup phase's contribution to the maintainer goal. `clarify` collects a `ui_conventions` doc reference so the survey starts grounded.
+
+The shared mechanism throughout is the per-repo `documentation-registry.md`: clarify registers convention docs, ui-mockup codifies into them, execution-plan reads them for both invalidation and generation, executing-plans bundles the doc work into atomic commits. Maintainability stops being a hope and becomes a reviewable artifact.
+
+**Reconciled with the execution model.** The sequencing rubric introduced a "build the shared thing first" stage that had to be squared with the existing macro-deliverable **seam-first** Workflow barrier. The reconciliation: a created shared surface lands either as a **standalone prior deliverable** (consumed beyond one cross-domain outcome) or as a **macro-deliverable seam** (serving only that one outcome's domains) — never as one of the concurrent domains, since its consumers depend on it. Rule-13 stages are partial-order barriers (not anti-parallel): within-stage and within-macro concurrency are preserved, and the only hard barrier the rubric adds is stage 3 (create shared) before stage 4 (consume it). `executing-plans` builds a seam-scoped shared surface in the contract agent and folds its doc into the single macro commit; `alignment` flags any plan that makes a shared surface a parallel domain or lets the Sequencing rationale and Workflow decision disagree.
 
 ---
 

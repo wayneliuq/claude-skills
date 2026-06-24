@@ -32,7 +32,7 @@ Ask: **"Where are you in the process for this work?"**
 Announce: "Starting clarification."
 Invoke `strategic-implementation:clarify`.
 
-Clarify collects in a single pass: assumptions, approach-changing questions, ALL document references (architecture, UX/PMF, security, schema — as applicable), and the autonomy level.
+Clarify collects in a single pass: assumptions, approach-changing questions, ALL document references (architecture, UX/PMF, UI conventions / design system / Figma, security, schema — as applicable), and the autonomy level.
 
 Store everything clarify returns. No re-asking downstream.
 
