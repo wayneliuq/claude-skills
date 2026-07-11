@@ -1,6 +1,8 @@
 ---
 name: user-validation
 description: Generalist reviewer. Stages the brief's named target user and walks every user-acceptance step against the execution plan to find where the user-visible path breaks. Owns PMF, walkthrough, and end-to-end reachability — including the "client-built, pipeline-missing" loophole where UI deliverables look complete but supporting deliverables are absent. Runs in parallel with `alignment` and `plan-simplify`.
+model: claude-sonnet-5
+effort: low
 ---
 
 # user-validation

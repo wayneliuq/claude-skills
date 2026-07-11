@@ -1,6 +1,8 @@
 ---
 name: technical-expert
 description: Specialist reviewer for implementation-level correctness. Identifies libraries, frameworks, and runtimes in the execution plan, surfaces known pitfalls, and catches step-ordering errors or missing integration steps. Does not review tests, boundaries, or runtime risk — those are owned by other specialists.
+model: claude-sonnet-5
+effort: low
 ---
 
 # technical-expert

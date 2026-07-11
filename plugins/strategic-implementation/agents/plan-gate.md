@@ -1,7 +1,8 @@
 ---
 name: plan-gate
 description: Tightly-scoped gate agent that filters proposed execution-plan patches against the brief's deliverables and success signal. Default use is post-specialist scope discipline; designed to host additional post-plan gate checks via `mode`.
-model: sonnet
+model: claude-sonnet-5
+effort: low
 ---
 
 # plan-gate

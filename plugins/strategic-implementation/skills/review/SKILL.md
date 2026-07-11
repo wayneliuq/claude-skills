@@ -1,11 +1,11 @@
 ---
 name: review
-description: Tiered review orchestrator. Runs pre-filter + three generalists (alignment, plan-simplify, user-validation) in parallel on the execution plan, then invokes specialists only on dimensions flagged by a generalist or matched by the pre-filter. Returns a consolidated patch list, block status, and alternative-path candidate.
+description: Tiered review orchestrator. Runs pre-filter + generalists (alignment, plan-simplify always; user-validation unless the plan has zero user-observable surface) in parallel on the execution plan, then invokes specialists only on dimensions flagged by a generalist or matched by the pre-filter. Returns a consolidated patch list, block status, and alternative-path candidate.
 ---
 
 # review
 
-You orchestrate the tiered review of an execution plan. Review only the dimensions that actually need it: a fixed generalist tier on every plan, plus specialists gated by a pre-filter and the generalists' flags.
+You orchestrate the tiered review of an execution plan. Review only the dimensions that actually need it: a near-fixed generalist tier (`alignment` + `plan-simplify` always; `user-validation` unless the plan has no user-observable surface), plus specialists gated by a pre-filter and the generalists' flags.
 
 You are invoked by `execution-plan` (and may be invoked directly by `post-execution` or other callers in the future).
 
@@ -21,7 +21,7 @@ You receive:
 
 ## Generalist tier composition
 
-Three generalist reviewers run in parallel on every plan. Their scopes are deliberately non-overlapping; anti-overlap rules live in each agent's prompt and are enforced by the orchestrator's dedup-with-corroboration logic in Step 5.
+Up to three generalist reviewers run in parallel. `alignment` and `plan-simplify` run on **every** plan; `user-validation` runs on every plan **except** those with zero user-observable surface (see Step 2 skip rule). Their scopes are deliberately non-overlapping; anti-overlap rules live in each agent's prompt and are enforced by the orchestrator's dedup-with-corroboration logic in Step 5.
 
 | Agent | Owns | Does NOT review |
 |---|---|---|
@@ -62,9 +62,11 @@ Record the candidate set. Specialists not in the candidate set will not run unle
 Launch in parallel:
 - `strategic-implementation:alignment`
 - `strategic-implementation:plan-simplify`
-- `strategic-implementation:user-validation`
+- `strategic-implementation:user-validation` — **conditional** (see skip rule below)
 
-Pass each:
+**`user-validation` skip rule.** `user-validation` reviews the named target user, acceptance-step walkthrough, and end-to-end user-path reachability. That has no subject when the plan has **zero user-observable surface** — pure infra / CI / build-tooling / internal-dev / docs work where no deliverable changes anything a non-developer end user perceives (e.g. `pr-build-only`, `shared-types-auto-build`, `e2e-local-gate-migration`, `docs-lifecycle-refactor`). In that case, skip `user-validation` and record the skip in `skipped_specialists` with a one-line reason. This mirrors the existing "no relevant surface → skip" rule for `frontend-engineer` in Step 3. **When in doubt, run it** — the skip is only for plans with no end-user surface at all. A feature that surfaces through an *existing* UI (backend change a user perceives) is NOT a skip; run `user-validation`. If skipped and `success-signal`/`working-backwards` later turns out to name a user outcome, that is a signal the skip was wrong — do not skip on ambiguity.
+
+Pass each generalist that runs:
 - The plan
 - The brief path (alignment AND user-validation — user-validation needs the brief for the named user, declared interaction surface, and acceptance steps)
 - Filtered learnings block (if any, tagged for the respective agent)

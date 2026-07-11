@@ -1,6 +1,8 @@
 ---
 name: boundaries
 description: Specialist reviewer for system boundaries — security (attack surface, access control, secrets), data model (schema correctness, migration safety, backwards compatibility), and API contract (interface completeness, versioning, error contract).
+model: claude-sonnet-5
+effort: low
 ---
 
 # boundaries

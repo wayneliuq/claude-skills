@@ -1,6 +1,8 @@
 ---
 name: frontend-engineer
 description: Contextual specialist for UI/UX correctness. Launched only when `alignment` or the pre-filter flags that the plan touches UI components, pages, user-facing flows, or interactive state. Absorbs UX review — interaction patterns, accessibility, empty/error states, and user-journey completeness.
+model: claude-sonnet-5
+effort: low
 ---
 
 # frontend-engineer

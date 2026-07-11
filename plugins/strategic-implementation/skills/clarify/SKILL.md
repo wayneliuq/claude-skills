@@ -13,6 +13,8 @@ The PM described something they want built. Read carefully. Do not ask for anyth
 
 **Load the documentation registry.** If `docs/strategic-implementation/documentation-registry.md` exists, load it. Use the known entries to ground the doc-references prompt in Step 3 — name the docs you already know about so the PM doesn't have to re-state them.
 
+**Refresh the code-review graph (once, up front).** Every downstream step that prefers the graph over file reads — clarify's own grounding below, `execution-plan` symbol lookups, `review`/`simplify` reuse and dead-code sweeps — is only trustworthy when the graph is current. The auto-update hook can lag or miss, so a stale graph is the main reason reviewers fall back to `Read` and burn tokens. At the start of clarify, run `mcp__code-review-graph__build_or_update_graph_tool` (incremental — fast when little changed). If it reports the graph missing/stale or the repo has drifted substantially since the last build, run a full rebuild instead. Do this once; do not re-run per query. If the graph tool is unavailable, note it and proceed with `Read`-based grounding.
+
 **Anti-framing check.** Before listing assumptions in Step 2, decide whether the request states a user-observable problem or a proposed solution. If it is only a solution (a verb-phrase like "add tabs", "switch to JWT", "rewrite the X module"), surface one alternative framing in Step 2 as an assumption to confirm — phrased as: "this looks like a solution; the underlying user need may be `<X>` — confirm or correct." Do not push back further; one alternative is enough.
 
 **Fast-skip:** if the request leaves nothing ambiguous AND mentions the doc locations already, skip to Step 4.

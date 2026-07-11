@@ -1,6 +1,8 @@
 ---
 name: plan-simplify
 description: Single-pass simplicity reviewer. Runs in parallel with `alignment` against the execution plan and looks for a shorter path to the brief's success signal and per-deliverable validation. Returns either PASS (with minor flags) or ALTERNATIVE (with a described shorter path).
+model: claude-sonnet-5
+effort: low
 ---
 
 # plan-simplify

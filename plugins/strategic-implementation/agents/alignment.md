@@ -1,6 +1,8 @@
 ---
 name: alignment
 description: Generalist reviewer. Checks the execution plan against the approved product brief, the project's architecture document, and product/UX goals. Owns the first-pass tier — flags which specialist dimensions need deeper review.
+model: claude-sonnet-5
+effort: low
 ---
 
 # alignment

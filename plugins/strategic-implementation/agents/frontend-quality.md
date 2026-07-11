@@ -1,6 +1,8 @@
 ---
 name: frontend-quality
 description: Shared frontend taste reference for strategic-implementation. Two tiers — SLIM (legibility/IA, applied to throwaway mockups) and RICH (pixel quality, applied to shipped UI). Owned in-plugin; not a separate skill. Referenced by ui-mockup (slim) and agents/frontend-engineer (rich).
+model: claude-sonnet-5
+effort: low
 ---
 
 # frontend-quality

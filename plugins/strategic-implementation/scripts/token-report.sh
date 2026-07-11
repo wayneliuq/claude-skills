@@ -150,11 +150,21 @@ if [[ ${#REPORTS[@]} -gt 0 ]]; then
   UNFILLED=0
   for r in "${REPORTS[@]}"; do
     # grep -c with no matches returns exit 1 + stdout "0"; force a clean integer.
+    # Disposition markers carry free-text annotations in practice
+    # (e.g. `<!-- pm-disposition: apply (E8 — deferred edit) -->`, or the
+    # past-tense `applied 2026-…`), so match the keyword as a PREFIX after the
+    # marker opener rather than requiring the bare `<!-- pm-disposition: X -->`.
     F=$(grep -c '^### F-' "$r" 2>/dev/null); F=${F:-0}; F=$(printf '%d' "${F//[^0-9]/}" 2>/dev/null || echo 0)
-    A=$(grep -c '<!-- pm-disposition: apply -->' "$r" 2>/dev/null); A=${A:-0}; A=$(printf '%d' "${A//[^0-9]/}" 2>/dev/null || echo 0)
-    D=$(grep -c '<!-- pm-disposition: defer -->' "$r" 2>/dev/null); D=${D:-0}; D=$(printf '%d' "${D//[^0-9]/}" 2>/dev/null || echo 0)
-    X=$(grep -c '<!-- pm-disposition: dismiss -->' "$r" 2>/dev/null); X=${X:-0}; X=$(printf '%d' "${X//[^0-9]/}" 2>/dev/null || echo 0)
-    U=$(grep -c '<!-- pm-disposition: -->' "$r" 2>/dev/null); U=${U:-0}; U=$(printf '%d' "${U//[^0-9]/}" 2>/dev/null || echo 0)
+    A=$(grep -cE '<!-- pm-disposition:[[:space:]]*appl(y|ied)' "$r" 2>/dev/null); A=${A:-0}; A=$(printf '%d' "${A//[^0-9]/}" 2>/dev/null || echo 0)
+    D=$(grep -cE '<!-- pm-disposition:[[:space:]]*defer' "$r" 2>/dev/null); D=${D:-0}; D=$(printf '%d' "${D//[^0-9]/}" 2>/dev/null || echo 0)
+    X=$(grep -cE '<!-- pm-disposition:[[:space:]]*dismiss' "$r" 2>/dev/null); X=${X:-0}; X=$(printf '%d' "${X//[^0-9]/}" 2>/dev/null || echo 0)
+    # Unfilled = an explicit EMPTY marker `<!-- pm-disposition: -->`. Counted
+    # directly (not derived as findings−filled): reports restate earlier
+    # dispositions in cumulative passes, so a derived count can exceed the
+    # finding total and go negative. NOTE: the marker convention is not
+    # machine-enforced — reports that record dispositions in prose only show
+    # 0/0/0/0 here. Treat these counts as indicative, not authoritative.
+    U=$(grep -cE '<!-- pm-disposition:[[:space:]]*-->' "$r" 2>/dev/null); U=${U:-0}; U=$(printf '%d' "${U//[^0-9]/}" 2>/dev/null || echo 0)
     TOTAL_FINDINGS=$((TOTAL_FINDINGS + F))
     APPLIED=$((APPLIED + A))
     DEFERRED=$((DEFERRED + D))

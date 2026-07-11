@@ -1,6 +1,8 @@
 ---
 name: runtime-risk
 description: Specialist reviewer for runtime behavior under load and for supply-chain risk — performance (queries, caching, blocking operations, unbounded resources) and dependencies (necessity, license, maintenance, version pinning).
+model: claude-sonnet-5
+effort: low
 ---
 
 # runtime-risk
