@@ -1,11 +1,11 @@
 ---
 name: review
-description: Tiered review orchestrator. Runs pre-filter + generalists (alignment, plan-simplify always; user-validation unless the plan has zero user-observable surface) in parallel on the execution plan, then invokes specialists only on dimensions flagged by a generalist or matched by the pre-filter. Returns a consolidated patch list, block status, and alternative-path candidate.
+description: Tiered review orchestrator. Runs pre-filter + generalists (alignment always; plan-simplify unless the plan is trivial; user-validation unless the plan has zero user-observable surface) in parallel on the execution plan, then invokes specialists only on dimensions flagged by a generalist or matched by the pre-filter. Returns a consolidated patch list, block status, and alternative-path candidate.
 ---
 
 # review
 
-You orchestrate the tiered review of an execution plan. Review only the dimensions that actually need it: a near-fixed generalist tier (`alignment` + `plan-simplify` always; `user-validation` unless the plan has no user-observable surface), plus specialists gated by a pre-filter and the generalists' flags.
+You orchestrate the tiered review of an execution plan. Review only the dimensions that actually need it: a near-fixed generalist tier (`alignment` always; `plan-simplify` unless the plan is trivial; `user-validation` unless the plan has no user-observable surface), plus specialists gated by a pre-filter and the generalists' flags.
 
 You are invoked by `execution-plan` (and may be invoked directly by `post-execution` or other callers in the future).
 
@@ -21,7 +21,7 @@ You receive:
 
 ## Generalist tier composition
 
-Up to three generalist reviewers run in parallel. `alignment` and `plan-simplify` run on **every** plan; `user-validation` runs on every plan **except** those with zero user-observable surface (see Step 2 skip rule). Their scopes are deliberately non-overlapping; anti-overlap rules live in each agent's prompt and are enforced by the orchestrator's dedup-with-corroboration logic in Step 5.
+Up to three generalist reviewers run in parallel. `alignment` runs on **every** plan; `plan-simplify` and `user-validation` are **conditional** (see the Step 2 skip rules — telemetry shows both are the lowest-ROI generalists, so they run only where they have a subject). Their scopes are deliberately non-overlapping; anti-overlap rules live in each agent's prompt and are enforced by the orchestrator's dedup-with-corroboration logic in Step 5.
 
 | Agent | Owns | Does NOT review |
 |---|---|---|
@@ -39,7 +39,7 @@ Scan the plan for trigger tokens. Determine which specialists are candidates:
 
 | Specialist | Trigger tokens (case-insensitive, any match) |
 |---|---|
-| `boundaries` | auth, permission, role, endpoint, route, schema, migration, column, index, secret, credential, token, api, webhook, pii |
+| `boundaries` | auth, permission, role, server/API endpoint, server/API route, schema, migration, column, index, secret, credential, access token / auth token (**not** a UI design/style token), api, webhook, pii. Match the data-model/API/security *sense* — bare `route`/`token` on a purely frontend plan (client routes, design tokens) is **not** a trigger. |
 | `runtime-risk` | cache, queue, batch, retry, cron, worker, hot path, throughput, latency, stream, poll, install, dependency, package, license, **any non-empty `Library lifecycle audit` section, or any deliverable with `Integration-risk class: a`** |
 | `tests` | (always a candidate — validation method adequacy is reviewed every run) |
 | `frontend-engineer` | component, page, route (if frontend framework present), modal, form, button, screen, view, css, style |
@@ -60,9 +60,11 @@ Record the candidate set. Specialists not in the candidate set will not run unle
 ## Step 2 — Generalist tier (parallel)
 
 Launch in parallel:
-- `strategic-implementation:alignment`
-- `strategic-implementation:plan-simplify`
+- `strategic-implementation:alignment` — always
+- `strategic-implementation:plan-simplify` — **conditional** (see skip rule below)
 - `strategic-implementation:user-validation` — **conditional** (see skip rule below)
+
+**`plan-simplify` skip rule.** `plan-simplify` looks for a shorter path from the brief's success signal to the plan — it earns its ~62k-token cost only when there is real path-space to shorten. Skip it on **trivial plans**: a single deliverable, or a purely mechanical change (config-only, doc-only, a rename, a one-file edit, a version bump) where no meaningfully shorter route exists. On multi-deliverable or architecturally non-trivial plans, run it. Record the skip in `skipped_specialists` with a one-line reason. **When in doubt, run it.**
 
 **`user-validation` skip rule.** `user-validation` reviews the named target user, acceptance-step walkthrough, and end-to-end user-path reachability. That has no subject when the plan has **zero user-observable surface** — pure infra / CI / build-tooling / internal-dev / docs work where no deliverable changes anything a non-developer end user perceives (e.g. `pr-build-only`, `shared-types-auto-build`, `e2e-local-gate-migration`, `docs-lifecycle-refactor`). In that case, skip `user-validation` and record the skip in `skipped_specialists` with a one-line reason. This mirrors the existing "no relevant surface → skip" rule for `frontend-engineer` in Step 3. **When in doubt, run it** — the skip is only for plans with no end-user surface at all. A feature that surfaces through an *existing* UI (backend change a user perceives) is NOT a skip; run `user-validation`. If skipped and `success-signal`/`working-backwards` later turns out to name a user outcome, that is a signal the skip was wrong — do not skip on ambiguity.
 
@@ -72,7 +74,7 @@ Pass each generalist that runs:
 - Filtered learnings block (if any, tagged for the respective agent)
 - `max_tokens: 1500` hint in prompt ("Cap output at ~1500 tokens.")
 
-Wait for all three.
+Wait for all generalists that ran.
 
 ---
 
@@ -86,7 +88,13 @@ Union of:
 `tests` is always included.
 `frontend-engineer` is included only if the pre-filter matched OR `alignment` flagged UI/UX OR `user-validation` named it.
 
-If a specialist is in the union but there is clearly no relevant surface (e.g. `frontend-engineer` with zero UI deliverables), skip it and log the skip in the synthesis output.
+If a specialist is in the union but there is clearly no relevant surface, skip it and log the skip in the synthesis output. This applies even when a specialist was added by the drafter hint — the hint can add, but a no-surface skip still removes. Concrete no-surface tests (telemetry shows `boundaries` and `technical-expert` are the highest-overlap specialists, so gate them to their real domains):
+
+- **`frontend-engineer`** — zero UI deliverables.
+- **`boundaries`** — no deliverable touches the data model, an API/interface contract, auth, secrets, or external inputs. A purely frontend/presentation plan (client routing, styling, design tokens, in-component state) is a skip.
+- **`technical-expert`** — no new library, runtime, or external integration, and no step-ordering/integration risk. It reviews implementation-level correctness of *new tech surfaces*; on a plan that only recombines existing, already-vetted libraries it is a skip.
+
+Do not skip on ambiguity — when a plan plausibly touches the specialist's domain, run it.
 
 ---
 
