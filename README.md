@@ -6,8 +6,14 @@ Personal Claude Code plugins for my development workflow.
 
 | Plugin | Description |
 |---|---|
-| [`strategic-implementation`](./plugins/strategic-implementation/) | Full planning-to-execution workflow: clarify → architecture → implementation guide → session plan → execute |
+| [`first-principles`](./plugins/first-principles/) | Coding discipline as six independent gates — scope, build, done, bug, ship, watch — over five first principles and a security spine. Not a workflow: each gate answers one question with evidence and admits its gaps |
 | [`crispr-primer-design`](./plugins/crispr-primer-design/) | Design and genome-verify PCR + nested Sanger primers to validate CRISPR-Cas9 cutting at a gRNA locus (ICE / TIDE / amplicon-NGS) |
+
+### Retired
+
+| Plugin | Why |
+|---|---|
+| `strategic-implementation` | Imposed a linear pipeline (clarify → brief → architecture → plan → execute). As models got stronger the march stopped paying for itself — a model optimizing for the artifact a stage demands is not optimizing for the code being right. Replaced by [`first-principles`](./plugins/first-principles/), which constrains outcomes instead of process. Still in git history; the six durable pieces were carried forward |
 
 ## Using this as a Claude Code marketplace
 
@@ -20,7 +26,7 @@ claude plugin marketplace add https://github.com/wayneliuq/claude-skills.git
 Then install any plugin from it:
 
 ```bash
-claude plugin install strategic-implementation@wayneliuq
+claude plugin install first-principles@wayneliuq
 ```
 
 To get updates after new plugins or changes are pushed:

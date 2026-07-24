@@ -4,15 +4,15 @@
     "name": "wayneliuq"
   },
   "metadata": {
-    "description": "Personal Claude Code plugins for strategic planning and execution workflows",
+    "description": "Personal Claude Code plugins: first-principles coding gates and lab-workflow tools",
     "homepage": "https://github.com/wayneliuq/claude-skills"
   },
   "plugins": [
     {
-      "name": "strategic-implementation",
-      "version": "4.2.1",
-      "source": "./plugins/strategic-implementation",
-      "description": "PM-oriented planning-to-execution workflow: clarify → product brief → plan-mode execution plan → tiered review → deliverable-gated execution"
+      "name": "first-principles",
+      "version": "1.0.0",
+      "source": "./plugins/first-principles",
+      "description": "Coding discipline as six independent outcome-based gates rather than a workflow: scope-gate, build-gate, done-gate, bug-gate (14-shape bug catalog), ship-gate, watch-gate \u2014 over a shared canon of five first principles and a six-rule security spine. Each gate produces a verdict with evidence and admits gaps explicitly."
     },
     {
       "name": "crispr-primer-design",

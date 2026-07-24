@@ -1,0 +1,9 @@
+{
+  "name": "first-principles",
+  "version": "1.0.0",
+  "description": "Coding discipline as six independent gates rather than a workflow, over a shared canon: verified beats assumed; one state, one owner; fix the class not the instance; change exactly what was asked; reversibility decides who acts — plus a six-rule security spine. scope-gate agrees on observable done before code. build-gate holds edit discipline and the producer/consumer audit. done-gate runs five verification layers including an adversarial pass and a reachability trace. bug-gate debugs and audits against a named bug-shape catalog. ship-gate handles secrets, config risk, and human-gated irreversibles. watch-gate asks whether a failure would ever be noticed. Each gate produces a verdict with evidence and admits its gaps.",
+  "author": {
+    "name": "wayneliuq"
+  },
+  "repository": "https://github.com/wayneliuq/claude-skills"
+}
