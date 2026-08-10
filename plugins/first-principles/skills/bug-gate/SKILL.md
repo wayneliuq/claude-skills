@@ -1,6 +1,6 @@
 ---
 name: bug-gate
-description: Find what is actually wrong — in a reported bug, a failing test, or existing code being audited. Runs a fourteen-shape bug catalog as a hypothesis generator instead of reading hopefully, requires a deterministic repro before theorizing, checks first whether the real defect is in the spec rather than the code, and always widens a fix to the whole class before it lands. Use when debugging, when a test fails or flakes, when reviewing existing or unfamiliar code for defects, or when asked whether code is correct.
+description: Find what is actually wrong — in a reported bug, a failing test, or existing code being audited. Runs a fourteen-shape bug catalog as a hypothesis generator instead of reading hopefully, requires a deterministic repro before theorizing, tiers audit findings as proven / traced / suspected so a pattern-match is never fixed as though it were proven, checks first whether the real defect is in the spec rather than the code, and always widens a fix to the whole class before it lands. Use when debugging, when a test fails or flakes, when reviewing existing or unfamiliar code for defects, or when asked whether code is correct.
 ---
 
 # bug-gate
@@ -18,14 +18,12 @@ checks. Read it before hypothesizing.
 
 ## 0. Is the defect in the spec?
 
-Do this **before** building a repro. It costs one read and saves hours.
-
-Scan the last several messages from whoever reported this. **If they have restated
-the same point more than once, suspect the specification, not the code.** Someone
-re-explaining themselves is telling you the understanding is broken, not the code.
-
-If triggered: stop. Restate your understanding of the desired behavior in one
-sentence, get it confirmed, and only then decide whether there is a bug at all.
+Do this **before** building a repro; it costs one read and saves hours. Scan the last
+several messages from whoever reported this. **If they have restated the same point
+more than once, suspect the specification, not the code** — someone re-explaining
+themselves is telling you the understanding is broken. If triggered: stop, restate the
+desired behavior in one sentence, get it confirmed, and only then decide whether there
+is a bug at all.
 
 ## Debug mode
 
@@ -88,7 +86,11 @@ all of it later is one search rather than an archaeology exercise.
 
 ## Audit mode
 
-No symptom; you are looking for what is wrong in code that appears to work.
+No symptom; you are looking for what is wrong in code that appears to work. The
+question an audit can actually answer is "does this resemble a bug," and correct code
+resembles one constantly — so **"nothing actionable" is a finding here.** An audit
+that manufactures a defect to justify the effort is worse than an empty one, because
+the fix that follows breaks working code.
 
 1. Establish what the code is *supposed* to do, from the code's consumers rather
    than its comments.
@@ -101,15 +103,47 @@ No symptom; you are looking for what is wrong in code that appears to work.
 5. Sample the tests for vacuity — shape 6. Coverage percentage tells you nothing
    about this.
 
+### Tier every finding
+
+Debug mode has a falsifiability bar — the repro. Audit mode has none, so it supplies
+its own. No finding is actionable at the tier it was *written*; it is actionable at
+the tier a second party can **re-derive from the code, not from the report.** The tier
+is how confidence survives being handed on — unlabelled, a 40%-sure hunch reads
+downstream as "Bug: X" and gets fixed as a premise.
+
+| Tier | Evidence | May be fixed |
+|---|---|---|
+| **Proven** | a deterministic repro, or a test that fails on current code | yes |
+| **Traced** | no repro — a specific path, `file:line`, and a named reachable condition | only after the fixer re-derives the trace itself |
+| **Suspected** | pattern match only | never in this pass — it goes on a list a human dispositions |
+
+The *Suspected* list will hold real bugs, unfixed. That is the accepted cost — by
+principle 4, an unfixed suspicion is cheaper than a broken correctness argument.
+Keep the list **visible**; a silent one becomes a fix by attrition.
+
+**Anchor what is known correct.** Where code is correct by argument rather than by
+obvious construction, encode the property as an invariant test and mark the
+definition site: `CORRECTNESS: <property> — proven in <test|doc>`. A later finding
+that contradicts it must refute that proof **by name**. This is what turns shape 12
+from an exposure into a defence.
+
+**A second round with no new symptom is a stop, not a step.** Code entering another
+audit→fix cycle with no externally reported symptom in between is being changed by
+the audit rather than by evidence, and each patch adds surface for the next round to
+find. Escalate instead, and diff against the last human-approved revision — never
+against the previous round.
+
 ## Reviewing someone's proposed fix
 
 - **Verify the claim against the codebase.** Does the described bug actually exist?
-  Trace the code path; do not take the description on faith.
+  Trace the code path; do not take the description on faith. If it does not exist,
+  the finding is **refuted** — that is the result, not the absence of one.
 - **A wrong premise beats bad code.** A change resting on an incorrect model of how
   the system works is a worse problem than a change with ugly code, and it is much
   harder to see. Check the premise first.
 - **Verify the test against unfixed code.** It must fail on the buggy version, for
-  the right reason.
+  the right reason. A test that cannot be made to fail refutes the finding; it does
+  not need adjusting until it fails.
 - **Reject model-compensation changes** — open-ended repair layers, retries, or
   normalizers that exist to absorb an upstream component's misbehavior. They mask
   non-compliance and become permanent. Surface the root failure instead.
@@ -132,6 +166,7 @@ If a sibling genuinely cannot be fixed here, name it explicitly as remaining wor
 Spec check:   clear | AMBIGUITY SUSPECTED — <evidence>
 Repro:        <deterministic steps> | NOT REPRODUCIBLE — <what was tried>
 Root cause:   <one sentence>  [determinate | assumption-based: <assumptions>]
+Findings:     <n> proven, <n> traced, <n> suspected (listed, unfixed), <n> refuted
 Class sweep:  <n> sibling sites found — <n> fixed, <n> remaining (<why>)
 Regression test: <verified failing on unfixed code for the right reason>
 ```

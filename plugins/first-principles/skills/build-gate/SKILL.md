@@ -1,6 +1,6 @@
 ---
 name: build-gate
-description: Discipline for code being written right now — surgical edits, tracing one authoritative value end-to-end, checking every consumer before changing a producer, proving resources release on every exit path, refusing coexisting patterns, and matching existing conventions. Use while implementing a change, when about to modify a shared helper or a data shape, when a change is starting to sprawl beyond its stated scope, or when deciding whether a new abstraction or shared component is justified.
+description: Discipline for code being written right now — falsifying a handed-down finding before implementing it, surgical edits, tracing one authoritative value end-to-end, checking every consumer before changing a producer, proving resources release on every exit path, refusing coexisting patterns, and matching existing conventions. Use while implementing a change, when about to modify a shared helper or a data shape, when a change is starting to sprawl beyond its stated scope, or when deciding whether a new abstraction or shared component is justified.
 ---
 
 # build-gate
@@ -12,6 +12,23 @@ Canon: `../principles/SKILL.md` — principles 2 (one state, one owner), 3 (fix 
 class), and 4 (change exactly what was asked).
 
 ---
+
+## 0. Falsify before you fix
+
+When the work in front of you is *someone else's finding* — an audit item, a review
+comment, a reported bug you did not reproduce yourself — your first action is not the
+fix. It is the test that fails on the code as it stands, for the reason the finding
+names.
+
+**If that test passes, the finding is refuted. Stop and report it refuted.** Do not
+tune the test until it fails, and do not implement the fix anyway on the grounds that
+it looks harmless. A finding you cannot make fail is a resemblance, not a defect, and
+changing correct code to satisfy it is the more expensive of the two available errors
+(principle 4).
+
+Where the finding is *traced* rather than *proven* (`../bug-gate/SKILL.md`), re-derive
+the trace from the code yourself before writing anything, and where it is merely
+*suspected*, do not implement it at all. A report is not evidence of its own claim.
 
 ## Edit discipline
 
@@ -93,9 +110,9 @@ Do not write all the tests first and then all the implementation — that produc
 a suite shaped like your plan rather than like the behavior, and it hides the
 moment where an assumption breaks.
 
-The test must fail on the unfixed code, **for the right reason**. A test that
-passes before your change protects nothing. Check this explicitly; it is the
-single cheapest way to catch a test that does not test what you think.
+The test must fail on the unfixed code, **for the right reason** — §0 applied to your
+own work as well as to someone else's finding. A test that passes before your change
+protects nothing.
 
 ## UI work
 
@@ -112,6 +129,7 @@ Findings with evidence, not reassurance. Report only what forces disclosure:
 
 ```
 Consumers:  <n> found — <n> updated, <n> unaffected (<why>), <n> skipped (<why>)
+Refuted:    <findings that could not be made to fail — not implemented, with the test>
 Out-of-scope noticed: <list, unfixed>
 Deliberate shortcuts: <what, its limit, upgrade path>
 ```

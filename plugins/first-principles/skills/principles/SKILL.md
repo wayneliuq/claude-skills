@@ -57,6 +57,10 @@ Scope creep is the largest source of self-inflicted regressions.
   no refactors nobody asked for, unless explicitly requested.
 - Build no speculative features. Not the logical extension, not the obvious
   next step, not the flag someone will probably want.
+- **Changing correct code is a worse outcome than leaving a suspected defect
+  unfixed.** The two errors are not symmetric, so a coin-flip finding does not
+  license a change. Code that merely *resembles* a bug has not been shown to be
+  one; record the suspicion and leave the code alone. When uncertain, refuse.
 - Match the conventions already in the codebase over personal taste, even where
   you would write it differently.
 - Do not write code that does not need to exist. Work down the rungs: does this

@@ -10,9 +10,9 @@
   "plugins": [
     {
       "name": "first-principles",
-      "version": "1.0.0",
+      "version": "1.1.0",
       "source": "./plugins/first-principles",
-      "description": "Coding discipline as six independent outcome-based gates rather than a workflow: scope-gate, build-gate, done-gate, bug-gate (14-shape bug catalog), ship-gate, watch-gate \u2014 over a shared canon of five first principles and a six-rule security spine. Each gate produces a verdict with evidence and admits gaps explicitly."
+      "description": "Coding discipline as six independent outcome-based gates rather than a workflow: scope-gate, build-gate, done-gate, bug-gate (14-shape bug catalog, findings tiered proven / traced / suspected), ship-gate, watch-gate \u2014 plus adversarial-delegation for running a gate over a worker you review rather than trust, over a shared canon of five first principles and a six-rule security spine. Each gate produces a verdict with evidence and admits gaps explicitly."
     },
     {
       "name": "crispr-primer-design",

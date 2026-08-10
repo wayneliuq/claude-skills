@@ -1,6 +1,6 @@
 ---
 name: done-gate
-description: The five-layer verification a change must survive before anyone says it is done — full test suite, independent review, an adversarial second pass, verification against the real running thing, and a fresh re-run immediately before merge. Also judges test quality: rejects vacuous tests, change-detector tests, source-shape assertions, and tests that pass on unfixed code. Use before declaring work complete, before merging, or whenever a claim of "done" or "tests pass" needs to be trusted.
+description: "The five-layer verification a change must survive before anyone says it is done — full test suite, independent review, an adversarial second pass, verification against the real running thing, and a fresh re-run immediately before merge. Also judges test quality: rejects vacuous tests, change-detector tests, source-shape assertions, and tests that pass on unfixed code. Use before declaring work complete, before merging, or whenever a claim of 'done' or 'tests pass' needs to be trusted."
 ---
 
 # done-gate
@@ -16,6 +16,11 @@ works. Layers 3 and 4 exist because layers 1 and 2 systematically miss.
 
 Run the layers in order. A failure at any layer stops the gate — do not proceed
 to the next and do not average the results.
+
+**No layer closes on generated text.** A layer passes when something was *executed* —
+a suite run, a flow driven, an artifact opened and looked at. A second model agreeing
+with the first is not a verification event, and two models agreeing that a defect
+exists is not evidence that it does.
 
 ---
 
@@ -43,7 +48,15 @@ A **second, differently-tuned** pass whose job is to find what the first pass wa
 constitutionally unable to see. Not a repeat with more effort — a different
 posture: assume the change is wrong and look for the reason.
 
-Where the two passes disagree on the same finding, **the stricter verdict wins.**
+Where the two passes disagree on the same finding, the *kind* of dispute decides the
+tiebreak:
+
+- **Adequacy** — is this tested enough, is this case handled, is this name clear:
+  **the stricter verdict wins.**
+- **Existence** — is this a defect at all: **the side holding evidence wins**, and
+  where neither side has evidence, **null wins and nothing changes.** "Stricter" on
+  an existence dispute means accepting the accusation, which is the mechanism by
+  which a review turns correct code into incorrect code.
 
 Cheap and effective in practice: a fresh reviewer with no knowledge of the
 reasoning, prompted to refute rather than to confirm.
@@ -92,7 +105,8 @@ A test is an asset only if it would catch the thing going wrong. Reject these:
   mocks that integration verifies nothing. Flag it explicitly rather than counting
   it as coverage.
 - **Not verified against unfixed code** — the fix's test must fail on the buggy
-  version, for the right reason.
+  version, for the right reason. A test that cannot be made to fail means the finding
+  was refuted, not fixed (`../build-gate/SKILL.md` §0).
 
 And know which tests are load-bearing. A test named after a function, asserting
 only on its return shape with synthetic inputs, is scaffolding. A test that walks
@@ -111,6 +125,7 @@ reading that diff will see it.
 Failed layer:  <which, or none>
 Reachability:  traced <entry point> → <new code> | NOT REACHABLE
 Verified:      <what, and how>
+Refuted:       <findings that did not survive falsification — none is an answer>
 Assumed:       <list>          ← anything here means not done
 Gaps:          <admitted, explicitly>
 ```
