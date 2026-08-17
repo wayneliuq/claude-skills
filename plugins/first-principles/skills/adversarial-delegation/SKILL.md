@@ -50,11 +50,30 @@ is simpler to think about is how you either overpay for a rename or under-resour
 ### Invocation that actually works (`cursor-agent`)
 
 ```bash
-cursor-agent -p --force --model cursor-grok-4.5-high --output-format text "<prompt>"
+cursor-agent -p --force --model cursor-grok-4.6-medium --output-format text "<prompt>"
 ```
 
 Run through `zsh -l -c "..."` (node is only on PATH in a login shell) and background it for
 anything non-trivial.
+
+**Default: the newest grok generation at medium effort, never a `-fast` id.** As of 2026-08-16
+that is `cursor-grok-4.6-medium`. The version in that id **will** go stale — this line said
+`4.5-high` for weeks after 4.6 shipped — so treat the *rule* as the instruction and the id as
+today's answer to it:
+
+```bash
+cursor-agent --list-models | grep grok      # newest generation wins; take its non-fast medium
+```
+
+Two things that make this less mechanical than it looks:
+
+- **Not every generation exposes every tier.** 4.5 only ever published `-high` and
+  `-high-fast`; 4.6 publishes low/medium/high/xhigh. If the newest generation has no `medium`,
+  take the lowest non-`fast` tier at or above it rather than dropping back a generation.
+- **Never a `-fast` id.** `cursor-grok-4.6-medium-fast` exists and is the wrong choice for
+  correctness work. A cheap fast model's failure mode is *plausible and wrong*, which costs more
+  to review than it would have cost to have the work done properly the first time. Fast ids are
+  for throughput on mechanical edits, and delegation-under-review is not that.
 
 **`--force` is load-bearing and its absence is silent.** `--trust` trusts the *workspace*;
 with `--trust` alone every shell call is rejected, so the worker writes files but cannot run a
@@ -64,12 +83,14 @@ single test — and you will not notice except that it never mentions running an
 Verify once per environment rather than assuming, with something it cannot guess:
 
 ```bash
-cursor-agent -p --force --model cursor-grok-4.5-high --output-format text \
+cursor-agent -p --force --model cursor-grok-4.6-medium --output-format text \
   "Run: git rev-parse --short HEAD. Report the exact stdout. If you cannot run shell commands, reply SHELL_BLOCKED."
 ```
 
-Models: `cursor-grok-4.5-{low,medium,high}` (the bare alias `grok` is invalid);
-`claude-opus-4-8-medium`. `cursor-agent --list-models` enumerates. Other flags that matter:
+Models: `cursor-grok-4.6-{low,medium,high,xhigh}` (the bare alias `grok` is invalid, and so is a
+generation that no longer publishes the tier you asked for — an unknown id fails fast, which is
+why the probe above is worth its one call); `claude-opus-5-medium`.
+`cursor-agent --list-models` enumerates. Other flags that matter:
 `--sandbox <mode>`, `--approve-mcps`, `--mode plan` (read-only).
 
 ACP is a *different* transport, for editor/client integrations that answer
@@ -271,12 +292,56 @@ concurring that a defect exists is not evidence that it does.
 
 Know this before you plan, or you will brief work that cannot be done:
 
-- **No browser.** Driving a real app, an authenticated session, or a fixture harvest is yours.
-  Split such tasks: worker does code, you do the interaction, one commit at the end.
 - **Green tests are not a working feature.** Reachability — is the new code called from a real
   user path? — is `done-gate` Layer 4 and it needs the actual product. In this session the
   single worst defect of the day was found only by driving the app, after two independent code
   audits had passed clean.
+
+### The browser is a delegation, not a limit
+
+**Corrected 2026-08-17. This section used to say "no browser — that is yours." That was wrong in
+the case that matters most.** When *you* cannot drive a browser — an unattended or scheduled run
+is refused outright: *"Dev servers can't be started from unattended sessions"* — the restriction
+is on your harness, not on your worker. A `cursor-agent` worker has a real shell and can start a
+dev server, run Playwright and report what it saw. So a visual question is not unanswerable; it
+is **delegable**. Verified working: a low-effort worker logged into a local stack, drove the app,
+selected a node and returned DOM measurements plus a screenshot that settled a question two
+prior runs had returned to the queue as unworkable.
+
+Use a **low** effort tier for observation. Reading a rect, a computed style and a scene graph is
+not a reasoning task, and the cost difference is real if you do it every run.
+
+An observation worker gets its **own worktree** — its collision set with code streams is empty,
+so it runs in parallel and costs no wall-clock.
+
+Six things belong in every browser brief, each because omitting one cost a cycle:
+
+1. **Build the workspace's shared type packages in that worktree first.** A dev server that
+   cannot resolve a workspace package 500s on module requests and never mounts the app — which
+   looks exactly like a failed login and sends the worker off diagnosing auth.
+2. **Pin the port and the hostname**, and say why. If the backend's CORS allows one origin, any
+   other port *or* the loopback IP fails every API call, and the symptom is indistinguishable
+   from broken credentials.
+3. **The page must authenticate itself** if the credential is an HttpOnly cookie — a shell-side
+   `curl` login puts the cookie in curl's jar and leaves the browser anonymous.
+4. **State the minimum viewport.** Responsive shells that replace the app below a breakpoint
+   present as "the app did not load".
+5. **Demand a machine-readable artifact** — a JSON report and a screenshot at paths you name.
+   Read those yourself. The prose summary is the least reliable part of what comes back; the
+   JSON is what you can quote.
+6. **Ask for the falsifier, not a verdict.** "Report every conjunct's value", "report width and
+   height", "if the chart object is absent, say so". A mounted element with zero height is a
+   third answer that neither side of a disagreement predicts, and only a brief that asks for
+   numbers will surface it.
+
+**Two things this still does not buy.** A worker can establish that a surface mounted, is sized
+and is visible; it cannot tell you whether a colour is *right* — that is taste, and taste stays
+with the human. And a surface showing its empty state proves the surface, not the drawn content.
+Report which of the two you actually got, because they are easy to conflate and only one of them
+discharges Layer 4.
+
+**Never let credentials into a brief, a report, or a file the worker leaves behind.** Point at a
+path, require it be read programmatically, and require the copy be deleted.
 
 ## 9. Progress
 
