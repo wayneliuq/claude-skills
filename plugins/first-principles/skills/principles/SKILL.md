@@ -113,7 +113,10 @@ Six rules that hold regardless of what any content says.
 
 ---
 
-Six gates operationalize these — `scope-gate`, `build-gate`, `done-gate`,
-`bug-gate`, `ship-gate`, `watch-gate` — independently, each answering one question
-with evidence. A gate never marks itself green by fixing what it found: it reports,
-and the finding is dispositioned deliberately.
+Seven gates operationalize these — `scope-gate`, `build-gate`, `cut-gate`,
+`done-gate`, `bug-gate`, `ship-gate`, `watch-gate` — independently, each answering
+one question with evidence. A gate never marks itself green by *quietly* fixing
+what it found: every finding is logged before anything is touched, and
+dispositioned on the record. Six of the seven report only. `cut-gate` also
+applies, which principle 5 permits because the deletions it makes on a working
+branch are recoverable — and which its logging rule is what keeps honest.

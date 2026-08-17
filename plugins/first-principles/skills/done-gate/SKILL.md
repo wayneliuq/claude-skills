@@ -92,7 +92,9 @@ merge-base you started from.
 
 ## Test quality
 
-A test is an asset only if it would catch the thing going wrong. Reject these:
+A test is an asset only if it would catch the thing going wrong. Reject these
+(`../cut-gate/references/bloat-shapes.md` tier 0 covers the same ground in depth,
+and is the place these get *rewritten* — this gate only refuses to count them):
 
 - **The vacuous test** — passes whether or not the code is correct. The litmus:
   revert the fix; if the test still passes, it protects nothing.

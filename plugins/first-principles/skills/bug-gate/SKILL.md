@@ -1,6 +1,6 @@
 ---
 name: bug-gate
-description: Find what is actually wrong — in a reported bug, a failing test, or existing code being audited. Runs a fourteen-shape bug catalog as a hypothesis generator instead of reading hopefully, requires a deterministic repro before theorizing, tiers audit findings as proven / traced / suspected so a pattern-match is never fixed as though it were proven, checks first whether the real defect is in the spec rather than the code, and always widens a fix to the whole class before it lands. Use when debugging, when a test fails or flakes, when reviewing existing or unfamiliar code for defects, or when asked whether code is correct.
+description: Find what is actually wrong — in a reported bug, a failing test, or existing code being audited. Runs a eighteen-shape bug catalog as a hypothesis generator instead of reading hopefully, requires a deterministic repro before theorizing, tiers audit findings as proven / traced / suspected so a pattern-match is never fixed as though it were proven, checks first whether the real defect is in the spec rather than the code, and always widens a fix to the whole class before it lands. Use when debugging, when a test fails or flakes, when reviewing existing or unfamiliar code for defects, or when asked whether code is correct.
 ---
 
 # bug-gate
@@ -11,7 +11,7 @@ open-ended searching, because open-ended searching finds what you expected to fi
 
 Canon: `../principles/SKILL.md` — principles 1 (verified beats assumed) and 3 (fix
 the class).
-Catalog: `references/bug-shapes.md` — fourteen shapes with symptoms and cheap
+Catalog: `references/bug-shapes.md` — eighteen shapes with symptoms and cheap
 checks. Read it before hypothesizing.
 
 ---

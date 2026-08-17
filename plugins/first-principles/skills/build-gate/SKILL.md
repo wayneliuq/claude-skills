@@ -43,6 +43,11 @@ the trace from the code yourself before writing anything, and where it is merely
   would not do, do it their way.
 - When you notice a real problem outside scope, note it and keep going. Say it at
   the end; do not fix it silently.
+- **Every guard you add must name the producer state that makes it reachable.**
+  If you cannot name one, you are not being careful — you are recording a question
+  you declined to answer, and the next reader inherits it as a fact about the
+  domain. Read the producer instead. This rule prevents more than any later pass
+  removes (`../cut-gate/SKILL.md`).
 
 ## Trace one authoritative value end-to-end
 
@@ -77,6 +82,11 @@ siblings.
 - Two implementations of the same behavior must not both be live. If the new one
   is landing, the old one goes in the same change, or is explicitly disabled with
   a note. "Both for now" is how coexistence bugs are born.
+- **Watch for the conditional form of "both for now."** Wrapping the old path in a
+  branch or fallback so it stays reachable is not a replacement — it is a
+  migration that looks finished and is not. Tests pass, because the new path is
+  the one they take. If the old arm is landing, name the input that selects it;
+  if none exists, it goes in this change.
 - When two patterns in the codebase genuinely conflict, pick one for this change
   and **flag the other for cleanup**. Do not blend them into a third.
 - Track when a value can go stale, and who is responsible for noticing.

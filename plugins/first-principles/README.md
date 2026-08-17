@@ -6,6 +6,10 @@ A gate answers one question, produces a verdict with evidence, and gets out of t
 way. What the gates constrain is **what must be true before you may call something
 done** — never how to get there.
 
+One gate, `cut-gate`, also *acts*: it deletes rather than only reporting. Principle
+5 permits that, because deletions on a working branch are recoverable — and it logs
+every finding before touching anything, so acting never conceals what it found.
+
 ## The five principles
 
 Every rule in every gate is a consequence of one of these. They live in
@@ -34,6 +38,7 @@ suspected vulnerabilities route privately.
 | [`principles`](skills/principles/) | reference | What are the invariants? |
 | [`scope-gate`](skills/scope-gate/) | before code | Do we agree what this is and how we'll know it worked? |
 | [`build-gate`](skills/build-gate/) | while coding | Is this change disciplined and complete in its own terms? |
+| [`cut-gate`](skills/cut-gate/) | after it works | Is this the smallest change that works, and does the code tell the truth about itself? |
 | [`done-gate`](skills/done-gate/) | before "done" | Is it actually correct, verified against the real thing? |
 | [`bug-gate`](skills/bug-gate/) | debug / audit | What is wrong here, and where are its siblings? |
 | [`ship-gate`](skills/ship-gate/) | before it leaves | Safe to release, honestly described — and is this mine to press? |
@@ -42,11 +47,19 @@ suspected vulnerabilities route privately.
 The gates are independent — none requires any other. Skip any of them when the work
 is trivially small.
 
-`bug-gate` carries the plugin's densest asset:
-[`references/bug-shapes.md`](skills/bug-gate/references/bug-shapes.md), a catalog of
-named bug shapes each paired with the symptom it wears and the cheap check that
-clears it. It works as a hypothesis generator, because open-ended searching finds
+Two gates carry catalogs, and they are the plugin's densest assets:
+[`bug-shapes.md`](skills/bug-gate/references/bug-shapes.md) (18 shapes) and
+[`bloat-shapes.md`](skills/cut-gate/references/bloat-shapes.md) (47 shapes). Each
+entry pairs a named shape with the symptom it wears and the cheap check that
+clears it. Both work as hypothesis generators, because open-ended searching finds
 what you already expected to find.
+
+They divide cleanly: bug-shapes is *what is wrong*, bloat-shapes is *what is
+unnecessary*. A bloat finding that turns out to be reachable and mishandled
+elsewhere stops being bloat and routes to `bug-gate`. `bloat-shapes.md` is tiered
+by blast radius, on the finding that some shapes — a suite that mocks its own
+subject, a `catch` that returns success — destroy the oracle every other check
+depends on, and so have to be cleared first.
 
 ## Telemetry
 

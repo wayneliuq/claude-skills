@@ -1,9 +1,14 @@
 # The bug-shape catalog
 
-Fourteen recurring shapes. Use as a hypothesis generator: for the symptom in
+Eighteen recurring shapes. Use as a hypothesis generator: for the symptom in
 front of you, ask which shapes could produce it, then rule them out cheaply
 before opening an investigation. Each entry gives the shape, the symptom it
 usually wears, and the cheap check that confirms or clears it.
+
+For code that is *unnecessary* rather than *wrong*, the companion catalog is
+[`../../cut-gate/references/bloat-shapes.md`](../../cut-gate/references/bloat-shapes.md).
+Shapes 15–18 below arrive most often from that direction: they are found while
+simplifying, and they are defects rather than excess.
 
 ---
 
@@ -140,3 +145,49 @@ cannot fix this and will burn hours proving the code correct.
 - **Check:** scan the last several messages from the requester. If they have
   restated the same point more than once, suspect the specification. Stop, restate
   your understanding in one sentence, and get it confirmed before writing a repro.
+
+## 15. Released only on the success path
+
+A resource is acquired and released by a statement placed after the last use
+rather than in a `finally` or equivalent. Any throw between the two leaks it.
+Reads as correct in the happy path, which is the path anyone reviewing it follows.
+
+- **Wears:** pool or handle exhaustion under load; degradation that clears on
+  restart; a leak that appears only once errors start happening.
+- **Check:** for each acquire, ask whether the release is reached on **all four**
+  exit paths — success, error, cancellation, teardown. Cancellation is the one
+  that gets forgotten; teardown is the one that leaks in tests.
+
+## 16. Validation ordered after the effect it gates
+
+The check is written correctly and called at the wrong point in time — data is
+persisted, sent, or committed first, and validated afterwards or on next startup.
+The invalid value is already in the system when the error is raised.
+
+- **Wears:** an error message about data that is already saved; corruption that
+  survives a restart and is then reported as a read bug.
+- **Check:** for the validator and the writer, confirm the ordering on the actual
+  path, not in the source layout. Validate at the point of use, not after it.
+
+## 17. Retry without a budget
+
+Retry logic with no cap, backoff, jitter, or cancellation — or applied to an
+operation that is not idempotent.
+
+- **Wears:** a struggling dependency getting three times the traffic during an
+  incident; duplicated writes, double charges, repeated notifications.
+- **Check:** for every retry, name the cap, the backoff, and the classification
+  of which failures are transient. Then ask whether the wrapped operation is safe
+  to run twice. If it is not, the retry is the bug.
+
+## 18. Preflight that duplicates the real call
+
+An existence or capability check performed immediately before the operation that
+would have reported the same thing — a HEAD before the GET, an exists before the
+read. Double the round trips, and a time-of-check/time-of-use window created for
+nothing.
+
+- **Wears:** intermittent failures under concurrency; latency twice what the
+  operation should cost.
+- **Check:** two calls to the same resource on one path where the first's only
+  role is to gate the second. Delete the first and handle the real call's failure.

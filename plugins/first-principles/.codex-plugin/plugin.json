@@ -1,0 +1,24 @@
+{
+  "name": "first-principles",
+  "version": "1.3.0",
+  "description": "Coding discipline as seven independent gates rather than a workflow, over a shared canon of five first principles and a security spine. Each gate produces a verdict with evidence and admits its gaps.",
+  "author": {
+    "name": "wayneliuq",
+    "url": "https://github.com/wayneliuq"
+  },
+  "repository": "https://github.com/wayneliuq/claude-skills",
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "First Principles",
+    "shortDescription": "Evidence-based coding gates for disciplined changes.",
+    "longDescription": "First Principles provides seven independent gates for coding work: scope, build, cut, done, bug, ship, and watch. They operationalize five principles—verified beats assumed, one state one owner, fix the class not the instance, change exactly what was asked, and reversibility decides who acts—plus a security spine.",
+    "developerName": "wayneliuq",
+    "category": "Productivity",
+    "capabilities": ["Interactive"],
+    "defaultPrompt": [
+      "Apply the scope gate to this change.",
+      "Audit this code with the bug gate.",
+      "Run the done gate before I call this complete."
+    ]
+  }
+}
