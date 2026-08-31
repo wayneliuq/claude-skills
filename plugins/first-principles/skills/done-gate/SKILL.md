@@ -29,8 +29,17 @@ exists is not evidence that it does.
 - Run it **to completion. Never sampled.** "I ran the relevant tests" hides
   defects in exactly the paths you did not think were relevant, which is where
   unexpected coupling lives.
-- Coverage ratchets one direction. Every fix ships with a regression test; the
-  suite only grows.
+- **A suite that only grows makes every later change more expensive.** One test per
+  unit fixed, at the highest layer that can fail on the symptom — prefer one
+  flow-level test over several unit tests, and ship none when an existing test
+  already covers the path or the change adds no new surface. The test that proves a
+  finding real is a *probe*: write it, watch it fail for the right reason, and it may
+  then be thrown away. Do not keep a test whose only justification is that a bug once
+  existed here.
+- **Replacing tests is ordinary work.** When one higher-layer test subsumes several
+  below it, delete those and lower any coverage floor in the same commit, naming the
+  test that replaced them. A non-vacuity floor exists to catch a suite that silently
+  *ran* less than it claims — not to stop a suite from deliberately *being* smaller.
 - **A flake is a defect.** An intermittent failure is a real race, a real ordering
   dependency, or real shared state — in the product, not in the test runner.
   Re-running until green normalizes a live bug. Root-cause it or file it; never

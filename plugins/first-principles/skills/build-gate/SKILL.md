@@ -113,6 +113,21 @@ Work the rungs from principle 4 before writing anything new. Then: a new shared
 component or abstraction needs **two or more current, named consumers** — not two
 hypothetical future ones. One consumer means it lives at the call site.
 
+## Fix at the layer where the wrong value is produced
+
+Name that layer before writing anything, and change it there — not where the wrong
+value is displayed. **If one defect makes you edit more than one call site, you are at
+the wrong layer**: find the shared point, or state why there isn't one. If an
+implementation already exists, use it — a second divergent path for the same job is the
+defect relocated, not a fix.
+
+The simplest change that fixes the whole class wins. A fix that sprawls past roughly
+150 changed non-test lines, or more than three files for one defect, has to justify why
+the simpler change was unavailable; usually the answer is that the layer is wrong.
+
+Enumerating every consumer before you change what something returns, emits or stores is
+a check **on** the fix — never a licence to push the change out to the consumers instead.
+
 ## Tests, while building
 
 Write **one failing test for the thinnest next slice**, make it pass, repeat.
