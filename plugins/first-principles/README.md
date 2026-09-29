@@ -61,6 +61,15 @@ by blast radius, on the finding that some shapes — a suite that mocks its own
 subject, a `catch` that returns success — destroy the oracle every other check
 depends on, and so have to be cleared first.
 
+## Worker definitions
+
+[`agents/`](agents/) holds the four implementation workers that
+`adversarial-delegation`'s triage dispatches to — Sonnet 5.5 and Opus 5.5, each at
+medium and high effort. They exist because an Agent-tool call can pick a model but
+not an effort level, and because the `sonnet`/`opus` aliases resolve differently per
+provider, so the definitions pin full model ids. **The four share one system prompt
+body; change all four together.**
+
 ## Telemetry
 
 [`skills/watch-gate/scripts/agent-roi.py`](skills/watch-gate/scripts/agent-roi.py)

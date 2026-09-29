@@ -1,105 +1,203 @@
 ---
 name: adversarial-delegation
-description: Run a first-principles gate (bug-gate / build-gate / done-gate) by delegating implementation to a worker — a cursor-agent (grok) subprocess or an Agent-tool subagent in a worktree — while acting as its adversarial reviewer. Use when a task is large enough to hand off but too consequential to accept on trust, and when several such tasks must run in parallel without colliding. Encodes how to pick the worker and transport, the flags that actually give it a shell, the file-safety rules that stop it destroying your uncommitted work, how to fence parallel streams and own the merges, how to write a brief it can refuse — including why its first action on any finding you did not prove is the test that would refute it — and what the reviewer must verify rather than believe.
+description: Run a first-principles gate (bug-gate / build-gate / done-gate) by delegating implementation to a Claude worker (Sonnet 5.5 or Opus 5.5, chosen by an automatic triage) while acting as its adversarial reviewer, and optionally commissioning a cross-lineage second look from grok via cursor-agent on one well-scoped decision or diff. Use when a task is large enough to hand off but too consequential to accept on trust, when several such tasks must run in parallel without colliding, or when a consequential decision deserves an independent adversary. Encodes whether to delegate at all, the worker triage, the Sonnet-specific brief rules, the file-safety rules that stop a worker destroying your uncommitted work, how to fence parallel streams and own the merges, how to write a brief it can refuse — including why its first action on any finding you did not prove is the test that would refute it — how to run grok as an adversary whose findings must fail a test before they count, and what the reviewer must verify rather than believe.
 ---
 
 # Adversarial delegation
 
-Two roles, never collapsed. The **worker** (a `cursor-agent` subprocess) writes code and runs
-gates. **You** are the adversarial reviewer: you set the charter, then try to break what comes
-back. The value is in the asymmetry — the worker is invested in its solution, you are not.
+Two roles, never collapsed. The **worker** (a Claude subagent) writes code and runs gates.
+**You** are the adversarial reviewer: you set the charter, then try to break what comes back.
+The value is in the asymmetry — the worker is invested in its solution, you are not.
+
+A third role is optional: the **second look** (grok via `cursor-agent`, §1b), a model from a
+different training lineage that attacks one well-scoped decision or diff. It never implements.
 
 Canon: `../bug-gate/SKILL.md`, `../build-gate/SKILL.md`, `../done-gate/SKILL.md`. This skill
 is the delegation mechanics those gates assume you have.
 
 ---
 
-## 1. Choosing the worker
+## 0. Delegate at all?
 
-Two transports, and they are not interchangeable. Decide before you write the brief, because
-the brief's fences differ.
+Delegation costs a plan, a handoff and a merge that doing the work yourself gets for free.
+Anthropic measured multi-agent setups at 3–10× the tokens of a single agent on equivalent
+tasks, and in every case it measured where the work was one dependent chain or fit in one
+context, the lead model alone **at lower effort** came out ahead. So the default is to do it
+yourself, and delegation has to earn its place.
 
-| | `cursor-agent` subprocess | Agent-tool subagent |
+**Do not delegate:**
+
+- work you can finish in a handful of tool calls;
+- one dependent chain — step two needs the full output of step one;
+- work that fits comfortably in your own context and has no bulky output to quarantine;
+- two pieces that edit the same file;
+- anything needing frequent back-and-forth with the human.
+
+**Delegate when at least one holds:**
+
+- **Independent, sizeable tracks** — several pieces with an empty collision set (§4).
+- **Bulky output you only need the conclusion of** — test runs, logs, wide file sweeps. The
+  worker absorbs it and returns a 1–2k-token summary.
+- **Routine work with a cost tail** — a solvable task that occasionally spirals is cheaper to
+  let spiral at worker rates.
+- **Work larger than one context window.**
+
+**Never delegate verification of your own work to another Claude.** Anthropic's guidance for
+Opus 5 and later is explicit: do not use subagents to verify or double-check your own work —
+it adds cost with no quality gain, because the model already self-checks. The reviewer role
+(§7) is yours, done directly. The only second pair of eyes this skill sanctions is a
+*different lineage* (§1b), on a decision worth its cost.
+
+Before building a multi-worker plan, compare it with yourself at lower effort. A plan that
+beats your default effort but loses to your low effort is not a saving.
+
+## 1. Choosing the worker — the triage
+
+Implementation goes to a **Claude worker**, dispatched through the Agent tool with one of the
+plugin's worker definitions. The definitions exist because the Agent tool's `model` argument
+cannot set effort — effort lives only in an agent definition's frontmatter — and because the
+`sonnet` / `opus` aliases resolve to different models on different providers. The definitions
+pin full model ids.
+
+| `subagent_type` | Model / effort | Takes |
 |---|---|---|
-| Isolation | none — your working tree | `isolation: "worktree"`, its own checkout |
-| Blast radius | your uncommitted work (see §2) | its worktree only |
-| Parallelism | one per working tree (§3) | many, safely |
-| Visible to you | a log file you poll | task notifications, `SendMessage` to resume |
-| Survives session exit | as a process, yes | **no — in-process state is lost** |
-| Cost centre | separate CLI quota | this session's budget |
+| `first-principles:worker-sonnet` | `claude-sonnet-5-5`, medium | Fully specified, bounded work where a test decides the outcome: a bug with a repro, a mechanical change across known sites (rename, thread a field, add a counter), read-only recon that returns evidence |
+| `first-principles:worker-sonnet-high` | `claude-sonnet-5-5`, high | Same shape, but longer or harder — many sites, an unfamiliar area, a fix whose test needs design |
+| `first-principles:worker-opus` | `claude-opus-5-5`, medium | Long-horizon or multi-file work; a port or shared-state change where the almost-correct form still compiles; research, design, or an experiment whose control has to be valid; migrations; **anything that computes or transforms a number a user will read** |
+| `first-principles:worker-opus-high` | `claude-opus-5-5`, high | The subtle end of the Opus column — a numeric core, a concurrency or ordering invariant, a change you have already seen a worker get plausibly wrong |
 
-Pick the transport by **isolation need first, model second**. Parallel streams over one repo
-want worktrees; a single sequenced task on the current tree can take either.
+Assign it yourself, per stream, before writing the brief. Do not ask the human which model.
 
-**Match the model to the failure mode, not to the task's size.** The question is what breaks
-if the worker reasons shallowly:
+**The tie-break is the failure mode, not the size.** When a stream could go either way, ask:
+*if the worker reasons shallowly, would the result still pass the tests?* If yes — the
+almost-correct version compiles and goes green — it goes to Opus. A cheap model's failure
+there is not "unfinished," it is *plausible and wrong*, which costs more to review than to
+have written. If shallow reasoning would fail loudly, Sonnet is correct and the review is
+quick.
 
-- **A subtle port or a shared-state change** — many references to rewrite where each one has a
-  correct and an almost-correct form, and the almost-correct form still compiles. Reach for the
-  strongest model. A cheap model's failure here is not "unfinished," it is *plausible and
-  wrong*, which costs more to review than to have written.
-- **A mechanical, fully-specified change** — add a counter, thread a field, apply a rename
-  across known sites. A cheap fast model is correct here and the review is quick.
-- **Research, design, or an experiment whose control has to be valid** — strongest model. A
-  flawed control produces confident numbers that send the whole stream the wrong way.
-- **Operational running and measurement** — the model barely matters; the fences do.
+Why numbers go to Opus regardless of size: a wrong pixel gets a bug report, a wrong number
+gets silently trusted. The review cost of a subtly wrong statistic is unbounded, so it never
+goes to the cheaper tier to save money.
 
-A mixed slate should get a mixed assignment. Assigning one model to every stream because it
-is simpler to think about is how you either overpay for a rename or under-resource a port.
+Why Sonnet runs at **medium, never low**: at `low`, Sonnet 5.5 sometimes reports a change as
+done without running a check that exercises it, and on long tasks it stops to check in. A
+delegated "done" with no check behind it is the exact thing this skill exists to prevent.
+Sonnet 5.5 is half Opus 5.5's per-token price, so medium is still the cheap lane.
+
+Anthropic's own positioning, for when the table is not enough: Sonnet 5.5 for "well-scoped
+everyday tasks, fixing bugs"; "for the hardest long-horizon work, an Opus model is the better
+choice." Escalate past Opus 5.5 only if it still falls short at `high`.
+
+**A mixed slate gets a mixed assignment.** One model for every stream because it is simpler to
+think about is how you overpay for a rename or under-resource a port.
+
+**Operational running and measurement** — the model barely matters; the fences do. Sonnet.
+
+### Transport facts
+
+| | Agent-tool subagent |
+|---|---|
+| Isolation | `isolation: "worktree"` gives its own checkout — but branched from the *default branch*, not your HEAD (see the stale-base trap, §3). To start from a prepared tree, dispatch without `isolation` and fence the worktree path in the brief |
+| Parallelism | many, safely, one per tree |
+| Visible to you | task notifications; `SendMessage` resumes it with context intact |
+| Survives session exit | **no — in-process state is lost** (§3) |
+| Starts with | its own system prompt, your brief, CLAUDE.md, a git-status snapshot. **Not** your conversation, **not** your auto-memory, **not** your output style |
+
+If the Agent tool is unavailable or the worker definitions do not resolve, fall back to
+`subagent_type: "general-purpose"` with `model: "claude-opus-5-5"` (effort then follows the
+session) and **report the downgrade** — a silent one makes two runs incomparable.
+
+## 1b. The second look — grok as adversary, never as author
+
+grok via `cursor-agent` is **not an implementation lane.** Its value is a different training
+lineage, which catches errors a Claude reviewer shares assumptions with. Its measured profile
+is the reason for every rule below:
+
+- **Recall useful, precision poor.** In one independent test, 8 of 10 grok review findings
+  were false positives (n=1 — treat as a direction, not a rate). Practitioner reports say it
+  catches real bugs Claude models miss.
+- **Not cheaper in practice.** List output price is below Sonnet 5.5's, but grok 4.7 burns
+  roughly twice the output tokens of 4.6, which cancels most of it.
+- **Weak on long-horizon work and unmeasured on math.** No independent numeric-reasoning
+  result exists for 4.6 or 4.7.
+- **An unreliable transport.** Dispatches have dropped mid-run with no output, twice in a row;
+  a dropped stream can also leave the worker still writing files (§9).
+
+**Use it for** one consequential, *well-scoped* question: a design decision about to be
+committed to, a diff you are about to accept, a claim a fix rests on. The scope must be small
+enough that every finding it returns can be checked. **Do not use it** for open-ended audits,
+for anything on the critical path, as the final word on correctness, or as a substitute for
+an external oracle on numeric code.
+
+**The brief for a second look:**
+
+1. **The artifact and the question, nothing else** — the diff or decision, the one claim to
+   attack, the files that carry the constraint. Not your reasoning for the answer you favour.
+2. **Report everything, with a confidence on each.** "Only high-severity" makes models
+   silently drop real findings; you filter afterwards.
+3. **Every finding must name the test or command that would fail if it is real.** A finding
+   with no falsifier is a suspicion, and is tiered as one.
+4. **Read-only.** It must not write, edit, checkout, restore, stash or commit. Enforce this in
+   the brief — `--mode plan` returns nothing under `--output-format text`.
+5. **Write the report to a named file as you go**, so a dropped transport leaves a partial
+   file rather than nothing.
+
+**Then you prove or refute each finding** — run the falsifier it named, against the current
+code. Only a finding whose falsifier fails is acted on; the rest are logged as `Refuted`
+(§10). Carry grok's refute rate across dispatches: a second look whose findings mostly refute
+is costing review time without buying anything, and that is the signal to stop commissioning
+it.
+
+**No round closes on model agreement.** grok concurring with you is not evidence; neither is
+grok disagreeing. An execution decides (§7).
 
 ### Invocation that actually works (`cursor-agent`)
 
 ```bash
-cursor-agent -p --force --model cursor-grok-4.6-medium --output-format text "<prompt>"
+cursor-agent -p --force --model grok-4.7-medium --output-format text "<prompt>"
 ```
 
-Run through `zsh -l -c "..."` (node is only on PATH in a login shell) and background it for
-anything non-trivial.
+Run through `zsh -l -c "..."` (node is only on PATH in a login shell) and background it.
+Pass the brief from a file through a tiny runner script (`prompt="$(cat "$1")"`) — inlining it
+in a double-quoted `zsh -c` breaks on backticks and `$`.
 
-**Default: the newest grok generation at medium effort, never a `-fast` id.** As of 2026-08-16
-that is `cursor-grok-4.6-medium`. The version in that id **will** go stale — this line said
-`4.5-high` for weeks after 4.6 shipped — so treat the *rule* as the instruction and the id as
-today's answer to it:
+**Model: the newest grok generation at medium effort, never a `-fast` id.** As of 2026-09-28
+that is `grok-4.7-medium`. Both the version **and the id's prefix** go stale — 4.6 was
+`cursor-grok-4.6-medium`; 4.7 dropped the `cursor-` prefix — so treat the *rule* as the
+instruction and the id as today's answer to it:
 
 ```bash
-cursor-agent --list-models | grep grok      # newest generation wins; take its non-fast medium
+cursor-agent --list-models | grep -i grok   # newest generation wins; take its non-fast medium
 ```
 
-Two things that make this less mechanical than it looks:
-
-- **Not every generation exposes every tier.** 4.5 only ever published `-high` and
-  `-high-fast`; 4.6 publishes low/medium/high/xhigh. If the newest generation has no `medium`,
-  take the lowest non-`fast` tier at or above it rather than dropping back a generation.
-- **Never a `-fast` id.** `cursor-grok-4.6-medium-fast` exists and is the wrong choice for
-  correctness work. A cheap fast model's failure mode is *plausible and wrong*, which costs more
-  to review than it would have cost to have the work done properly the first time. Fast ids are
-  for throughput on mechanical edits, and delegation-under-review is not that.
+- **Not every generation exposes every tier.** If the newest has no `medium`, take the lowest
+  non-`fast` tier above it rather than dropping back a generation.
+- **Never a `-fast` id.** Its failure mode is plausible and wrong. (4.7's fast labels also
+  contain zero-width characters; copy ids from `--list-models`, never retype them.)
+- **`xhigh` is not worth it here** — it roughly doubles tokens for a few points in the
+  vendor's own numbers.
 
 **`--force` is load-bearing and its absence is silent.** `--trust` trusts the *workspace*;
-with `--trust` alone every shell call is rejected, so the worker writes files but cannot run a
-single test — and you will not notice except that it never mentions running anything. `--force`
-("Force allow commands unless explicitly denied", alias `--yolo`) is what permits execution.
+with `--trust` alone every shell call is rejected, so the worker can read but cannot run the
+falsifier it proposes — and you will not notice except that it never mentions running
+anything. `--force` (alias `--yolo`) permits execution; read-only is enforced by the brief.
 
 Verify once per environment rather than assuming, with something it cannot guess:
 
 ```bash
-cursor-agent -p --force --model cursor-grok-4.6-medium --output-format text \
+cursor-agent -p --force --model grok-4.7-medium --output-format text \
   "Run: git rev-parse --short HEAD. Report the exact stdout. If you cannot run shell commands, reply SHELL_BLOCKED."
 ```
 
-Models: `cursor-grok-4.6-{low,medium,high,xhigh}` (the bare alias `grok` is invalid, and so is a
-generation that no longer publishes the tier you asked for — an unknown id fails fast, which is
-why the probe above is worth its one call); `claude-opus-5-medium`.
-`cursor-agent --list-models` enumerates. Other flags that matter:
-`--sandbox <mode>`, `--approve-mcps`, `--mode plan` (read-only).
-
-ACP is a *different* transport, for editor/client integrations that answer
-`session/request_permission` with `allow-once`/`allow-always`. Print mode has nothing to answer
-it, which is exactly why `-p` without `--force` blocks. You do not need ACP for delegation.
+An unknown id fails fast, which is why the probe is worth its one call. If the probe or the
+dispatch fails, **skip the second look and say so** — do not retry a transport that has
+failed once with no output, and do not substitute a Claude reviewer (§0).
 
 ## 2. File safety — the rules that exist because they were broken
 
-A worker with `--force` can run `git restore`. Its blast radius is your whole working tree.
+Any worker with a shell can run `git restore` — a Claude subagent dispatched without
+`isolation`, and a `cursor-agent` second look under `--force`. Its blast radius is the whole
+working tree it runs in.
 
 - **Commit before dispatching.** Always. Uncommitted work is the only thing at risk.
 - **Do not edit files while a worker is running.** An unexpected diff looks to the worker like
@@ -178,6 +276,11 @@ branches of an unmade decision — two live implementations of one behaviour is 
 §2 of the canon exists to prevent, and shipping it "for now" makes the decision harder, not
 easier.
 
+**Give a lead a time budget when you can estimate one.** Opus 5.5 paces itself to an
+`elapsed Ns / budget Ns` line and parallelises more to fit it. The budget is advisory — keep a
+real timeout — and under pressure it may verify a little less, so do not use it on a numeric
+stream.
+
 ## 5. Recon before briefs
 
 You cannot write a brief the worker can refuse (§6) until you know which of your premises are
@@ -252,6 +355,30 @@ Then the structure that has worked:
 
    This pays for itself. Refusals of a bad brief are the highest-value output you get.
 
+### What a Claude worker needs that you would not think to say
+
+A subagent starts blank: its own system prompt, your brief, CLAUDE.md and a git-status
+snapshot. The worker definitions' system prompts already carry the generic rules — run a real
+check before reporting done, finish the whole task, add nothing unrequested, launch no reviewer
+subagents, never checkout/restore/stash/commit, write the report as you go. The brief carries
+everything specific:
+
+- **Paste in the memories that apply.** Auto-memory does not reach a subagent. If a
+  memory records a trap in the area the stream touches, quote it; a pointer to the memory
+  file is not enough.
+- **Name the scope literally.** Sonnet 5.5 does what the brief says and does not infer what
+  it leaves out. "Fix the three call sites" gets three; if you mean every site of the
+  pattern, say "every site, found by `<search>`, with file:line for each."
+- **Name the checks that count.** The definition tells it to run a real check; the brief
+  names which — the exact test scope, the typechecker, the build. A worker left to choose
+  runs the fast one and skips the one that catches its class of mistake.
+- **Name the return.** The format of the report, its path, and its size (a 1–2k-token
+  summary plus the evidence you asked for). Ask for everything it noticed with a confidence
+  on each; "only report serious issues" makes it drop real findings silently.
+- **Give the report a file path** and say *write it as you go*. A stalled worker then leaves a
+  partial file; a refusing one leaves a complete one. Without it the two are
+  indistinguishable.
+
 ## 7. Reviewing: verify, do not believe
 
 A worker's report is a claim. Check, in this order — cheapest disqualifying check first:
@@ -302,14 +429,17 @@ Know this before you plan, or you will brief work that cannot be done:
 **Corrected 2026-08-17. This section used to say "no browser — that is yours." That was wrong in
 the case that matters most.** When *you* cannot drive a browser — an unattended or scheduled run
 is refused outright: *"Dev servers can't be started from unattended sessions"* — the restriction
-is on your harness, not on your worker. A `cursor-agent` worker has a real shell and can start a
-dev server, run Playwright and report what it saw. So a visual question is not unanswerable; it
-is **delegable**. Verified working: a low-effort worker logged into a local stack, drove the app,
-selected a node and returned DOM measurements plus a screenshot that settled a question two
-prior runs had returned to the queue as unworkable.
+is on your harness, not on your worker. A worker with a real shell can start a dev server, run
+Playwright and report what it saw. So a visual question is not unanswerable; it is
+**delegable**. Verified working (on a `cursor-agent` worker, 2026-08-17): a low-effort worker
+logged into a local stack, drove the app, selected a node and returned DOM measurements plus a
+screenshot that settled a question two prior runs had returned to the queue as unworkable.
 
-Use a **low** effort tier for observation. Reading a rect, a computed style and a scene graph is
-not a reasoning task, and the cost difference is real if you do it every run.
+Send observation to `first-principles:worker-sonnet`. Reading a rect, a computed style and a
+scene graph is not a reasoning task, and the cost difference is real if you do it every run. A
+Claude subagent's shell has not yet been verified to start a dev server from an unattended
+session; if it is refused, a `cursor-agent` observation worker is the permitted fallback —
+observation writes no product code, so it is not the implementation lane §1b rules out.
 
 An observation worker gets its **own worktree** — its collision set with code streams is empty,
 so it runs in parallel and costs no wall-clock.
@@ -344,6 +474,16 @@ discharges Layer 4.
 path, require it be read programmatically, and require the copy be deleted.
 
 ## 9. Progress
+
+**Agent-tool workers** run in the background and re-invoke you with a task notification when
+they finish, so there is nothing to poll. Do reviewer prep (below) while they run, and review in
+the turn the notification arrives. The rest of this section is for `cursor-agent` dispatches,
+which notify nobody.
+
+**Before staging anything after a `cursor-agent` run, confirm the process is gone**
+(`ps -eo pid,command | grep '[c]ursor-agent'`). A dropped transport kills the output stream,
+not the worker, which can keep writing files for minutes — a gate run and a `git add` in that
+window commit work nobody reviewed. Stage by path, never `-A`.
 
 Background the worker, then watch it with a `Monitor` loop rather than polling by hand:
 
@@ -404,8 +544,9 @@ Two reporting rules that follow from the mechanics:
 Report as the reviewer, not as the worker's spokesperson:
 
 ```
-Delegated:   <what, to which model, on which transport>
+Delegated:   <what, to which worker definition, and why the triage put it there>
 Fence:       <what it owned — and whether it stayed inside>
+Second look: <none | grok on <question>: N findings, N proven by a failing falsifier, N refuted>
 Gate:        <numbers YOU ran, after any rebase>
 Accepted:    <what survived review>
 Changed:     <what you overrode, and why>

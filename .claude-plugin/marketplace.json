@@ -10,7 +10,7 @@
   "plugins": [
     {
       "name": "first-principles",
-      "version": "1.3.2",
+      "version": "1.3.3",
       "source": "./plugins/first-principles",
       "description": "Coding discipline as seven independent outcome-based gates rather than a workflow: scope-gate, build-gate, cut-gate (47-shape bloat catalog tiered by blast radius, plus a two-question test-value rule; the one gate that edits, logging every finding before it touches anything), done-gate, bug-gate (18-shape bug catalog, findings tiered proven / traced / suspected), ship-gate, watch-gate \u2014 plus adversarial-delegation for running a gate over a worker you review rather than trust, over a shared canon of five first principles and a six-rule security spine. Each gate produces a verdict with evidence and admits gaps explicitly."
     },
