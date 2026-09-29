@@ -43,8 +43,9 @@ suspected vulnerabilities route privately.
 | [`bug-gate`](skills/bug-gate/) | debug / audit | What is wrong here, and where are its siblings? |
 | [`ship-gate`](skills/ship-gate/) | before it leaves | Safe to release, honestly described — and is this mine to press? |
 | [`watch-gate`](skills/watch-gate/) | after release | Would we find out if this broke? |
+| [`pr-review`](skills/pr-review/) | "review this PR" | Should this PR exist, is it the right shape, and is it now the PR we would have written? |
 
-The gates are independent — none requires any other. Skip any of them when the work
+`pr-review` is the one composite: it runs bug-gate, cut-gate and done-gate over a draft PR, fixes what it finds in that branch, and never marks the PR ready. The gates are independent — none requires any other. Skip any of them when the work
 is trivially small.
 
 Two gates carry catalogs, and they are the plugin's densest assets:
