@@ -1,6 +1,6 @@
 ---
 name: pr-review
-description: "Adversarially review a pull request and fix what the review finds, in that PR's branch — activated by \"review this PR\", \"review PR #n\", or \"adversarially review\" a PR. Not a findings list: every proven defect is fixed and pushed as an atomic commit. Distrusts the PR's stated premise (revert the fix in your head — what would a user actually lose, and can the problem even occur?), checks the fix sits at the right layer rather than being a band-aid, rebuilds each touched contract-bounded unit from scratch in thought and implements the simpler shape (with a cross-lineage second look on the rebuild decision), prunes tests that cannot fail for a reason a user would care about, cross-checks every open repo issue against the PR, strips historical bloat, and folds surviving knowledge into living docs as revisitable locked-in decisions. Never marks a draft PR ready. Takes the release stage (pre-release / alpha / GA) as the input that decides how much rebuild is allowed."
+description: "Adversarially review a pull request and fix what the review finds, in that PR's branch — activated by \"review this PR\", \"review PR #n\", or \"adversarially review\" a PR. Not a findings list: every proven defect is fixed and pushed as an atomic commit. Distrusts the PR's stated premise (revert the fix in your head — what would a user actually lose, and can the problem even occur?), checks the fix sits at the right layer rather than being a band-aid, rebuilds each touched contract-bounded unit from scratch in thought and implements the simpler shape (with a cross-lineage second look on the rebuild decision), prunes tests that cannot fail for a reason a user would care about, cross-checks every open repo issue against the PR, strips historical bloat, folds surviving knowledge into living docs as revisitable locked-in decisions, and finishes by rewriting the PR title and body as concise, user-facing release notes regenerated from the branch. Never marks a draft PR ready. Takes the release stage (pre-release / alpha / GA) as the input that decides how much rebuild is allowed."
 ---
 
 # pr-review
@@ -176,7 +176,7 @@ For each issue, one disposition:
 
 | The issue is | Do |
 |---|---|
-| **resolved by this PR** | confirm it against the code, not the title; add `Closes #n` so it closes atomically when the PR merges — one `Closes` per issue, on the commit or PR-body line of the change that resolves it |
+| **resolved by this PR** | confirm it against the code, not the title; add `Closes #n` so it closes atomically when the PR merges — one `Closes` per issue, on the release-notes line of the change that resolves it (§11) |
 | **in tension with a decision this PR made** | reconcile it — adjust the code or the issue text — if the right answer is clear; otherwise escalate (§9) |
 | **a real bug, unfixed** | reproduce it (bug-gate); proven or traced → fix it in this branch with `Closes #n`; suspected → comment what you tried, leave it open |
 | **a net-new feature** | if this PR changed a premise the issue rests on, update the issue text to match; otherwise leave it alone |
@@ -218,14 +218,57 @@ Batch escalations; do not block on them. Keep fixing everything else and bring t
 the end, smallest number of genuine forks first — and if one answer dissolves others, ask
 that one and say so.
 
-## 10. Verify, push, report
+## 10. Verify and push
 
 - Run the project's full gate (done-gate's layer 1) after the last commit, not per commit.
   A lane that refused is not a pass.
-- Push to the PR branch. If the project maintains the PR body as release notes, regenerate
-  it from the branch's log.
-- **Confirm the PR is still a draft** (`gh pr view <n> --json isDraft`). If it somehow is
-  not, say so first in the report.
+- Push to the PR branch.
+
+## 11. Rewrite the PR message as release notes — the final step
+
+Last, after every commit is pushed, because the message describes what the branch *now*
+does, not what the author first intended or what the review changed along the way.
+
+**Regenerate, never append.** Build the body from `git log <base>..HEAD` and the final diff.
+A change the review reverted leaves the notes with it; review narration ("addressed
+feedback", "reviewer found") never enters them.
+
+**Structure.** If the project prescribes a release-notes format, use it exactly. Otherwise:
+
+```
+## New features
+## Fixes
+## Improvements
+## Behind the scenes        ← refactors, tests, docs, CI, chores
+## Verification             ← what ran, and what did not
+## Needs your attention     ← migrations, deploy-affecting changes, anything irreversible, open escalations
+```
+
+Omit an empty section rather than writing "none".
+
+**Each line:**
+
+- **One change, one line, in user terms** — what the person using the product now sees or
+  can do, not which function moved. "Plots keep their colours after reload", not "fix
+  colour-scale cache invalidation in restyle path".
+- **`(Closes #n)` inline on the line of the change that closes it** — one per issue, never a
+  grouped list, so each issue closes with exactly the change that fixed it.
+- **Concise.** No preamble, no summary paragraph restating the list, no filler adjectives
+  ("robust", "seamless", "comprehensive"), no hedging. Positive phrasing: say what now
+  works, not what no longer breaks, where both are true.
+- **Honest.** `Verification` states what actually ran; a skipped lane is written as skipped.
+  Nothing claims more than the commits and the gate show.
+
+**Title:** a plain summary of the user-visible change, matching the project's title
+convention if it has one.
+
+Apply with `gh pr edit <n> --title … --body-file …`, then re-read it with `gh pr view <n>`
+to confirm what landed.
+
+**Confirm the PR is still a draft** (`gh pr view <n> --json isDraft`). If it somehow is not,
+say so first in the report.
+
+## 12. Report
 
 ```
 PR:          <#n — title> · draft: yes · stage: <stage> · branch: <head>
@@ -242,6 +285,7 @@ Bloat/docs:  <removed> · <folded into <doc>> · <decisions recorded>
 Choices:     <ambiguous fixes where the simplest was picked, one line each>
 Gate:        <command, result, what did not run>
 Commits:     <n pushed, one line each>
+PR message:  <rewritten as release notes — title, sections used>
 
 Needs your decision:
   <escalations, §9 format>
