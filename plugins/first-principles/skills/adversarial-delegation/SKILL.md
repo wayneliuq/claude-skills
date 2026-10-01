@@ -1,6 +1,6 @@
 ---
 name: adversarial-delegation
-description: Run a first-principles gate (bug-gate / build-gate / done-gate) by delegating implementation to a Claude worker (Sonnet 5.5 or Opus 5.5, chosen by an automatic triage) while acting as its adversarial reviewer, and optionally commissioning a cross-lineage second look from grok via cursor-agent on one well-scoped decision or diff. Use when a task is large enough to hand off but too consequential to accept on trust, when several such tasks must run in parallel without colliding, or when a consequential decision deserves an independent adversary. Encodes whether to delegate at all, the worker triage, the Sonnet-specific brief rules, the file-safety rules that stop a worker destroying your uncommitted work, how to fence parallel streams and own the merges, how to write a brief it can refuse — including why its first action on any finding you did not prove is the test that would refute it — how to run grok as an adversary whose findings must fail a test before they count, and what the reviewer must verify rather than believe.
+description: Delegate implementation to a Claude worker (Sonnet 5.5 or Opus 5.5, chosen by an automatic triage) while acting as its adversarial reviewer, optionally adding a cross-lineage second look from grok via cursor-agent on one well-scoped decision or diff. Use when a task is large enough to hand off but too consequential to accept on trust, when several such tasks must run in parallel without colliding, or when a consequential decision deserves an independent adversary. Covers whether to delegate at all, the worker triage, the Sonnet-specific brief rules, the file-safety rules that stop a worker destroying your uncommitted work, fencing parallel streams and owning the merges, writing a brief the worker can refuse — whose first action on any finding you did not prove is the test that would refute it — running grok as an adversary whose findings must fail a test before they count, and what the reviewer must verify rather than believe.
 ---
 
 # Adversarial delegation
@@ -12,8 +12,8 @@ The value is in the asymmetry — the worker is invested in its solution, you ar
 A third role is optional: the **second look** (grok via `cursor-agent`, §1b), a model from a
 different training lineage that attacks one well-scoped decision or diff. It never implements.
 
-Canon: `../bug-gate/SKILL.md`, `../build-gate/SKILL.md`, `../done-gate/SKILL.md`. This skill
-is the delegation mechanics those gates assume you have.
+Canon: `../principles/SKILL.md`. This skill is the delegation mechanics those principles
+assume you have.
 
 ---
 
@@ -326,7 +326,7 @@ Then the structure that has worked:
    them" for what you proved, and mark everything else as a hypothesis to test. Workers waste
    entire runs re-deriving things you already established — or, worse, accept a wrong premise
    because you stated it confidently. **Tier every finding you pass on** — *proven*, *traced*,
-   *suspected* (`../bug-gate/SKILL.md`). The worker may act only at the tier it can re-derive
+   *suspected* (`../principles/SKILL.md` §2). The worker may act only at the tier it can re-derive
    from the code, and never on a *suspected* one. An untiered finding is a guess laundered into
    a premise.
 2. **Required reading, by path.** Name the files whose docstrings carry the constraint. Add:
@@ -409,7 +409,7 @@ why loop degradation is invisible: round two audits round one's *output* as thou
 original, with no access to the artifact it started from. So any artifact entering a second
 audit→fix round **with no external symptom reported in between** stops and comes to the human.
 Diff every round against the last human-approved revision, never against the previous round.
-This is `bug-gate`'s three-strike rule lifted from the hypothesis to the loop.
+This is the three-strike rule (`../principles/SKILL.md` §3) lifted from the hypothesis to the loop.
 
 **No round closes on model output alone.** A round ends at an execution — a suite you ran, a
 flow you drove, an artifact you opened — never at a second model's agreement. Two models
@@ -420,7 +420,7 @@ concurring that a defect exists is not evidence that it does.
 Know this before you plan, or you will brief work that cannot be done:
 
 - **Green tests are not a working feature.** Reachability — is the new code called from a real
-  user path? — is `done-gate` Layer 4 and it needs the actual product. In this session the
+  user path? — is principle 1's "the running app" and it needs the actual product. In this session the
   single worst defect of the day was found only by driving the app, after two independent code
   audits had passed clean.
 

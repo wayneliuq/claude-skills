@@ -1,0 +1,16 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "awk 'f>=2; /^---$/{f++}' \"${CLAUDE_PLUGIN_ROOT}/skills/principles/SKILL.md\"",
+            "timeout": 5
+          }
+        ]
+      }
+    ]
+  }
+}

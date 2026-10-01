@@ -28,8 +28,7 @@ on — not frequency and not severity. Three observations set the order:
   volume and leaves the rate of accumulation unchanged. These have to be checked
   for, on the diff.
 
-Order the *catalog* by radius. Order the *passes* by dependency — pass 0 changes
-what the later passes can even see. Those are different orderings on purpose.
+Clear tier 0 before anything else: it changes what every later check can even see.
 
 Detection is marked **static** (text or AST), **graph** (call/type graph query),
 or **reasoning** (needs judgment). Roughly two-thirds are mechanical; reserve
@@ -302,8 +301,8 @@ other N−1.
 - **Why it is in this catalog:** invariant-across-all-writers tests are the
   highest-value tests in a codebase *and* the ones most likely to look redundant to
   a pruning pass — they duplicate coverage the per-writer tests appear to provide.
-  They are protected. Deleting one is the characteristic failure of this gate; see
-  the worked example in `../SKILL.md`.
+  They are protected. Deleting one is the characteristic failure of a pruning
+  pass.
 
 ---
 
