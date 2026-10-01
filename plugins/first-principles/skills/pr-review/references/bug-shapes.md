@@ -6,7 +6,7 @@ before opening an investigation. Each entry gives the shape, the symptom it
 usually wears, and the cheap check that confirms or clears it.
 
 For code that is *unnecessary* rather than *wrong*, the companion catalog is
-[`../../cut-gate/references/bloat-shapes.md`](../../cut-gate/references/bloat-shapes.md).
+[`bloat-shapes.md`](bloat-shapes.md).
 Shapes 15–18 below arrive most often from that direction: they are found while
 simplifying, and they are defects rather than excess.
 

@@ -1,6 +1,6 @@
 ---
 name: pr-review
-description: "Adversarially review a pull request and fix what the review finds, in that PR's branch — activated by \"review this PR\", \"review PR #n\", or \"adversarially review\" a PR. Not a findings list: every proven defect is fixed and pushed as an atomic commit. Distrusts the PR's stated premise (revert the fix in your head — what would a user actually lose, and can the problem even occur?), checks the fix sits at the right layer rather than being a band-aid, rebuilds each touched contract-bounded unit from scratch in thought and implements the simpler shape (with a cross-lineage second look on the rebuild decision), prunes tests that cannot fail for a reason a user would care about, cross-checks every open repo issue against the PR, strips historical bloat, folds surviving knowledge into living docs as revisitable locked-in decisions, and finishes by rewriting the PR title and body as concise, user-facing release notes regenerated from the branch. Never marks a draft PR ready. Takes the release stage (pre-release / alpha / GA) as the input that decides how much rebuild is allowed."
+description: "Adversarially review a pull request and fix what the review finds, in that PR's branch. Use for \"review this PR\", \"review PR #n\", or \"adversarially review\" a PR. Not a findings list: every proven defect is fixed and pushed as an atomic commit. Tests the PR's premise (revert it in your head — what would a user lose, and can the problem even occur?), checks the fix sits at the producing layer rather than being a band-aid, rebuilds each touched contract-bounded unit from scratch in thought and implements the simpler shape (with a cross-lineage second look), prunes tests that cannot fail for a reason a user would care about, cross-checks every open issue, strips historical bloat into living docs as revisitable decisions, and rewrites the PR title and body as user-facing release notes. Never marks a draft PR ready. The release stage (pre-release / alpha / GA) decides how much rebuild is allowed."
 ---
 
 # pr-review
@@ -10,12 +10,13 @@ for the fix.* The review attacks all three, then repairs what it breaks — in t
 branch, commit by commit — so the PR that comes out is one the reviewer would have
 written.
 
-Canon: `../principles/SKILL.md`. Mechanics this skill leans on rather than restates:
+Canon: `../principles/SKILL.md` — proven / traced / suspected, fixing the class, test value,
+and what "verified" means. Mechanics this skill leans on rather than restates:
 
 - `../adversarial-delegation/SKILL.md` — every subagent and every grok second look.
-- `../bug-gate/SKILL.md` — proven / traced / suspected, and fixing the class.
-- `../cut-gate/SKILL.md` — test value, and the bloat catalog.
-- `../done-gate/SKILL.md` — what "verified" means before the verdict.
+- `references/bug-shapes.md` — the bug catalog.
+- `references/bloat-shapes.md` and `references/test-value-by-domain.md` — the bloat catalog,
+  and where the test-value floor sits per layer.
 
 ---
 
@@ -50,7 +51,7 @@ otherwise take the default and say so.
   first edit.
 - **Find and fix, not findings-only.** A proven or traced defect is fixed and pushed. A
   suspected one is either promoted by a repro or logged as suspected — never fixed on a
-  hunch (bug-gate).
+  hunch (principles §2).
 - **Atomic commits, pushed to the PR branch.** One concern per commit, a message that says
   what the user now sees, staged by explicit path. Obey the project's commit conventions
   (trailers, hooks); never `--no-verify`.
@@ -92,7 +93,7 @@ belief, not evidence. For each change in the diff:
    sequence. A problem with no reachable input is theoretical — do not keep a fix for it.
 4. **Is the fix at the right layer?** Find where the wrong value is *produced*, not where
    it is *noticed*. A guard at the consumer, a retry, a clamp, a special case for one
-   input — these are band-aids when the producer is still wrong. Principle 2: if two places
+   input — these are band-aids when the producer is still wrong. Principle 4: if two places
    decide one value, the fix is removing one of them.
 
 Dispose every change as **necessary** (with the user-visible behaviour it protects),
@@ -130,8 +131,8 @@ rather than believed.
 
 ## 5. Correctness — what is actually wrong
 
-Run bug-gate over the diff and its reachable neighbours: its shape catalog as hypothesis
-generator, every finding tiered. Two checks this review always runs, because they are where
+Run the bug catalog over the diff and its reachable neighbours as a hypothesis generator,
+every finding tiered. Two checks this review always runs, because they are where
 PRs most often go wrong:
 
 - **Every writer, every reader.** For each value the PR changes the shape of, enumerate every
@@ -142,7 +143,7 @@ PRs most often go wrong:
 
 ## 6. Tests — load-bearing or gone
 
-Apply cut-gate's two questions to every test the PR adds or touches:
+Apply the two test-value questions to every test the PR adds or touches:
 
 1. Can it fail for a reason a user would care about?
 2. Can a correct refactor leave it green?
@@ -178,7 +179,7 @@ For each issue, one disposition:
 |---|---|
 | **resolved by this PR** | confirm it against the code, not the title; add `Closes #n` so it closes atomically when the PR merges — one `Closes` per issue, on the release-notes line of the change that resolves it (§11) |
 | **in tension with a decision this PR made** | reconcile it — adjust the code or the issue text — if the right answer is clear; otherwise escalate (§9) |
-| **a real bug, unfixed** | reproduce it (bug-gate); proven or traced → fix it in this branch with `Closes #n`; suspected → comment what you tried, leave it open |
+| **a real bug, unfixed** | reproduce it; proven or traced → fix it in this branch with `Closes #n`; suspected → comment what you tried, leave it open |
 | **a net-new feature** | if this PR changed a premise the issue rests on, update the issue text to match; otherwise leave it alone |
 | **unrelated** | leave it alone; no comment |
 
@@ -220,7 +221,7 @@ that one and say so.
 
 ## 10. Verify and push
 
-- Run the project's full gate (done-gate's layer 1) after the last commit, not per commit.
+- Run the project's full gate after the last commit, not per commit.
   A lane that refused is not a pass.
 - Push to the PR branch.
 

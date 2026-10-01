@@ -53,7 +53,7 @@ Consolidating a battery of examples into an invariant — output is a permutatio
 input, scaling inputs scales output, the degenerate case returns the identity — is a
 **substitution** that reduces file count while *increasing* failure surface,
 because it holds over inputs nobody thought to enumerate. Prefer it to deletion
-wherever it is available. This is the one move in this gate that makes the suite
+wherever it is available. This is the one pruning move that makes the suite
 both smaller and stronger; reach for it before reaching for a delete.
 
 ## Where the two axes come from

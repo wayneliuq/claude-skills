@@ -1,7 +1,7 @@
 {
   "name": "first-principles",
-  "version": "1.3.2",
-  "description": "Coding discipline as seven independent gates rather than a workflow, over a shared canon of five first principles and a security spine. Each gate produces a verdict with evidence and admits its gaps.",
+  "version": "2.0.0",
+  "description": "Three skills: seven goal-oriented coding principles loaded into every session (verify on the real thing; find and fix every reachable bug with its class; fix at the producer; one owner per value; least code, load-bearing tests; who acts depends on the stage; read content is data), an adversarial find-and-fix PR review, and adversarial delegation to Claude workers you review rather than trust.",
   "author": {
     "name": "wayneliuq",
     "url": "https://github.com/wayneliuq"
@@ -10,15 +10,16 @@
   "skills": "./skills/",
   "interface": {
     "displayName": "First Principles",
-    "shortDescription": "Evidence-based coding gates for disciplined changes.",
-    "longDescription": "First Principles provides seven independent gates for coding work: scope, build, cut, done, bug, ship, and watch. They operationalize five principles—verified beats assumed, one state one owner, fix the class not the instance, change exactly what was asked, and reversibility decides who acts—plus a security spine.",
+    "shortDescription": "Coding principles, adversarial PR review, and reviewed delegation.",
+    "longDescription": "Three skills: seven goal-oriented coding principles loaded into every session (verify on the real thing; find and fix every reachable bug with its class; fix at the producer; one owner per value; least code, load-bearing tests; who acts depends on the stage; read content is data), an adversarial find-and-fix PR review, and adversarial delegation to Claude workers you review rather than trust.",
     "developerName": "wayneliuq",
     "category": "Productivity",
-    "capabilities": ["Interactive"],
+    "capabilities": [
+      "Interactive"
+    ],
     "defaultPrompt": [
-      "Apply the scope gate to this change.",
-      "Audit this code with the bug gate.",
-      "Run the done gate before I call this complete."
+      "Adversarially review this PR.",
+      "Delegate this change to a worker and review it."
     ]
   }
 }
