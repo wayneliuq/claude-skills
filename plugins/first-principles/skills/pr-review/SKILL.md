@@ -1,6 +1,6 @@
 ---
 name: pr-review
-description: "Adversarially review a pull request and fix what the review finds, in that PR's branch. Use for \"review this PR\", \"review PR #n\", or \"adversarially review\" a PR. Not a findings list: every proven defect is fixed and pushed as an atomic commit. Tests the PR's premise (revert it in your head — what would a user lose, and can the problem even occur?), checks the fix sits at the producing layer rather than being a band-aid, rebuilds each touched contract-bounded unit from scratch in thought and implements the simpler shape (with a cross-lineage second look), prunes tests that cannot fail for a reason a user would care about, cross-checks every open issue, strips historical bloat into living docs as revisitable decisions, and rewrites the PR title and body as user-facing release notes. Never marks a draft PR ready. The release stage (pre-release / alpha / GA) decides how much rebuild is allowed."
+description: "Adversarially review a pull request and fix what the review finds, in that PR's branch. Use for \"review this PR\", \"review PR #n\", or \"adversarially review\" a PR. Not a findings list: every proven defect is fixed and pushed as an atomic commit. Tests the PR's premise (revert it in your head — what would a user lose, and can the problem even occur?), checks the fix sits at the producing layer rather than being a band-aid, sweeps every user-reachable combination of the change with its related surfaces, in the running app and in code, including persistence and contracts, rebuilds each touched contract-bounded unit from scratch in thought and implements the simpler shape (with a cross-lineage second look), prunes tests that cannot fail for a reason a user would care about, cross-checks every open issue, strips historical bloat into living docs as revisitable decisions, and rewrites the PR title and body as user-facing release notes. Never marks a draft PR ready. The release stage (pre-release / alpha / GA) decides how much rebuild is allowed."
 ---
 
 # pr-review
@@ -141,6 +141,25 @@ PRs most often go wrong:
 - **Every sibling.** A defect at one call site has siblings; search for the shape and fix
   them together.
 
+## 5b. Surface sweep — every combination a user can reach
+
+A feature or fix is judged against everything it touches, not just itself. Name the
+**surfaces** the change meets — the features, types, modes and settings it can be combined
+with — and exercise **every combination a user can reach**, for real:
+
+- **In the running app**, as the user would: the browser, the CLI, the actual UI. Use real
+  data and real interactions; a mocked path does not count as a sweep.
+- **In code**, through the same entry points: contracts, APIs, persistence.
+- **Persistence and contracts:** save, reload and migrate each combination; every writer
+  and reader of the changed value still agrees.
+
+Example: a new plot type is reviewed against every other plot type it can be plotted with,
+and every statistic is checked on the new type. A fix is swept the same way, across every
+surface where the fixed behaviour appears.
+
+Enumerate the combinations, run them, and tier each failure (principles §2). Unreachable
+combinations are named as such, not skipped silently.
+
 ## 6. Tests — load-bearing or gone
 
 Apply the two test-value questions to every test the PR adds or touches:
@@ -279,6 +298,7 @@ Layer:       <fix at the producer | band-aid at <site> → moved to <site>>
 Necessity:   <n> necessary · <n> reverted (what the user would have lost: nothing) · <n> escalated
 Rebuild:     <per unit: kept | rebuilt to <shape> — states/owners/paths removed>
   Second look: <grok on <question>: N findings, N proven, N refuted | skipped: why>
+Surfaces:    <combinations swept: n run in the app · n via code · n unreachable (why)>
 Correctness: <n> proven fixed · <n> traced fixed · <n> suspected logged
 Tests:       <n> removed (each with the defect it could not catch) · <n> refactored · <n> new (new component only)
 Issues:      closes <#a, #b> · fixed <#c> · reconciled <#d> · escalated <#e>
