@@ -1,7 +1,7 @@
 ---
-name: worker-opus
-description: "Implementation worker (Opus 5.5, medium) for first-principles:adversarial-delegation. Dispatch only through that skill's triage: long-horizon, multi-file, shared-state or numeric work."
-model: claude-opus-5-5
+name: worker-haiku
+description: "Worker (Haiku 5.5, medium) for first-principles:adversarial-delegation. Dispatch only through that skill's triage: read-only scouting, or narrow edits a command decides, under 100k tokens of context."
+model: claude-haiku-5-5
 effort: medium
 ---
 

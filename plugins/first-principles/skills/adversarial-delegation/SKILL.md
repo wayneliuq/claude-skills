@@ -1,16 +1,22 @@
 ---
 name: adversarial-delegation
-description: Delegate implementation to a Claude worker (Sonnet 5.5 or Opus 5.5, chosen by an automatic triage) while acting as its adversarial reviewer, optionally adding a cross-lineage second look from grok via cursor-agent on one well-scoped decision or diff. Use when a task is large enough to hand off but too consequential to accept on trust, when several such tasks must run in parallel without colliding, or when a consequential decision deserves an independent adversary. Covers whether to delegate at all, the worker triage, the Sonnet-specific brief rules, the file-safety rules that stop a worker destroying your uncommitted work, fencing parallel streams and owning the merges, writing a brief the worker can refuse — whose first action on any finding you did not prove is the test that would refute it — running grok as an adversary whose findings must fail a test before they count, and what the reviewer must verify rather than believe.
+description: Keep Opus-level work in-session and delegate well-scoped work to cheaper Claude workers (Haiku 5.5 for scouting and narrow command-checked edits, Sonnet 5.5 for bounded implementation, chosen by an automatic triage) while acting as their adversarial reviewer, with grok via cursor-agent as a cross-lineage adversary on every consequential change whoever wrote it. Use when a task has bulk you only need the conclusion of, when a mapping or edit can be specified without reading the code yourself, when several tasks must run in parallel without colliding, or when a consequential change deserves an independent adversary. Covers whether delegation pays for its brief, the Haiku checklist, the worker triage, the file-safety rules that stop a worker destroying your uncommitted work, fencing parallel streams and owning the merges, writing a brief the worker can refuse — whose first action on any finding you did not prove is the test that would refute it — running grok as an adversary whose findings must fail a test before they count, and what the reviewer must verify rather than believe.
 ---
 
 # Adversarial delegation
 
-Two roles, never collapsed. The **worker** (a Claude subagent) writes code and runs gates.
-**You** are the adversarial reviewer: you set the charter, then try to break what comes back.
+Two roles, never collapsed. The **worker** (a Haiku or Sonnet subagent) maps, edits and runs
+gates. **You** — the session's own model — are the adversarial reviewer: you set the charter,
+do the work that needs the strongest judgment yourself, and try to break what comes back.
 The value is in the asymmetry — the worker is invested in its solution, you are not.
 
-A third role is optional: the **second look** (grok via `cursor-agent`, §1b), a model from a
-different training lineage that attacks one well-scoped decision or diff. It never implements.
+There are no Opus workers. Work that needs Opus-level judgment stays in-session, where it
+has your full context; a subagent at the same price as you buys only context isolation, and
+a Haiku scout buys that for a fortieth of the price.
+
+A third role is the **second look** (grok via `cursor-agent`, §1b), a model from a different
+training lineage that attacks every consequential change — a worker's or your own. It never
+implements.
 
 Canon: `../principles/SKILL.md`. This skill is the delegation mechanics those principles
 assume you have.
@@ -29,69 +35,122 @@ yourself, and delegation has to earn its place.
 
 - work you can finish in a handful of tool calls;
 - one dependent chain — step two needs the full output of step one;
-- work that fits comfortably in your own context and has no bulky output to quarantine;
+- work you cannot specify without first reading the code it touches — by then you have paid
+  the cost delegation would have saved;
 - two pieces that edit the same file;
 - anything needing frequent back-and-forth with the human.
 
 **Delegate when at least one holds:**
 
+- **Bulky input you only need the conclusion of** — mapping an unfamiliar area, finding every
+  site of a pattern, test runs, logs. Every token you read stays in your context and is
+  re-read on every later turn until compaction, and it dilutes the context you reason in. A
+  scout absorbs it and returns 1–2k tokens of evidence. **Map before you read:** when
+  locating something would take more than a few file reads, send `worker-haiku` (§5) rather
+  than reading yourself or using the built-in Explore agent, which runs at your model's price.
 - **Independent, sizeable tracks** — several pieces with an empty collision set (§4).
-- **Bulky output you only need the conclusion of** — test runs, logs, wide file sweeps. The
-  worker absorbs it and returns a 1–2k-token summary.
 - **Routine work with a cost tail** — a solvable task that occasionally spirals is cheaper to
   let spiral at worker rates.
 - **Work larger than one context window.**
+
+### What a delegation costs
+
+Prices per million tokens, input / output (Anthropic pricing page, 2026-10): Opus 5.5
+$4 / $20, Sonnet 5.5 $2 / $10, Haiku 5.5 $0.10 / $0.50 for prompts up to 100k tokens
+($0.50 / $2.50 above). Haiku is 20× cheaper than Sonnet and 40× cheaper than Opus.
+
+That makes **your brief and your review the cost**, not the worker's run. Estimates — not yet
+measured — for one narrow delegated edit:
+
+| | Tokens | Cost |
+|---|---|---|
+| You: decide, write the brief, review the diff and report | ~1.5–3k output, ~3–6k input added to your context | ~$0.03–0.06 plus the residue |
+| A Haiku worker's whole run, staying under 100k | ~5–15k output, mostly cache reads in | ~$0.01–0.05 |
+| You doing it yourself | ~200–400 output per edit site, plus 2–8k input per file read, re-read every later turn | grows with sites and reads |
+
+Break-even sits around **6 or more edit sites, or 10k or more tokens of reading you would
+otherwise do** — and only when the brief can be written blind (above). Below that, do it
+yourself.
+
+**Calibrate rather than trust these numbers.** Each task notification reports the worker's
+token total; record it in the verdict (§10), and revise the thresholds once real runs
+disagree with them.
 
 **Never delegate verification of your own work to another Claude.** Anthropic's guidance for
 Opus 5 and later is explicit: do not use subagents to verify or double-check your own work —
 it adds cost with no quality gain, because the model already self-checks. The reviewer role
 (§7) is yours, done directly. The only second pair of eyes this skill sanctions is a
-*different lineage* (§1b), on a decision worth its cost.
+*different lineage* (§1b).
 
 Before building a multi-worker plan, compare it with yourself at lower effort. A plan that
 beats your default effort but loses to your low effort is not a saving.
 
 ## 1. Choosing the worker — the triage
 
-Implementation goes to a **Claude worker**, dispatched through the Agent tool with one of the
+Delegated work goes to a **Claude worker**, dispatched through the Agent tool with one of the
 plugin's worker definitions. The definitions exist because the Agent tool's `model` argument
 cannot set effort — effort lives only in an agent definition's frontmatter — and because the
-`sonnet` / `opus` aliases resolve to different models on different providers. The definitions
-pin full model ids.
+`sonnet` / `haiku` aliases resolve to different models on different providers. The
+definitions pin full model ids.
 
-| `subagent_type` | Model / effort | Takes |
+| Who | Model / effort | Takes |
 |---|---|---|
-| `first-principles:worker-sonnet` | `claude-sonnet-5-5`, medium | Fully specified, bounded work where a test decides the outcome: a bug with a repro, a mechanical change across known sites (rename, thread a field, add a counter), read-only recon that returns evidence |
+| `first-principles:worker-haiku` | `claude-haiku-5-5`, medium | **Read-only scouting** (§5): mapping an area, every call site with file:line, checking one named claim, condensing test output and logs. **Narrow edits that pass the Haiku checklist** below |
+| `first-principles:worker-sonnet` | `claude-sonnet-5-5`, medium | Bounded, fully specified implementation with several dependent steps where a test decides the outcome: a bug with a repro, a change whose sites need judgment to find; browser observation (§8); a Haiku edit that failed its check |
 | `first-principles:worker-sonnet-high` | `claude-sonnet-5-5`, high | Same shape, but longer or harder — many sites, an unfamiliar area, a fix whose test needs design |
-| `first-principles:worker-opus` | `claude-opus-5-5`, medium | Long-horizon or multi-file work; a port or shared-state change where the almost-correct form still compiles; research, design, or an experiment whose control has to be valid; migrations; **anything that computes or transforms a number a user will read** |
-| `first-principles:worker-opus-high` | `claude-opus-5-5`, high | The subtle end of the Opus column — a numeric core, a concurrency or ordering invariant, a change you have already seen a worker get plausibly wrong |
+| **You, in-session** | the session's model | Long-horizon or multi-file work; a port or shared-state change where the almost-correct form still compiles; research, design, or an experiment whose control has to be valid; migrations; concurrency and ordering invariants; **anything that computes or transforms a number a user will read**; every review and every merge |
 
 Assign it yourself, per stream, before writing the brief. Do not ask the human which model.
 
-**The tie-break is the failure mode, not the size.** When a stream could go either way, ask:
-*if the worker reasons shallowly, would the result still pass the tests?* If yes — the
-almost-correct version compiles and goes green — it goes to Opus. A cheap model's failure
-there is not "unfinished," it is *plausible and wrong*, which costs more to review than to
-have written. If shallow reasoning would fail loudly, Sonnet is correct and the review is
-quick.
+**The tie-break is the failure mode, not the size.** Ask: *if the worker reasons shallowly,
+would the result still pass the tests?* If yes — the almost-correct version compiles and goes
+green — it stays with you. A cheap model's failure there is not "unfinished," it is
+*plausible and wrong*, which costs more to review than to have written. If shallow reasoning
+would fail loudly, a worker is correct and the review is quick.
 
-Why numbers go to Opus regardless of size: a wrong pixel gets a bug report, a wrong number
+Why numbers stay with you regardless of size: a wrong pixel gets a bug report, a wrong number
 gets silently trusted. The review cost of a subtly wrong statistic is unbounded, so it never
-goes to the cheaper tier to save money.
+goes to a cheaper tier to save money.
 
-Why Sonnet runs at **medium, never low**: at `low`, Sonnet 5.5 sometimes reports a change as
-done without running a check that exercises it, and on long tasks it stops to check in. A
-delegated "done" with no check behind it is the exact thing this skill exists to prevent.
-Sonnet 5.5 is half Opus 5.5's per-token price, so medium is still the cheap lane.
+### The Haiku checklist — all five, or it is not Haiku's
 
-Anthropic's own positioning, for when the table is not enough: Sonnet 5.5 for "well-scoped
-everyday tasks, fixing bugs"; "for the hardest long-horizon work, an Opus model is the better
-choice." Escalate past Opus 5.5 only if it still falls short at `high`.
+1. **You can specify it blind.** You can name the exact change and the sites — or the search
+   that finds every site — without reading the code yourself.
+2. **A command decides it.** A compiler, type-checker or named test fails loudly if the edit
+   is wrong.
+3. **It fits under 100k.** The files it must read total about 50k tokens or less (roughly
+   200KB of code, one area), leaving room for the subagent's own system prompt and tools.
+   Past 100k Haiku's price quintuples and the cheap lane is gone.
+4. **It is big enough** — about 6 or more sites, or 10k or more tokens of reading you would
+   otherwise do (§0).
+5. **Nothing subtle is in it.** No number a user reads, no ordering or concurrency, no shared
+   state, no design choice.
+
+Fails 4 → do it yourself. Fails 3 → split it, or Sonnet. Fails 1, 2 or 5 → Sonnet, or you.
+
+Why the line sits there: on Anthropic's published numbers Haiku 5.5 is close to Sonnet 5.5 on
+a single coding problem (FrontierCode 1.1: 46.4% vs 52.1%) and about half of it on multi-step
+terminal work (Terminal-Bench 4.0: 39.2% vs 70.6%). Anthropic positions it for "more narrowly
+scoped tasks" and "as a subagent on coding work", and says Sonnet and Opus "remain better
+choices for complex agentic coding tasks". Its cost-optimisation guidance for checkable work
+is to run cheap and re-run only the failures stronger — which is exactly the Haiku → Sonnet
+fallback.
+
+**Escalate once, by re-dispatch.** A Haiku edit whose check fails, or that refuses, goes to
+`worker-sonnet` with the Haiku report attached as evidence — not back to Haiku with a longer
+brief. A Sonnet failure comes to you.
+
+Why workers run at **medium, never low**: at `low`, both Haiku 5.5 and Sonnet 5.5 sometimes
+report a change as done without running a check that exercises it, and in long tasks they
+stop early. A delegated "done" with no check behind it is the exact thing this skill exists
+to prevent. Anthropic documents that Haiku 5.5 can still skip the check at medium; its
+recommended fix — the verification paragraph — is in every worker definition verbatim.
 
 **A mixed slate gets a mixed assignment.** One model for every stream because it is simpler to
 think about is how you overpay for a rename or under-resource a port.
 
-**Operational running and measurement** — the model barely matters; the fences do. Sonnet.
+**Operational running and measurement** — the model barely matters; the fences do. Haiku if
+it passes the checklist, otherwise Sonnet.
 
 ### Transport facts
 
@@ -99,13 +158,14 @@ think about is how you overpay for a rename or under-resource a port.
 |---|---|
 | Isolation | `isolation: "worktree"` gives its own checkout — but branched from the *default branch*, not your HEAD (see the stale-base trap, §3). To start from a prepared tree, dispatch without `isolation` and fence the worktree path in the brief |
 | Parallelism | many, safely, one per tree |
-| Visible to you | task notifications; `SendMessage` resumes it with context intact |
+| Visible to you | task notifications, with the worker's token total; `SendMessage` resumes it with context intact |
 | Survives session exit | **no — in-process state is lost** (§3) |
 | Starts with | its own system prompt, your brief, CLAUDE.md, a git-status snapshot. **Not** your conversation, **not** your auto-memory, **not** your output style |
 
 If the Agent tool is unavailable or the worker definitions do not resolve, fall back to
-`subagent_type: "general-purpose"` with `model: "claude-opus-5-5"` (effort then follows the
-session) and **report the downgrade** — a silent one makes two runs incomparable.
+`subagent_type: "general-purpose"` with `model: "haiku"` or `model: "sonnet"` (effort then
+follows the session) and **report the downgrade** — a silent one makes two runs incomparable.
+Never fall back to an Opus subagent; do that work yourself.
 
 ## 1b. The second look — grok as adversary, never as author
 
@@ -123,11 +183,19 @@ is the reason for every rule below:
 - **An unreliable transport.** Dispatches have dropped mid-run with no output, twice in a row;
   a dropped stream can also leave the worker still writing files (§9).
 
-**Use it for** one consequential, *well-scoped* question: a design decision about to be
-committed to, a diff you are about to accept, a claim a fix rests on. The scope must be small
+**Run it on every consequential change, whoever wrote it** — a Sonnet or Haiku worker's diff
+before you accept it, and your own in-session work before you commit it. Your in-session work
+needs it most: nothing else in this skill puts a second pair of eyes on it, and another
+Claude would share your blind spots (§0). "Consequential" means the change can reach a user
+and is not trivially checkable — skip a rename the compiler fully decides, a doc fix, a
+scouting report. One dispatch per change, framed as one *well-scoped* question: the diff and
+the claim it rests on, or the decision about to be committed to. The scope must be small
 enough that every finding it returns can be checked. **Do not use it** for open-ended audits,
-for anything on the critical path, as the final word on correctness, or as a substitute for
-an external oracle on numeric code.
+as the final word on correctness, or as a substitute for an external oracle on numeric code.
+
+It runs **off the critical path**: dispatch it in the background as soon as the diff exists,
+and keep reviewing (§7) while it runs. Its findings join your own review; they do not gate
+the start of it.
 
 **The brief for a second look:**
 
@@ -146,7 +214,8 @@ an external oracle on numeric code.
 code. Only a finding whose falsifier fails is acted on; the rest are logged as `Refuted`
 (§10). Carry grok's refute rate across dispatches: a second look whose findings mostly refute
 is costing review time without buying anything, and that is the signal to stop commissioning
-it.
+it — say so in the verdict, and the default above becomes the exception until the rate
+recovers.
 
 **No round closes on model agreement.** grok concurring with you is not evidence; neither is
 grok disagreeing. An execution decides (§7).
@@ -276,17 +345,18 @@ branches of an unmade decision — two live implementations of one behaviour is 
 §2 of the canon exists to prevent, and shipping it "for now" makes the decision harder, not
 easier.
 
-**Give a lead a time budget when you can estimate one.** Opus 5.5 paces itself to an
-`elapsed Ns / budget Ns` line and parallelises more to fit it. The budget is advisory — keep a
-real timeout — and under pressure it may verify a little less, so do not use it on a numeric
-stream.
-
 ## 5. Recon before briefs
 
 You cannot write a brief the worker can refuse (§6) until you know which of your premises are
 load-bearing. Buy that knowledge first, with read-only workers whose only deliverable is
-evidence.
+evidence. Recon is `worker-haiku`'s home lane: it is the bulk you would otherwise read
+yourself, it writes nothing, and a missed site surfaces when you check the load-bearing claim.
 
+- **One area per scout, under 100k.** Scope each scout to what it can read in about 50k
+  tokens (§1). Several narrow scouts in parallel beat one wide one — each stays in the cheap
+  price tier, and each report is small enough to check.
+- **State read-only in the brief.** The Haiku definition can edit, because the same worker
+  takes narrow edits; a scouting brief forbids every write, by name.
 - **Fence recon hard: read-only, and forbidden from spending money.** No writes, no commits, no
   branch checkouts in a shared tree, no run that bills a provider. A recon agent that "helpfully"
   runs the expensive pass has pre-empted the experiment you were designing.
@@ -366,9 +436,13 @@ everything specific:
 - **Paste in the memories that apply.** Auto-memory does not reach a subagent. If a
   memory records a trap in the area the stream touches, quote it; a pointer to the memory
   file is not enough.
-- **Name the scope literally.** Sonnet 5.5 does what the brief says and does not infer what
-  it leaves out. "Fix the three call sites" gets three; if you mean every site of the
-  pattern, say "every site, found by `<search>`, with file:line for each."
+- **Name the scope literally.** Haiku 5.5 and Sonnet 5.5 do what the brief says and do not
+  infer what it leaves out. "Fix the three call sites" gets three; if you mean every site of
+  the pattern, say "every site, found by `<search>`, with file:line for each."
+- **Keep a Haiku brief short.** The brief is most of what a delegation costs you (§0), and
+  Anthropic reports Haiku stopping early more often under long agent prompts. A Haiku edit
+  brief is the change, the sites or the search, the check, the fence and the report path. If
+  it needs the full structure above, the task fails the checklist — it is Sonnet's.
 - **Name the checks that count.** The definition tells it to run a real check; the brief
   names which — the exact test scope, the typechecker, the build. A worker left to choose
   runs the fast one and skips the one that catches its class of mistake.
@@ -544,9 +618,10 @@ Two reporting rules that follow from the mechanics:
 Report as the reviewer, not as the worker's spokesperson:
 
 ```
-Delegated:   <what, to which worker definition, and why the triage put it there>
+Delegated:   <what, to which worker definition, and why the triage put it there | kept in-session: why>
+Tokens:      <the worker's total from its task notification, against the §0 estimate>
 Fence:       <what it owned — and whether it stayed inside>
-Second look: <none | grok on <question>: N findings, N proven by a failing falsifier, N refuted>
+Second look: <grok on <question>: N findings, N proven by a failing falsifier, N refuted | skipped: why>
 Gate:        <numbers YOU ran, after any rebase>
 Accepted:    <what survived review>
 Changed:     <what you overrode, and why>
