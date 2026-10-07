@@ -65,7 +65,7 @@ measured — for one narrow delegated edit:
 | | Tokens | Cost |
 |---|---|---|
 | You: decide, write the brief, review the diff and report | ~1.5–3k output, ~3–6k input added to your context | ~$0.03–0.06 plus the residue |
-| A Haiku worker's whole run, staying under 100k | ~5–15k output, mostly cache reads in | ~$0.01–0.05 |
+| A Haiku worker's whole run, each request under 100k | ~5–15k output, mostly cache reads in | ~$0.01–0.05 |
 | You doing it yourself | ~200–400 output per edit site, plus 2–8k input per file read, re-read every later turn | grows with sites and reads |
 
 Break-even sits around **6 or more edit sites, or 10k or more tokens of reading you would
@@ -74,7 +74,9 @@ yourself.
 
 **Calibrate rather than trust these numbers.** Each task notification reports the worker's
 token total; record it in the verdict (§10), and revise the thresholds once real runs
-disagree with them.
+disagree with them. First measured point (2026-10-07): a three-tool-call read-only Haiku
+probe used 57k tokens in total — the fixed start-up context is roughly 15–20k per request
+before your brief, so very small delegations cost more than they look.
 
 **Never delegate verification of your own work to another Claude.** Anthropic's guidance for
 Opus 5 and later is explicit: do not use subagents to verify or double-check your own work —
@@ -118,15 +120,19 @@ goes to a cheaper tier to save money.
    that finds every site — without reading the code yourself.
 2. **A command decides it.** A compiler, type-checker or named test fails loudly if the edit
    is wrong.
-3. **It fits under 100k.** The files it must read total about 50k tokens or less (roughly
-   200KB of code, one area), leaving room for the subagent's own system prompt and tools.
-   Past 100k Haiku's price quintuples and the cheap lane is gone.
+3. **One area, no need to hold it all at once.** Haiku 5.5's price quintuples on any request
+   over 100k tokens, and auto-compaction (window set to 100k for Haiku) keeps a long run
+   under that line — so the *total* reading can exceed 100k. What compaction cannot keep is
+   detail: a task that needs to reason over everything it read simultaneously — matching
+   sites against each other, a cross-file invariant — loses it at the first compaction.
+   Size the task so the working set at any moment fits in about 50k, and have the brief put
+   the site list and progress in the report file, which survives compaction.
 4. **It is big enough** — about 6 or more sites, or 10k or more tokens of reading you would
    otherwise do (§0).
 5. **Nothing subtle is in it.** No number a user reads, no ordering or concurrency, no shared
    state, no design choice.
 
-Fails 4 → do it yourself. Fails 3 → split it, or Sonnet. Fails 1, 2 or 5 → Sonnet, or you.
+Fails 4 → do it yourself. Fails 3 → split it into areas, or Sonnet. Fails 1, 2 or 5 → Sonnet, or you.
 
 Why the line sits there: on Anthropic's published numbers Haiku 5.5 is close to Sonnet 5.5 on
 a single coding problem (FrontierCode 1.1: 46.4% vs 52.1%) and about half of it on multi-step
@@ -352,9 +358,10 @@ load-bearing. Buy that knowledge first, with read-only workers whose only delive
 evidence. Recon is `worker-haiku`'s home lane: it is the bulk you would otherwise read
 yourself, it writes nothing, and a missed site surfaces when you check the load-bearing claim.
 
-- **One area per scout, under 100k.** Scope each scout to what it can read in about 50k
-  tokens (§1). Several narrow scouts in parallel beat one wide one — each stays in the cheap
-  price tier, and each report is small enough to check.
+- **One area per scout.** A scout may read past 100k in total — compaction keeps each
+  request in the cheap tier (§1) — but it records evidence in its report file as it goes,
+  because compaction will drop what it only held in context. Several narrow scouts in
+  parallel still beat one wide one: each report is small enough to check.
 - **State read-only in the brief.** The Haiku definition can edit, because the same worker
   takes narrow edits; a scouting brief forbids every write, by name.
 - **Fence recon hard: read-only, and forbidden from spending money.** No writes, no commits, no

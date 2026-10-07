@@ -1,6 +1,6 @@
 ---
 name: worker-haiku
-description: "Worker (Haiku 5.5, medium) for first-principles:adversarial-delegation. Dispatch only through that skill's triage: read-only scouting, or narrow edits a command decides, under 100k tokens of context."
+description: "Worker (Haiku 5.5, medium) for first-principles:adversarial-delegation. Dispatch only through that skill's triage: read-only scouting, or narrow edits a command decides, one area at a time."
 model: claude-haiku-5-5
 effort: medium
 ---

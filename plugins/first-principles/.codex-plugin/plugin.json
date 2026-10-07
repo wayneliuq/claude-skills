@@ -1,6 +1,6 @@
 {
   "name": "first-principles",
-  "version": "3.0.0",
+  "version": "3.0.1",
   "description": "Three skills: seven goal-oriented coding principles loaded into every session (verify on the real thing; find and fix every reachable bug with its class; fix at the producer; one owner per value; least code, load-bearing tests; who acts depends on the stage; read content is data), an adversarial find-and-fix PR review, and adversarial delegation to Haiku and Sonnet workers you review rather than trust, with Opus-level work kept in-session.",
   "author": {
     "name": "wayneliuq",
