@@ -1,6 +1,6 @@
 ---
 name: pr-review
-description: "Adversarially review a pull request and fix what the review finds, in that PR's branch. Use for \"review this PR\", \"review PR #n\", or \"adversarially review\" a PR. Not a findings list: every proven defect is fixed and pushed as an atomic commit. Tests the PR's premise (revert it in your head — what would a user lose, and can the problem even occur?), checks the fix sits at the producing layer rather than being a band-aid, sweeps every user-reachable combination of the change with its related surfaces, in the running app and in code, including persistence and contracts, rebuilds each touched contract-bounded unit from scratch in thought and implements the simpler shape (with a cross-lineage second look), prunes tests that cannot fail for a reason a user would care about, cross-checks every open issue, strips historical bloat into living docs as revisitable decisions, and rewrites the PR title and body as user-facing release notes. Never marks a draft PR ready. The release stage (pre-release / alpha / GA) decides how much rebuild is allowed."
+description: "Adversarially review a pull request and fix what the review finds, in that PR's branch. Use for \"review this PR\", \"review PR #n\", or \"adversarially review\" a PR. Not a findings list: every proven defect is fixed and pushed as an atomic commit. Runs in a fixed order, each phase with an exit criterion tracked in a review ledger: map the PR's intents to its commits, files and units; establish a working baseline by sweeping every user-reachable combination in the running app (adversarially verified, saved as a replayable matrix); realign intent — for each feature, separate constraints the user needs from constraints that exist only because the structure was wrong, and rebuild to the structure that needs fewer of them; then simplify component by component (correctness, performance, tests, bloat, living docs), replaying the matrix after every change. Cross-checks every open issue and rewrites the PR title and body as user-facing release notes. Never marks a draft PR ready. The release stage (pre-release / alpha / GA) decides how much rebuild is allowed."
 ---
 
 # pr-review
@@ -10,10 +10,25 @@ for the fix.* The review attacks all three, then repairs what it breaks — in t
 branch, commit by commit — so the PR that comes out is one the reviewer would have
 written.
 
+The phases run in a fixed order because each one is the precondition of the next:
+
+1. **Map** — know what the PR intends, and where each intent lives.
+2. **Baseline** — see it working in the real thing, and save that observation as a matrix
+   you can replay. Nothing is refactored before this exists: a refactor is only safe
+   against a behaviour you have watched work.
+3. **Realign intent** — per feature, keep the constraints the user needs, and rebuild away
+   the ones that exist only because the structure was wrong.
+4. **Simplify** — component by component, on the realigned structure.
+5. **Close out** — issues, final sweep, gate, release notes.
+
+Every phase ends at an **exit criterion**, not at the end of its steps. A phase is done when
+its criterion holds, however much work that takes.
+
 Canon: `../principles/SKILL.md` — proven / traced / suspected, fixing the class, test value,
 and what "verified" means. Mechanics this skill leans on rather than restates:
 
-- `../adversarial-delegation/SKILL.md` — every subagent and every grok second look.
+- `../adversarial-delegation/SKILL.md` — every subagent, every browser worker, and every
+  grok second look.
 - `references/bug-shapes.md` — the bug catalog.
 - `references/bloat-shapes.md` and `references/test-value-by-domain.md` — the bloat catalog,
   and where the test-value floor sits per layer.
@@ -52,36 +67,141 @@ otherwise take the default and say so.
 - **Find and fix, not findings-only.** A proven or traced defect is fixed and pushed. A
   suspected one is either promoted by a repro or logged as suspected — never fixed on a
   hunch (principles §2).
+- **No refactor before the baseline** (§4 exit). No refactor lands without the matrix
+  replayed after it.
 - **Atomic commits, pushed to the PR branch.** One concern per commit, a message that says
   what the user now sees, staged by explicit path. Obey the project's commit conventions
   (trailers, hooks); never `--no-verify`.
 - **Ambiguous fix → pick the simplest, and record the choice** in the commit message and
   the verdict. Escalate only what is genuinely the owner's decision (§9).
 - **No net-new unit tests** unless the PR introduces a net-new component. Otherwise, make
-  the existing tests more load-bearing (§6).
+  the existing tests more load-bearing (§6c).
 
-## 2. Load the PR
+## 2. The review ledger
 
-Before judging anything:
+Exhaustive fails silently: a long session is summarised, and what it had not yet covered
+is forgotten rather than skipped on purpose. So the review keeps its state in a file, not
+in context.
+
+Create `pr-review-<n>.md` in the scratchpad (or another untracked location — never commit
+it). It holds:
+
+- **The map** (§3): every intent, every commit, every changed file, every unit.
+- **The matrix** (§4): every combination, how to run it, and its latest result.
+- **The intent ledger** (§5): per feature, every constraint and its disposition.
+- **A disposition per file per phase**: each mapped file is marked for baseline, realign and
+  simplify — *done*, *unaffected because …*, or *skipped because …*. A blank cell is a
+  miss.
+
+Update it as each item closes, not at the end of a phase. After a context summary, or on
+resuming, re-read the ledger before doing anything else and continue from its first open
+cell.
+
+## 3. Map — what the PR intends, and where
+
+Load, before judging anything:
 
 1. `gh pr view <n> --json title,body,isDraft,baseRefName,headRefName,closingIssuesReferences,files`
    — and confirm `isDraft`. Record it; §1 depends on it.
-2. The full diff against the merge base, not the last commit: `git diff <base>...HEAD`.
+2. The full diff against the merge base, not the last commit: `git diff <base>...HEAD`, and
+   the commit list: `git log --reverse --format='%h %s%n%b' <base>..HEAD`.
 3. Every issue the PR claims to close, and the PR's own stated premise, **quoted** — you
    are about to test it, so write down exactly what it says.
-4. The project's living docs index and the rules the project holds itself to.
+4. **Every** open issue: `gh issue list --state open --limit 1000 --json number,title,body,labels`.
+   The default limit is 30, and a truncated list is a silent miss. Issues are behaviour real
+   users hit: the ones that touch this PR's surfaces feed the matrix (§4) and the intent
+   ledger (§5). Their dispositions are settled in §7.
+5. The project's living docs index and the rules the project holds itself to.
 
-Then name the **contract-bounded units** the diff touches — the smallest pieces with a
-stated interface (a module, a service, a component with its props/events, a table with its
-readers). Every later pass works per unit.
+Then build the map: **intent → commits → files → units.**
 
-## 3. Necessity — does this change need to exist?
+- **Intents** are the user-visible things the PR sets out to do — one line each, in user
+  terms. Derive them from the commit messages and the PR body, then check each against
+  its diff.
+- **A commit message is a claim, not the truth.** Read each commit's diff (`git show <sha>`)
+  and flag every commit whose diff does more, less or other than its message says. Those
+  mismatches are where unannounced changes hide; each gets an intent of its own.
+- **Flag fix-on-fix chains**: a later commit in the PR that patches an earlier one — a guard
+  added after the feature, a special case for an input the first version mishandled, a
+  revert-and-redo. A chain is the strongest early sign that the structure is wrong; each one
+  goes into the intent ledger as a constraint to examine in §5.
+- **Messages too vague to map** ("wip", "fix", "address review") → cluster the files by what
+  their changes do, and name the intent yourself.
+- **Contract-bounded units** — the smallest pieces with a stated interface (a module, a
+  service, a component with its props/events, a table with its readers). Every changed file
+  belongs to at least one unit; every later phase works per unit.
 
-Run this **first**. Simplifying a change that should not exist is wasted work, and the
-answer here can dissolve every later pass.
+**Exit:** every commit maps to an intent, every changed file to a unit, every mismatch and
+fix-on-fix chain is flagged — all in the ledger.
+
+## 4. Baseline — see it work, and save what you saw
+
+The baseline is a real-user sweep, run first and exhaustively, because everything after it
+is judged against it. A refactor is only proven safe by replaying an observation of working
+behaviour; without one, simplification is guesswork.
+
+### 4a. Build the matrix
+
+A feature or fix is judged against everything it touches, not just itself. For each intent,
+name the **surfaces** it meets — the features, types, modes, settings and data states it can
+be combined with — and enumerate **every combination a user can reach**.
+
+Example: a new plot type is reviewed against every other plot type it can be plotted with,
+and every statistic is checked on the new type. A fix is swept the same way, across every
+surface where the fixed behaviour appears.
+
+When the full product of axes is too large to run, cover **every pair** of values across all
+axes, and the **full product on the risky axes** — the ones the PR changed, the ones a
+fix-on-fix chain touched, the ones an open issue names. Write down which combinations were
+cut and why; an uncovered combination is never silent.
+
+Each row records: the combination, the exact steps to run it (so it can be replayed by
+someone with no context), the expected result in user terms, and the observed result.
+Unreachable combinations are named as such, with the reason.
+
+### 4b. Run it — for real, and verified adversarially
+
+- **In the running app**, as the user would: the browser, the CLI, the actual UI. Use real
+  data and real interactions; a mocked path does not count as a sweep. When you cannot
+  drive the browser yourself, it is a delegation (adversarial-delegation §8), not a gap.
+- **In code**, through the same entry points: contracts, APIs, persistence — save, reload
+  and migrate each combination; every writer and reader of a changed value still agrees.
+- **Every result is verified adversarially, whoever produced it.** A worker's sweep is
+  reviewed under adversarial-delegation §7 — read its machine-readable artifacts, re-run a
+  sample of rows yourself, check the oracle's dimension. A sweep you ran yourself gets the
+  same scrutiny: for each pass, ask what the observation would have looked like if the
+  feature were broken, and confirm it did not look like that. An empty state proves the
+  surface, not the content.
+
+### 4c. Triage the failures
+
+Tier every failure (principles §2), then split by **where the cause lives**:
+
+- **Local cause** — a wrong value at one site, the structure otherwise sound → fix it now,
+  at the producer, with its siblings. One commit per concern.
+- **Structural cause** — the failure exists because of how the unit is shaped (two owners of
+  one value, a state the design allows but should not, a path that should not exist) →
+  do **not** patch it here. Mark the row **known-failure: structural**, and add the cause to
+  the intent ledger for §5. A band-aid now is work §5 throws away.
+
+### 4d. Gate
+
+Run the project's fast gate (typecheck, lint, the changed packages' tests). Failures are
+triaged as in 4c.
+
+**Exit:** every reachable row is **green** or **known-failure: structural** with its cause in
+the intent ledger; the gate is green; the matrix is saved and replayable. Only now may
+anything be refactored.
+
+## 5. Realign intent — needed constraint, or structural artifact?
+
+For each feature (each intent in the map), step back from the code. The question is not
+*is this code right* but *does this constraint need to exist at all?*
+
+### 5a. Necessity — does this change need to exist?
 
 **Do not trust the premise.** The PR description and the linked issue are the author's
-belief, not evidence. For each change in the diff:
+belief, not evidence. For each intent:
 
 1. **Revert it in your head** (or actually, on a scratch branch). What user-facing
    behaviour changes? Name it concretely: what the person would see, click, or be told
@@ -89,51 +209,80 @@ belief, not evidence. For each change in the diff:
 2. **Would a real user notice?** Picture the actual user of this product doing their
    actual job. If nobody would ever see the difference, the change is ballast.
 3. **Can the problem actually occur?** Trace the input that reaches the fixed branch, from
-   a real entry point. State the circumstance: which user action, which data, which
-   sequence. A problem with no reachable input is theoretical — do not keep a fix for it.
-4. **Is the fix at the right layer?** Find where the wrong value is *produced*, not where
-   it is *noticed*. A guard at the consumer, a retry, a clamp, a special case for one
-   input — these are band-aids when the producer is still wrong. Principle 4: if two places
-   decide one value, the fix is removing one of them.
+   a real entry point — the matrix tells you which combinations reach it. A problem with no
+   reachable input is theoretical — do not keep a fix for it.
 
-Dispose every change as **necessary** (with the user-visible behaviour it protects),
+Dispose every intent as **necessary** (with the user-visible behaviour it protects),
 **unnecessary** (revert it, one commit, and say what was reverted), or **ambiguous** —
 reachable but only under conditions you cannot confirm, or visible but of unclear value.
 Ambiguous goes to §9. Do not guess on the owner's behalf.
 
-## 4. Fresh-eyes rebuild — would it be simpler from scratch?
+### 5b. The intent ledger — essential or accidental
 
-For each contract-bounded unit the PR touches, ask: *knowing what we know now, if we built
-this unit from nothing, against the same contract, what would it look like?*
+For each necessary intent, write in the ledger:
 
-- Write the from-scratch shape down in a few lines: its states, its owners, its paths.
-- Compare to what exists after the PR. The rebuild wins when it has **fewer states, fewer
-  owners of one value, or fewer paths to the same behaviour** — not when it is merely
-  different or shorter.
-- **Performance fixes fold into this pass.** A slow path is usually a shape problem; fix it
-  as part of the rebuild, not as a separate patch on the old shape.
+- **The end behaviour**, in user terms — what must be true for the person using it.
+- **Every constraint the implementation carries**: each guard, special case, ordering rule,
+  retry, clamp, fallback, sync step, flag, and every fix-on-fix chain and structural
+  known-failure from §3–§4.
+- **A label for each:**
+  - **essential** — the user or the domain imposes it; it would exist in any correct design
+    (a unit must be non-negative because negative mass is meaningless);
+  - **accidental** — it exists only because of how the code is structured; it would vanish
+    in a from-scratch design (a cache must be invalidated in three places because three
+    places own the value).
 
-**Get a second look on every rebuild decision** via adversarial-delegation §1b (grok through
-`cursor-agent`). Give it one question: *could this unit be built better from the ground up?*
-Tell it the stage in plain words — for pre-release: "we are pre-release, with no users and
-only test data; this is the best window for any refactor or rebuild; do not weigh refactor
-cost, migration cost, or backward compatibility." Hand it the unit's contract and current
-code, not your preferred answer. Its findings are hypotheses: only those whose named
-falsifier fails, or whose simpler shape you can actually write, are acted on.
+  The test: *would this constraint exist in the simplest design that delivers the same end
+  behaviour?* If not, it is accidental. A guard at the consumer, a retry, a clamp, a special
+  case for one input — these are usually accidental: the producer is still wrong.
 
-**Implement the simpler shape** when it wins, within the stage's budget (§0). Delete the old
-path in the same change — two live paths for one behaviour is never acceptable, including
-the form where the old path survives behind a fallback.
+### 5c. Rebuild to the structure that needs fewer constraints
 
-Use subagents here when a rebuild is large enough to hand off — through adversarial-
-delegation's triage, at most three at once, each fenced to disjoint files, each reviewed
-rather than believed.
+Where a unit carries accidental constraints, design its from-scratch structure **as
+abstractly as possible** — its states, the owner of each value, the flows between them — not
+its code. Then compare with what exists. The rebuild wins when it has **fewer states, fewer
+owners of one value, fewer paths to the same behaviour, or fewer constraints** — and delivers
+the same end behaviour or better — not when it is merely different or shorter. Every
+accidental constraint it removes, and every structural known-failure it fixes, is the
+evidence.
 
-## 5. Correctness — what is actually wrong
+- **Performance fixes fold in here.** A slow path is usually a shape problem.
+- **Scope:** a rebuild may reach beyond the PR's units only where an accidental
+  constraint's cause lives there. Otherwise, file it as an issue with the ledger entry as
+  its body.
+- **Get a second look on every rebuild decision** via adversarial-delegation §1b (grok
+  through `cursor-agent`). Give it the unit's end behaviour, its constraints and the current
+  code — not your preferred answer — and one question: *which of these constraints exist only
+  because of the structure, and what structure would need none of them?* Tell it the stage
+  in plain words — for pre-release: "we are pre-release, with no users and only test data;
+  this is the best window for any refactor or rebuild; do not weigh refactor cost, migration
+  cost, or backward compatibility." Its findings are hypotheses: only those whose named
+  falsifier fails, or whose simpler shape you can actually write, are acted on.
 
-Run the bug catalog over the diff and its reachable neighbours as a hypothesis generator,
-every finding tiered. Two checks this review always runs, because they are where
-PRs most often go wrong:
+**Implement the simpler shape** within the stage's budget (§0). Delete the old path in the
+same change — two live paths for one behaviour is never acceptable, including the form where
+the old path survives behind a fallback. Use subagents when a rebuild is large enough to
+hand off — through adversarial-delegation's triage, at most three at once, each fenced to
+disjoint files, each reviewed rather than believed.
+
+**After each rebuild, replay the matrix rows it touches.** A row that was green and is now
+red is a regression in the rebuild — fix the rebuild, not the row. A structural
+known-failure the rebuild was meant to fix must now be green.
+
+**Exit:** every intent is necessary-with-behaviour, reverted, or escalated; every constraint
+is labelled; every accidental constraint is removed by a rebuild, or escalated, or filed with
+a reason it could not be removed in this PR; no structural known-failure remains; the matrix
+is green.
+
+## 6. Simplify — component by component
+
+Now, on the realigned structure, go unit by unit through the map. For each unit, run every
+pass below, mark it in the ledger, and **replay that unit's matrix rows before moving on**.
+
+### 6a. Correctness
+
+Run the bug catalog over the unit and its reachable neighbours as a hypothesis generator,
+every finding tiered. Two checks always run, because they are where PRs most often go wrong:
 
 - **Every writer, every reader.** For each value the PR changes the shape of, enumerate every
   producer and consumer — including rows written before the change, cold reloads, and
@@ -141,31 +290,24 @@ PRs most often go wrong:
 - **Every sibling.** A defect at one call site has siblings; search for the shape and fix
   them together.
 
-## 5b. Surface sweep — every combination a user can reach
+A finding the matrix did not catch is a missing row: add it.
 
-A feature or fix is judged against everything it touches, not just itself. Name the
-**surfaces** the change meets — the features, types, modes and settings it can be combined
-with — and exercise **every combination a user can reach**, for real:
+### 6b. Simplification
 
-- **In the running app**, as the user would: the browser, the CLI, the actual UI. Use real
-  data and real interactions; a mocked path does not count as a sweep.
-- **In code**, through the same entry points: contracts, APIs, persistence.
-- **Persistence and contracts:** save, reload and migrate each combination; every writer
-  and reader of the changed value still agrees.
+Run the bloat catalog over the unit: duplicated logic, a hand-copied predicate where a
+shared helper exists, indirection with one caller, configuration nobody varies, a branch
+for a state the realigned structure no longer allows. Reuse what exists; prefer the change
+that removes a branch or a state over the one that adds a guard.
 
-Example: a new plot type is reviewed against every other plot type it can be plotted with,
-and every statistic is checked on the new type. A fix is swept the same way, across every
-surface where the fixed behaviour appears.
+### 6c. Tests — load-bearing or gone
 
-Enumerate the combinations, run them, and tier each failure (principles §2). Unreachable
-combinations are named as such, not skipped silently.
-
-## 6. Tests — load-bearing or gone
-
-Apply the two test-value questions to every test the PR adds or touches:
+Apply the two test-value questions to every test the unit's changes add or touch:
 
 1. Can it fail for a reason a user would care about?
 2. Can a correct refactor leave it green?
+
+The rebuild in §5 makes this pass sharper: a test that broke under a behaviour-preserving
+rebuild was pinned to structure, not behaviour.
 
 **Remove spurious tests.** Spurious means any of:
 
@@ -187,24 +329,7 @@ net-new component — and then the smallest set that can fail on that component'
 A regression test that stays or is rewritten must fail against the unfixed code. Run it
 there once, and record that you did.
 
-## 7. Open-issue cross-check
-
-Pull **every** open issue: `gh issue list --state open --limit 1000 --json number,title,body,labels`.
-The default limit is 30, and a truncated list is a silent miss.
-
-For each issue, one disposition:
-
-| The issue is | Do |
-|---|---|
-| **resolved by this PR** | confirm it against the code, not the title; add `Closes #n` so it closes atomically when the PR merges — one `Closes` per issue, on the release-notes line of the change that resolves it (§11) |
-| **in tension with a decision this PR made** | reconcile it — adjust the code or the issue text — if the right answer is clear; otherwise escalate (§9) |
-| **a real bug, unfixed** | reproduce it; proven or traced → fix it in this branch with `Closes #n`; suspected → comment what you tried, leave it open |
-| **a net-new feature** | if this PR changed a premise the issue rests on, update the issue text to match; otherwise leave it alone |
-| **unrelated** | leave it alone; no comment |
-
-Most issues are unrelated. Report only the non-trivial dispositions.
-
-## 8. Historical bloat and living docs
+### 6d. Historical bloat and living docs
 
 **Remove from the branch:** comments narrating history ("previously", "was changed to",
 "fix for #n"), dead code and unreachable arms, commented-out code, stale TODOs, generated
@@ -215,10 +340,40 @@ development or maintenance: a constraint, a non-obvious reason, a trap someone f
 Fold it into the living doc that owns that subject, found through the project's docs index.
 Never create a parallel doc where one already owns the topic.
 
-**Update the living docs** the PR's change touches, so they describe the system as it now
-is. **Record each design decision the PR settles** as a locked-in decision that can be
-revisited: what was decided, the reason, the date, and what evidence would reopen it. A
-decision without its reopen condition reads as permanent and stops being questioned.
+**Update the living docs** the unit's change touches, so they describe the system as it now
+is. **Record each design decision the PR settles** — including each essential constraint
+from the intent ledger whose reason is not obvious from the code — as a locked-in decision
+that can be revisited: what was decided, the reason, the date, and what evidence would reopen
+it. A decision without its reopen condition reads as permanent and stops being questioned.
+
+**Exit:** every unit in the map has a disposition for every pass in the ledger, and its
+matrix rows are green.
+
+## 7. Open-issue dispositions
+
+The issues were read in §3. Settle each one against the branch as it now is:
+
+| The issue is | Do |
+|---|---|
+| **resolved by this PR** | confirm it against the code and the matrix, not the title; add `Closes #n` so it closes atomically when the PR merges — one `Closes` per issue, on the release-notes line of the change that resolves it (§10) |
+| **in tension with a decision this PR made** | reconcile it — adjust the code or the issue text — if the right answer is clear; otherwise escalate (§9) |
+| **a real bug, unfixed** | reproduce it; proven or traced → fix it in this branch with `Closes #n`, and add its row to the matrix; suspected → comment what you tried, leave it open |
+| **a net-new feature** | if this PR changed a premise the issue rests on, update the issue text to match; otherwise leave it alone |
+| **unrelated** | leave it alone; no comment |
+
+Most issues are unrelated. Report only the non-trivial dispositions.
+
+## 8. Final sweep, gate, push
+
+Simplification breaks things too, and a per-unit replay misses interactions between units.
+
+1. **Replay the whole matrix**, every row, in the running app — verified as in §4b.
+2. **Run the project's full gate** after the last commit. A lane that refused is not a pass.
+3. Any red → back to the phase that owns it (local defect → fix; structural → §5), then
+   replay again.
+4. Push to the PR branch.
+
+**Exit:** full matrix green, full gate green, every commit pushed.
 
 ## 9. Escalation
 
@@ -238,13 +393,7 @@ Batch escalations; do not block on them. Keep fixing everything else and bring t
 the end, smallest number of genuine forks first — and if one answer dissolves others, ask
 that one and say so.
 
-## 10. Verify and push
-
-- Run the project's full gate after the last commit, not per commit.
-  A lane that refused is not a pass.
-- Push to the PR branch.
-
-## 11. Rewrite the PR message as release notes — the final step
+## 10. Rewrite the PR message as release notes — the final step
 
 Last, after every commit is pushed, because the message describes what the branch *now*
 does, not what the author first intended or what the review changed along the way.
@@ -276,8 +425,9 @@ Omit an empty section rather than writing "none".
 - **Concise.** No preamble, no summary paragraph restating the list, no filler adjectives
   ("robust", "seamless", "comprehensive"), no hedging. Positive phrasing: say what now
   works, not what no longer breaks, where both are true.
-- **Honest.** `Verification` states what actually ran; a skipped lane is written as skipped.
-  Nothing claims more than the commits and the gate show.
+- **Honest.** `Verification` states what actually ran — the matrix size, how many rows ran
+  in the app, which were cut — and a skipped lane is written as skipped. Nothing claims more
+  than the commits, the matrix and the gate show.
 
 **Title:** a plain summary of the user-visible change, matching the project's title
 convention if it has one.
@@ -288,23 +438,25 @@ to confirm what landed.
 **Confirm the PR is still a draft** (`gh pr view <n> --json isDraft`). If it somehow is not,
 say so first in the report.
 
-## 12. Report
+## 11. Report
 
 ```
 PR:          <#n — title> · draft: yes · stage: <stage> · branch: <head>
 Premise:     <quoted claim> → <held | partly held | did not hold: why>
-Layer:       <fix at the producer | band-aid at <site> → moved to <site>>
 
-Necessity:   <n> necessary · <n> reverted (what the user would have lost: nothing) · <n> escalated
-Rebuild:     <per unit: kept | rebuilt to <shape> — states/owners/paths removed>
+Map:         <n> intents · <n> commits · <n> units · <n> message/diff mismatches · <n> fix-on-fix chains
+Baseline:    <n> rows (<n> in the app · <n> via code · <n> unreachable · <n> cut: why)
+             <n> local fixes · <n> structural → realign
+Realign:     <n> necessary · <n> reverted (what the user would have lost: nothing) · <n> escalated
+             constraints: <n> essential · <n> accidental → <n> removed · <n> filed · <n> escalated
+             <per rebuilt unit: old shape → new shape — states/owners/paths/constraints removed>
   Second look: <grok on <question>: N findings, N proven, N refuted | skipped: why>
-Surfaces:    <combinations swept: n run in the app · n via code · n unreachable (why)>
-Correctness: <n> proven fixed · <n> traced fixed · <n> suspected logged
-Tests:       <n> removed (each with the defect it could not catch) · <n> refactored · <n> new (new component only)
+Simplify:    correctness <n> proven fixed · <n> traced fixed · <n> suspected logged
+             tests <n> removed (each with the defect it could not catch) · <n> refactored · <n> new (new component only)
+             bloat/docs <removed> · <folded into <doc>> · <decisions recorded>
 Issues:      closes <#a, #b> · fixed <#c> · reconciled <#d> · escalated <#e>
-Bloat/docs:  <removed> · <folded into <doc>> · <decisions recorded>
 Choices:     <ambiguous fixes where the simplest was picked, one line each>
-Gate:        <command, result, what did not run>
+Final sweep: <n>/<n> rows green · gate <command, result, what did not run>
 Commits:     <n pushed, one line each>
 PR message:  <rewritten as release notes — title, sections used>
 
