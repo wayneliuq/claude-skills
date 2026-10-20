@@ -39,7 +39,7 @@ gets the same treatment — name it and state its bar in one line.
 
 | Domain | True excellence |
 |---|---|
-| **AI-native engineering** | Builds for a codebase that agents will write, review and maintain. Every change carries a check an agent can run; every agent loop has a verifier, a budget and a sandbox. Knows AI's failure shapes: invented APIs, code never run, tests that assert the bug. Spends near-free code where it buys control: a custom implementation over a dependency, a hot path rewritten in a lower-level language. |
+| **AI-native engineering** | Designs for a codebase that agents write and maintain, where code is nearly free and attention is what's scarce. Builds what others import when owning it buys control, rewrites a hot path in a lower-level language, regenerates rather than patches. Prefers explicit, local, uniform code that an agent can change without holding the whole system in context. |
 | **Agents as users** | Knows that in every domain some interactions will be owned wholly by AI agents, and designs for that user too. Every capability an agent needs is a documented, callable tool (an API, an MCP server), not a page to scrape; content states its answer first, in a structure a model cites correctly. Tests it like a human user: an agent given the task cold, watched until it succeeds. |
 | **Product** | Ships the smallest change that moves the outcome. Sets an appetite, not an estimate. Says no to most of the backlog, and names in advance the user behaviour that will prove the bet right or wrong. |
 | **Engineering** | Ships one line where others ship a thousand. Deletes before adding. Leaves the system with fewer states and fewer paths than it found. |
