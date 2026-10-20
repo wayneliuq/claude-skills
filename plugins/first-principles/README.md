@@ -1,6 +1,6 @@
 # first-principles
 
-Three skills, kept small on purpose: capable models need goals and the few processes
+Four skills, kept small on purpose: capable models need goals and the few processes
 they would not run unaided, not checklists.
 
 | Skill | What it is |
@@ -8,6 +8,7 @@ they would not run unaided, not checklists.
 | [`principles`](skills/principles/) | Seven goal-oriented principles for building, debugging, fixing and shipping. Loaded into **every session** by a `SessionStart` hook ([`hooks/hooks.json`](hooks/hooks.json)); not model-invoked. |
 | [`pr-review`](skills/pr-review/) | Adversarial find-and-fix review of a PR, in that PR's branch. Never marks a draft ready. Carries the bug and bloat catalogs in [`references/`](skills/pr-review/references/). |
 | [`adversarial-delegation`](skills/adversarial-delegation/) | Keep Opus-level work in-session; hand scouting and narrow checkable edits to Haiku and bounded implementation to Sonnet, review rather than trust; grok second look on every consequential change. |
+| [`deepen`](skills/deepen/) | Rewrites a plan, prompt or brief into a deeper version, not a bigger one: evidence first, then the bar each relevant domain's best practitioners would hold, each addition judged by an external oracle. Returned in the input's own form. User-invoked only. |
 
 ## Worker definitions
 
