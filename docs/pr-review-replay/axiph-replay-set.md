@@ -20,3 +20,17 @@ Real bugs that shipped inside a reviewed axiph change, each with the commit that
 | W6 | in-app sweep | `46c13779a` | `296d0dcd5` | 3, 53, 1 | fix(plots): a size or a shape is not held where no row draws every value |
 
 Size is files, lines added, lines removed. Built 2026-10-23 from the commit history of axiph #844 and #987.
+
+## Results, 2026-10-23 (the two escapes only)
+
+Each lane got the same neutral brief: the commit, "find every defect a real user could hit,
+read beyond the diff". The every-reader run was a fresh Sonnet agent given only the new
+pr-review §6 rule and the commit.
+
+| Case | New §6 every-reader rule | grok-4.7-medium | Free opencode models |
+|---|---|---|---|
+| E1 credential leak in feedback reports | **caught**: tokens after "Bearer", cookies after the first, `?code=` in addresses, @mention pings | **missed** the leak; found 5 other issues (quota spent by failed sends, false "degraded" status) | no result: nemotron ran in the wrong folder; deepseek and glm hit "Free usage limit reached" |
+| E2 log-axis box readers | **caught**: the preview and fallback box summary, plus 3 more possible stale readers | **caught** the fallback (finding 6), plus 5 more | no result: same two causes |
+
+grok took 15–18 minutes per case. The free lane's wrong-folder problem is fixed in the runner
+(the brief now names the repository); its quota problem is not fixable from here.
