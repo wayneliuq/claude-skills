@@ -1,0 +1,19 @@
+{
+  "_comment": "Second-look lanes: models from another lineage that attack a change. Copy this file to ~/.claude/first-principles/second-looks.json to override it. {prompt} is replaced by the brief. A lane whose command is not installed, fails, times out, or prints one of its fail_patterns is reported as skipped. A lane's report is at the end of its output file.",
+  "timeout_seconds": 900,
+  "lanes": [
+    {
+      "name": "grok",
+      "enabled": true,
+      "command": ["cursor-agent", "-p", "--force", "--model", "grok-4.7-medium", "--output-format", "text", "{prompt}"],
+      "note": "Newest grok generation at medium, never -fast. Check: cursor-agent --list-models | grep -i grok"
+    },
+    {
+      "name": "free",
+      "enabled": true,
+      "command": ["opencode", "run", "--agent", "plan", "-m", "opencode/nemotron-3-ultra-free", "{prompt}"],
+      "fail_patterns": ["Free usage limit reached"],
+      "note": "Free opencode model, read-only plan agent. Check: opencode models | grep free"
+    }
+  ]
+}

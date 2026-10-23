@@ -1,6 +1,6 @@
 ---
 name: adversarial-delegation
-description: Keep Opus-level work in-session and delegate well-scoped work to cheaper Claude workers (Haiku 5.5 for scouting and narrow command-checked edits, Sonnet 5.5 for bounded implementation, chosen by an automatic triage) while acting as their adversarial reviewer, with grok via cursor-agent as a cross-lineage adversary on every consequential change whoever wrote it. Use when a task has bulk you only need the conclusion of, when a mapping or edit can be specified without reading the code yourself, when several tasks must run in parallel without colliding, or when a consequential change deserves an independent adversary. Covers whether delegation pays for its brief, the Haiku checklist, the worker triage, the file-safety rules that stop a worker destroying your uncommitted work, fencing parallel streams and owning the merges, writing a brief the worker can refuse — whose first action on any finding you did not prove is the test that would refute it — running grok as an adversary whose findings must fail a test before they count, and what the reviewer must verify rather than believe.
+description: Keep Opus-level work in-session and delegate well-scoped work to cheaper Claude workers (Haiku 5.5 for scouting and narrow command-checked edits, Sonnet 5.5 for bounded implementation, chosen by an automatic triage) while acting as their adversarial reviewer, with second looks from other model lineages (grok, a free opencode model — swappable lanes in one settings file) as adversaries on every consequential change whoever wrote it. Use when a task has bulk you only need the conclusion of, when a mapping or edit can be specified without reading the code yourself, when several tasks must run in parallel without colliding, or when a consequential change deserves an independent adversary. Covers whether delegation pays for its brief, the Haiku checklist, the worker triage, the file-safety rules that stop a worker destroying your uncommitted work, fencing parallel streams and owning the merges, writing a brief the worker can refuse — whose first action on any finding you did not prove is the test that would refute it — running second-look lanes as adversaries whose findings must fail a test before they count, and what the reviewer must verify rather than believe.
 ---
 
 # Adversarial delegation
@@ -14,8 +14,8 @@ There are no Opus workers. Work that needs Opus-level judgment stays in-session,
 has your full context; a subagent at the same price as you buys only context isolation, and
 a Haiku scout buys that for a fortieth of the price.
 
-A third role is the **second look** (grok via `cursor-agent`, §1b), a model from a different
-training lineage that attacks every consequential change — a worker's or your own. It never
+A third role is the **second look** (§1b): models from a different
+training lineage, run as swappable lanes, that attacks every consequential change — a worker's or your own. It never
 implements.
 
 Canon: `../principles/SKILL.md`. This skill is the delegation mechanics those principles
@@ -173,11 +173,15 @@ If the Agent tool is unavailable or the worker definitions do not resolve, fall 
 follows the session) and **report the downgrade** — a silent one makes two runs incomparable.
 Never fall back to an Opus subagent; do that work yourself.
 
-## 1b. The second look — grok as adversary, never as author
+## 1b. The second look — another lineage as adversary, never as author
 
-grok via `cursor-agent` is **not an implementation lane.** Its value is a different training
-lineage, which catches errors a Claude reviewer shares assumptions with. Its measured profile
-is the reason for every rule below:
+A second look is **not an implementation lane.** Its value is a different training lineage,
+which catches errors a Claude reviewer shares assumptions with. On axiph's large PRs it was
+the second-largest source of real defects (11 of grok's 16 findings in one round were real).
+The lanes — today grok via `cursor-agent` and a free opencode model — live in one settings
+file, so models and harnesses change without editing this skill. Grok's measured profile is
+the reason for the rules below, and a new lane earns the same rules until its own record says
+otherwise:
 
 - **Recall useful, precision poor.** In one independent test, 8 of 10 grok review findings
   were false positives (n=1 — treat as a direction, not a rate). Practitioner reports say it
@@ -218,55 +222,43 @@ the start of it.
 
 **Then you prove or refute each finding** — run the falsifier it named, against the current
 code. Only a finding whose falsifier fails is acted on; the rest are logged as `Refuted`
-(§10). Carry grok's refute rate across dispatches: a second look whose findings mostly refute
+(§10). Carry each lane's refute rate across dispatches: a second look whose findings mostly refute
 is costing review time without buying anything, and that is the signal to stop commissioning
 it — say so in the verdict, and the default above becomes the exception until the rate
 recovers.
 
-**No round closes on model agreement.** grok concurring with you is not evidence; neither is
-grok disagreeing. An execution decides (§7).
+**No round closes on model agreement.** A lane concurring with you is not evidence; neither is
+a lane disagreeing. An execution decides (§7).
 
-### Invocation that actually works (`cursor-agent`)
-
-```bash
-cursor-agent -p --force --model grok-4.7-medium --output-format text "<prompt>"
-```
-
-Run through `zsh -l -c "..."` (node is only on PATH in a login shell) and background it.
-Pass the brief from a file through a tiny runner script (`prompt="$(cat "$1")"`) — inlining it
-in a double-quoted `zsh -c` breaks on backticks and `$`.
-
-**Model: the newest grok generation at medium effort, never a `-fast` id.** As of 2026-09-28
-that is `grok-4.7-medium`. Both the version **and the id's prefix** go stale — 4.6 was
-`cursor-grok-4.6-medium`; 4.7 dropped the `cursor-` prefix — so treat the *rule* as the
-instruction and the id as today's answer to it:
+### Running the lanes
 
 ```bash
-cursor-agent --list-models | grep -i grok   # newest generation wins; take its non-fast medium
+python3 ../../scripts/second-look.py <brief-file> <repo-dir> <out-dir> [lane ...]
 ```
 
-- **Not every generation exposes every tier.** If the newest has no `medium`, take the lowest
-  non-`fast` tier above it rather than dropping back a generation.
-- **Never a `-fast` id.** Its failure mode is plausible and wrong. (4.7's fast labels also
-  contain zero-width characters; copy ids from `--list-models`, never retype them.)
-- **`xhigh` is not worth it here** — it roughly doubles tokens for a few points in the
-  vendor's own numbers.
+It reads `../../second-looks.json`, or the owner's copy at
+`~/.claude/first-principles/second-looks.json` when one exists, runs every enabled lane in
+parallel in `<repo-dir>`, streams each to `<out-dir>/<lane>.md`, and prints one status line per
+lane: ok, skipped (not installed or disabled), failed, timed out, or no output. Run it in the
+background through `zsh -l -c` (node is only on PATH in a login shell). **A lane that fails is
+skipped and reported** — never retried after a silent failure, never replaced by a Claude
+reviewer (§0). Pass lane names to run only some.
 
-**`--force` is load-bearing and its absence is silent.** `--trust` trusts the *workspace*;
-with `--trust` alone every shell call is rejected, so the worker can read but cannot run the
-falsifier it proposes — and you will not notice except that it never mentions running
-anything. `--force` (alias `--yolo`) permits execution; read-only is enforced by the brief.
+**Adding or changing a lane** is an edit to the settings file: a name, `enabled`, and the
+command with `{prompt}` where the brief goes. The command must be read-only by construction
+where the harness allows it (opencode's `--agent plan`), and by the brief otherwise.
 
-Verify once per environment rather than assuming, with something it cannot guess:
+**The grok lane.** Newest generation at medium effort, never a `-fast` id (its failure mode is
+plausible and wrong; copy ids from `cursor-agent --list-models`, which hides zero-width
+characters in fast labels). Ids go stale, prefix included, so the rule is the instruction and
+the id in the settings file is today's answer. `--force` is load-bearing and silent when
+missing: without it the worker can read but cannot run the falsifier it proposes. Probe once
+per environment with something it cannot guess: "Run `git rev-parse --short HEAD` and report
+the exact stdout, or reply SHELL_BLOCKED."
 
-```bash
-cursor-agent -p --force --model grok-4.7-medium --output-format text \
-  "Run: git rev-parse --short HEAD. Report the exact stdout. If you cannot run shell commands, reply SHELL_BLOCKED."
-```
-
-An unknown id fails fast, which is why the probe is worth its one call. If the probe or the
-dispatch fails, **skip the second look and say so** — do not retry a transport that has
-failed once with no output, and do not substitute a Claude reviewer (§0).
+**The free lane.** A free model on opencode's own provider (`opencode models | grep free`),
+run under the read-only `plan` agent. Free quotas run out; when one does, the lane reports no
+output and is skipped.
 
 ## 2. File safety — the rules that exist because they were broken
 
@@ -628,7 +620,7 @@ Report as the reviewer, not as the worker's spokesperson:
 Delegated:   <what, to which worker definition, and why the triage put it there | kept in-session: why>
 Tokens:      <the worker's total from its task notification, against the §0 estimate>
 Fence:       <what it owned — and whether it stayed inside>
-Second look: <grok on <question>: N findings, N proven by a failing falsifier, N refuted | skipped: why>
+Second look: <per lane, on <question>: N findings, N proven by a failing falsifier, N refuted | skipped: why>
 Gate:        <numbers YOU ran, after any rebase>
 Accepted:    <what survived review>
 Changed:     <what you overrode, and why>
