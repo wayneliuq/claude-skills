@@ -4,7 +4,9 @@
 
 Take the first rung that fully works (after ponytail, DietrichGebert/ponytail, MIT):
 
-1. **Does it need to exist?** Skip features, options and flexibility nobody asked for.
+1. **Does it need to exist?** Skip features, options and flexibility nobody asked for. In
+   pr-review this rung is §3's necessity check and §5's constraint trace; the rungs below are
+   §5e.
 2. **Already in this codebase?** A helper, component, service or pattern: use it the way the
    surrounding code does. A house component beats a native widget.
 3. **The platform or the standard library?** Use it, unless the project has its own.
@@ -17,7 +19,9 @@ breaks is part of it. Code that is moved or merged keeps its error handling and 
 Between options of equal size, take the one correct on edge cases.
 
 **Never cut:** validation at trust boundaries, error handling that prevents data loss,
-security, accessibility, anything the user asked for or sees, a test with an external oracle.
+security, accessibility, anything the user asked for or sees, a test with an external oracle. A
+shortcut with a known limit stays when it says so in a `shortcut: <limit>, <when to upgrade>`
+comment.
 
 ## Why bloat matters
 
