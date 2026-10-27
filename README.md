@@ -6,7 +6,7 @@ Personal Claude Code plugins for my development workflow.
 
 | Plugin | Description |
 |---|---|
-| [`first-principles`](./plugins/first-principles/) | Seven goal-oriented coding principles loaded into every session, an adversarial find-and-fix PR review, and adversarial delegation to Claude workers. v2 retired the seven gates |
+| [`first-principles`](./plugins/first-principles/) | Seven goal-oriented coding principles loaded into every session, an adversarial find-and-fix PR review, and second looks from another model lineage on every consequential change. v2 retired the seven gates |
 | [`crispr-primer-design`](./plugins/crispr-primer-design/) | Design and genome-verify PCR + nested Sanger primers to validate CRISPR-Cas9 cutting at a gRNA locus (ICE / TIDE / amplicon-NGS) |
 
 ### Retired

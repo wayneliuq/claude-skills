@@ -33,7 +33,7 @@ the final report; the owner's hands-on run is handed over early and folded in if
 before the end; anything still open at the end is listed in the report.
 
 Canon: `../principles/SKILL.md` (proven / traced / suspected, fixing the class, test value,
-what "verified" means). Leans on `../adversarial-delegation/SKILL.md` for second looks,
+what "verified" means). Leans on `../second-look/SKILL.md` for second looks,
 `references/lean.md` for the smallest-change ladder and the bloat and test shapes, and
 `references/bug-shapes.md` for bug hypotheses.
 
@@ -114,7 +114,7 @@ A finding the matrix missed is a missing row: add it.
 
 ### 2c. Second looks
 
-Run, briefed and proven as `../adversarial-delegation/SKILL.md` says; that skill owns the
+Run, briefed and proven as `../second-look/SKILL.md` says; that skill owns the
 brief, the lanes runner, file safety and the proving rule. Here only when, and what is reported.
 
 **When:** every §5 change, and the final diff once the last code change is in (§7). A §5
