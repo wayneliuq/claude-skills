@@ -1,13 +1,15 @@
 ---
 name: deepen
-description: "Rewrite a plan, prompt, goal, spec or brief into a deeper version — not a bigger one — by asking what the best professionals in each domain it touches would bring, grounded in evidence from the real system, and hand it back in the same form it arrived in (plan file rewritten in place, inline prompt as a fenced block, artifact at its location). Use only when the user invokes deepen by name or asks for \"a deeper version\", \"what would experts do here\", or similar. Never invoke on your own initiative."
+description: "Rewrite a plan, prompt, goal, spec or brief into a deeper version — not a bigger one — by asking how the best professionals in each domain it touches would find the solution (never prescribing the solution itself), grounded in evidence from the real system, and hand it back in the same form it arrived in (plan file rewritten in place, inline prompt as a fenced block, artifact at its location). Use only when the user invokes deepen by name or asks for \"a deeper version\", \"what would experts do here\", or similar. Never invoke on your own initiative."
 ---
 
 # deepen
 
-Deeper means each part of the work is aimed at the right target and judged by something
-other than anyone's say-so. It does not mean more: every added word carries a target, a check
-or a cut.
+Deeper means each part of the work is aimed at the right target, judged by something other
+than anyone's say-so, and carries how the best practitioners would find the solution — never
+the solution itself. The deeper version sets up the work that uncovers the answer; it does
+not supply the answer. It does not mean more: every added word carries a target, a check, a
+way of finding, or a cut.
 
 Canon: `../principles/SKILL.md` — observed / inferred / guessed, and what "verified" means.
 
@@ -25,10 +27,11 @@ unused), its history (git log, fix commits, issues), its current measures, and w
 checked, say so.
 
 Evidence often shows the input is aimed at the wrong target — 124 backend fixes pointing at
-the write model, not the table count. When it does, re-aim the work to what the evidence
-supports, and raise the reading you set aside as one of the closing questions. If the work
-is moot, the deeper version closes it, keeping only what is still live. Do not polish the
-wrong target.
+the write model, not the table count. When it does, re-aim the work at the target the
+evidence supports, and raise the reading you set aside as one of the closing questions. What
+you find goes into the deeper version as leads to test, labelled, not as conclusions to act
+on: the work that follows confirms or kills them. If the work is moot, the deeper version
+closes it, keeping only what is still live. Do not polish the wrong target.
 
 ## 3. Bring in the domains the work touches
 
@@ -56,39 +59,32 @@ gets the same treatment — name it and state its bar in one line.
 | **Measurement** | States the hypothesis, the comparison and the decision rule before collecting data. Knows the noise floor — variance and power — before calling any difference real. |
 | **Release** | Ships small, dark and reversible: feature flags, staged rollout, a kill switch, and a written condition for rolling back. |
 
-For each domain invoked, answer five questions. They are for your thinking; only what
-survives §4 reaches the output.
-
-1. What would this practitioner do here that the user did not ask for and the input lacks?
-2. What would they investigate, spike or measure before building? Each spike answers one
-   question, settles one decision, and has a rule for when to change course.
-3. Which named methods would they use? Name only real ones, and only where they fit.
-4. What external oracle would say the result is right — a corpus of historical bugs that
-   fails before and passes after, a reference implementation, screenshot baselines, a
-   scanner, a measurement on real data, a real user's timed task?
-5. If the input states more than one goal or unit, in what order would they do them, and
-   what must be true before each? Reorder only when the order changes what is learned or
-   risked first.
+The bar names the kind of result, not the route to it. For each domain invoked, ask one
+question: **how would these practitioners find the solution that reaches this kind of result,
+here?** Answer it from this situation, not from a fixed procedure, and write down how they
+would find it and how they would know they had — never what they would find. The answer is
+for your thinking; only what survives §4 reaches the output.
 
 ## 4. Filter hard
 
 - Keep an addition only if it changes a decision, catches a failure the input would miss,
   or replaces an assertion with an oracle. Each addition displaces something weaker.
 - Cut what the evidence shows the input over-scoped.
-- Every item is a recommendation, never a menu: one option, and the tradeoff accepted.
+- Cut any sentence that states the solution; if it mattered, replace it with how to find it.
+- Every item is a recommendation, never a menu.
 - **A plan, spec or brief** stays within about 1.2× its word count.
 - **A prompt of a few sentences** is short because it leaves out what done looks like, so it
-  may grow — but only by the target, the oracle that judges it, and what is out of scope. No
-  implementation steps and no options: those are the doer's job. "The script is too slow,
-  make it faster" deepens to "Time one real run per stage; speed up only the slowest stage,
+  may grow — but only by the target, the oracle that judges it, what is out of scope, and how
+  the answer would be found. Never the answer, and no implementation steps: those are what
+  the work uncovers. "The script is too slow, make it faster" deepens to "Find where the time
+  actually goes on a real run before changing anything; change only what that points to,
   with every primer identical".
 
 ## 5. Hold every unit of work to the bar
 
 If the input is multi-step, each unit gets an acceptance check written first and seen
-failing (or a baseline recorded), and replays the earlier units' checks. If the work is
-long-running, say how progress and evidence survive a context reset: files of record, and
-a re-entry step that reads them. A claim without evidence is not done.
+failing (or a baseline recorded), and replays the earlier units' checks. A claim without
+evidence is not done.
 
 ## 6. Separate decisions from mechanics
 
@@ -107,4 +103,4 @@ each.
   answer, in terms of what the user would see or pay.
 
 Before handing back, check: the form matches the input; the rewrite meets its length rule
-above; every addition names its oracle.
+above; every addition names its oracle; no sentence states the solution.

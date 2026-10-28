@@ -8,7 +8,7 @@ they would not run unaided, not checklists.
 | [`principles`](skills/principles/) | Seven goal-oriented principles for building, debugging, fixing and shipping. Loaded into **every session** by a `SessionStart` hook ([`hooks/hooks.json`](hooks/hooks.json)); not model-invoked. |
 | [`pr-review`](skills/pr-review/) | Adversarial find-and-fix review of a PR, a change or a whole codebase, on the PR's branch or a review branch: an in-app combination sweep, a short hands-on run for the owner, a constraint trace (every rule ends removed or with one owner, counted before and after, traced past the diff), every reader of every changed value, and second looks from other models. Never marks a draft ready. The bug catalog and the lean reference are in [`references/`](skills/pr-review/references/). |
 | [`second-look`](skills/second-look/) | Every consequential change, whoever wrote it, is attacked by a model from another lineage (grok, a free opencode model), read-only, and a finding counts only once its test fails. |
-| [`deepen`](skills/deepen/) | Rewrites a plan, prompt or brief into a deeper version, not a bigger one: evidence first, then the bar each relevant domain's best practitioners would hold, each addition judged by an external oracle. Returned in the input's own form. User-invoked only. |
+| [`deepen`](skills/deepen/) | Rewrites a plan, prompt or brief into a deeper version, not a bigger one: evidence first, then how each relevant domain's best practitioners would find the solution (never the solution itself), each addition judged by an external oracle. Returned in the input's own form. User-invoked only. |
 
 ## Scripts and settings
 
